@@ -3,12 +3,14 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// GitHub Pages serves the site under /salud/
-export default defineConfig({
-  base: '/salud/',
+// GitHub Pages serves the site under /salud/. `vite build --mode android` builds the same app for the
+// Capacitor shell: relative base and no service worker (the APK already ships every file).
+export default defineConfig(({ mode }) => ({
+  base: mode === 'android' ? './' : '/salud/',
   plugins: [
     react(),
     VitePWA({
+      disable: mode === 'android',
       registerType: 'prompt',
       injectRegister: false,
       includeAssets: ['favicon.svg', 'icons/*.png'],
@@ -32,7 +34,21 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,json}'],
+        // OCR engine (≈ 6 MB used per device) and exercise illustrations are cached on first use instead.
+        globIgnores: ['ocr/**', 'exercise-media/**'],
         maximumFileSizeToCacheInBytes: 14 * 1024 * 1024,
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/ocr/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'ocr-assets', expiration: { maxEntries: 12 } },
+          },
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/exercise-media/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'exercise-media', expiration: { maxEntries: 2500 } },
+          },
+        ],
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
       },
@@ -45,4 +61,4 @@ export default defineConfig({
     setupFiles: ['src/test/setup.ts'],
     passWithNoTests: true,
   },
-})
+}))

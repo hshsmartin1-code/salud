@@ -57,46 +57,46 @@ export function BodyPage() {
         }
       />
       <div className="space-y-5">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Card>
-            <div className="text-xs text-muted">Peso</div>
-            <div className="num mt-1 text-2xl font-bold" data-testid="latest-weight">
+        <div className="metric-strip grid-cols-2 sm:grid-cols-4">
+          <div>
+            <div className="text-[13px] text-muted">Peso</div>
+            <div className="readout mt-2 text-[30px]" data-testid="latest-weight">
               {latestW ? formatNumber(latestW.weightKg as number, 1) : '—'}
               <span className="ml-1 text-sm font-medium text-muted">kg</span>
             </div>
-            <div className="text-[11px] text-faint">
+            <div className="mt-1 text-xs text-faint">
               {latestW ? formatDateEs(latestW.date) : 'Sin registros'}
               {latestW?.approx ? ' · aprox.' : ''}
             </div>
-          </Card>
-          <Card>
-            <div className="text-xs text-muted">Media 7 días</div>
-            <div className="num mt-1 text-2xl font-bold">
+          </div>
+          <div>
+            <div className="text-[13px] text-muted">Media 7 días</div>
+            <div className="readout mt-2 text-[30px]">
               {avg7 ? formatNumber(avg7.value, 1) : '—'}
               <span className="ml-1 text-sm font-medium text-muted">kg</span>
             </div>
-            <div className="text-[11px] text-faint">{avg7 ? `${avg7.n} ${avg7.n === 1 ? 'día' : 'días'} con peso` : '—'}</div>
-          </Card>
-          <Card>
-            <div className="text-xs text-muted">Cintura</div>
-            <div className="num mt-1 text-2xl font-bold">
+            <div className="mt-1 text-xs text-faint">{avg7 ? `${avg7.n} ${avg7.n === 1 ? 'día' : 'días'} con peso` : '—'}</div>
+          </div>
+          <div>
+            <div className="text-[13px] text-muted">Cintura</div>
+            <div className="readout mt-2 text-[30px]">
               {latestWaist ? formatNumber(latestWaist.circumferences.waist as number, 1) : '—'}
               <span className="ml-1 text-sm font-medium text-muted">cm</span>
             </div>
-            <div className="text-[11px] text-faint">
+            <div className="mt-1 text-xs text-faint">
               {latestWaist && profile.heightCm ? `Cintura/talla ${formatNumber(whtr(latestWaist.circumferences.waist as number, profile.heightCm), 2)}` : latestWaist ? formatDateEs(latestWaist.date) : '—'}
             </div>
-          </Card>
-          <Card>
-            <div className="text-xs text-muted">Grasa estimada</div>
-            <div className="num mt-1 text-2xl font-bold">
+          </div>
+          <div>
+            <div className="text-[13px] text-muted">Grasa estimada</div>
+            <div className="readout mt-2 text-[30px]">
               {latestFat ? formatNumber(latestFat.derived!.bodyFatPct as number, 1) : '—'}
               <span className="ml-1 text-sm font-medium text-muted">%</span>
             </div>
-            <div className="text-[11px] text-faint">
+            <div className="mt-1 text-xs text-faint">
               {latestFat ? PROTOCOLS.find((p) => p.id === latestFat.derived!.protocol)?.es : latestSum ? `Suma ${formatNumber(latestSum.derived!.sum as number, 1)} mm` : 'Sin pliegues'}
             </div>
-          </Card>
+          </div>
         </div>
         {latestW && profile.heightCm ? (
           <p className="text-xs text-muted">

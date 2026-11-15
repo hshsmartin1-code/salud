@@ -29,6 +29,19 @@ export interface ProfileSettings {
   addActivityKcal: boolean
   skinfoldProtocol?: ProtocolId
   weekStartsMonday?: boolean
+  /** Adaptive energy settings for this profile (absent = adaptation off). */
+  adaptive?: StoredAdaptiveSettings
+}
+export interface StoredAdaptiveSettings {
+  /** 'off' (default), 'suggest' (proposals need review) or 'auto' (opt-in automatic adjustments). */
+  mode: 'off' | 'suggest' | 'auto'
+  phase: 'deficit' | 'maintenance' | 'surplus'
+  /** Target change in % of body weight per week (negative = loss). */
+  targetRatePctPerWeek: number
+  windowDays?: number
+  maxStepKcal?: number
+  cooldownDays?: number
+  minKcalFloor?: number | null
 }
 export interface Profile extends BaseRow {
   name: string
@@ -69,6 +82,8 @@ export interface Goal extends PersonalRow, Provenance {
   warnings: string[]
   targetWeightKg: number | null
   notes?: string
+  /** Created by an adaptive-energy adjustment (applied automatically or accepted by the user). */
+  adaptive?: boolean
 }
 
 // ───────────── Nutrition ─────────────
@@ -115,6 +130,30 @@ export interface CustomFood extends PersonalRow {
   servingSize: number | null
   servingUnit: 'g' | 'ml' | null
   notes?: string
+  /** How the label states its values, before any conversion ('package' = whole package). */
+  labelBasis?: 'serving' | '100g' | '100ml' | 'package' | null
+  /** Values exactly as printed for labelBasis (the stored `nutrients` may be converted to per 100). */
+  labelNutrients?: NutrientMap | null
+  servingLabel?: string | null
+  servingsPerPackage?: number | null
+  packageSize?: number | null
+  packageUnit?: 'g' | 'ml' | null
+  /** How the values were entered; OCR and pasted text are always reviewed by the user before saving. */
+  entryMethod?: 'manual' | 'text' | 'ocr'
+  /** Original pasted or recognised label text (kept for traceability). */
+  sourceText?: string | null
+  labelImageId?: ID | null
+  validation?: 'confirmed'
+}
+
+/** Optional photo of a nutrition label, stored once per food (never copied into logs). */
+export interface LabelImage extends PersonalRow {
+  foodId: ID | null
+  /** Downscaled JPEG as a data URL, so it survives JSON backups. */
+  dataUrl: string
+  width: number
+  height: number
+  bytes: number
 }
 
 /** Shared reference foods imported on this device: private ICBF table, Open Food Facts cache. */
@@ -308,6 +347,28 @@ export interface HabitLog extends PersonalRow {
   value: number
   notes?: string
 }
+/** User mark that a day's food log is complete (or knowingly incomplete); used by adaptive energy. */
+export interface DayMark extends PersonalRow {
+  date: LocalDate
+  complete: boolean
+}
+
+/** One applied change of the calorie target made by the adaptive energy module. */
+export interface EnergyAdjustment extends PersonalRow {
+  date: LocalDate
+  fromKcal: number
+  toKcal: number
+  formulaTdee: number | null
+  observedTdee: number | null
+  blendedTdee: number | null
+  confidence: 'none' | 'low' | 'medium' | 'high'
+  phase: 'deficit' | 'maintenance' | 'surplus'
+  ratePctPerWeek: number
+  applied: 'auto' | 'accepted'
+  reason: string
+  goalId: ID | null
+}
+
 /** Phase 0 day-level values without food detail (intake totals, band kcal, …). */
 export interface ImportedDaily extends PersonalRow, Provenance {
   date: LocalDate

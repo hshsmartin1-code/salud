@@ -1,0 +1,108 @@
+fedb_id,repdb_id,note
+fedb:Barbell_Squat,squat,back squat; bar on upper traps in both records; image checked
+fedb:Front_Barbell_Squat,front-squat,barbell front-rack squat in both
+fedb:Smith_Machine_Squat,smith-machine-squat,Smith machine back squat in both
+fedb:Hack_Squat,hack-squat,hack squat machine; image checked
+fedb:Goblet_Squat,goblet-squat,kettlebell held at chest in both
+fedb:Bodyweight_Squat,bodyweight-squat,air squat in both
+fedb:Leg_Press,leg-press,45-degree sled leg press; image checked (not the horizontal variant)
+fedb:Leg_Extensions,leg-extension,seated leg extension machine
+fedb:Lying_Leg_Curls,leg-curl,prone leg curl machine in both
+fedb:Seated_Leg_Curl,seated-leg-curl,seated leg curl machine
+fedb:Standing_Calf_Raises,standing-calf-raise,shoulder-pad standing calf machine; image checked
+fedb:Seated_Calf_Raise,seated-calf-raise,seated calf machine with thigh pads
+fedb:Thigh_Abductor,hip-abduction,seated hip abduction machine
+fedb:Thigh_Adductor,hip-adduction,seated hip adduction machine
+fedb:Barbell_Bench_Press_-_Medium_Grip,bench-press,flat barbell bench press
+fedb:Barbell_Incline_Bench_Press_-_Medium_Grip,incline-bench-press,incline barbell bench press
+fedb:Decline_Barbell_Bench_Press,decline-bench-press-barbell,decline barbell bench press
+fedb:Dumbbell_Bench_Press,db-bench-press,flat dumbbell bench press
+fedb:Incline_Dumbbell_Press,incline-db-press,incline dumbbell press
+fedb:Decline_Dumbbell_Bench_Press,decline-bench-press,RepDB record 'Decline Bench Press' is the dumbbell version (equipment dumbbell)
+fedb:Close-Grip_Barbell_Bench_Press,close-grip-bench-press,shoulder-width grip barbell bench in both
+fedb:Smith_Machine_Bench_Press,smith-machine-bench-press,flat bench inside Smith machine
+fedb:Smith_Machine_Incline_Bench_Press,smith-machine-incline-bench-press,incline bench inside Smith machine
+fedb:Leverage_Chest_Press,chest-press-machine,seated machine chest press (lever vs selectorised; same pattern)
+fedb:Dumbbell_Flyes,db-fly,flat dumbbell fly
+fedb:Incline_Dumbbell_Flyes,incline-dumbbell-fly,incline dumbbell fly
+fedb:Decline_Dumbbell_Flyes,decline-db-fly,decline dumbbell fly
+fedb:Butterfly,pec-deck,pec deck machine
+fedb:Cable_Crossover,cable-fly,standing cable fly from high pulleys in both
+fedb:Pushups,push-up,standard push-up
+fedb:Dips_-_Chest_Version,dips,RepDB 'dips' is 'Chest Dips' on parallel bars
+fedb:Bench_Dips,bench-dips,hands on bench behind the body
+fedb:Barbell_Deadlift,deadlift,conventional barbell deadlift
+fedb:Romanian_Deadlift,romanian-deadlift,barbell RDL from standing
+fedb:Stiff-Legged_Barbell_Deadlift,stiff-leg-deadlift,barbell stiff-leg deadlift
+fedb:Sumo_Deadlift,sumo-deadlift,same lift; primary-muscle labels differ (fedb hamstrings vs RepDB glutes/quads)
+fedb:Good_Morning,good-morning,barbell good morning
+fedb:Barbell_Hip_Thrust,hip-thrust,barbell hip thrust against bench; image checked
+fedb:Barbell_Glute_Bridge,barbell-glute-bridge,barbell glute bridge on the floor
+fedb:One-Legged_Cable_Kickback,cable-kickback,ankle cuff on low pulley
+fedb:Glute_Kickback,glute-kickback,bodyweight kickback on all fours
+fedb:Dumbbell_Lunges,db-lunge,forward lunge holding dumbbells
+fedb:Barbell_Lunge,barbell-lunge,forward lunge with bar on upper back
+fedb:Dumbbell_Rear_Lunge,reverse-lunge,RepDB 'Reverse Lunge' is the dumbbell version (equipment dumbbell)
+fedb:Split_Squat_with_Dumbbells,bulgarian-split-squat,fedb text: rear foot elevated; RepDB bulgarian split squat with dumbbells
+fedb:Pullups,pull-up,overhand pull-up
+fedb:Chin-Up,chin-ups,underhand chin-up
+fedb:Wide-Grip_Lat_Pulldown,lat-pulldown,RepDB instructions: wide bar with overhand grip
+fedb:One_Arm_Lat_Pulldown,one-arm-lat-pulldown,single-handle pulldown
+fedb:Seated_Cable_Rows,seated-cable-row,seated low-pulley row with close handle; image checked
+fedb:Bent_Over_Barbell_Row,barbell-row,bent-over barbell row; image checked
+fedb:Reverse_Grip_Bent-Over_Rows,reverse-grip-bent-over-row,underhand bent-over barbell row
+fedb:One-Arm_Dumbbell_Row,single-arm-db-row,knee and hand on bench; image checked
+fedb:Bent_Over_Two-Dumbbell_Row,bent-over-db-row,two dumbbells; neutral grip in both
+fedb:T-Bar_Row_with_Handle,t-bar-row,landmine/T-bar row straddling the bar
+fedb:Inverted_Row,inverted-row,bodyweight row under a racked bar (fedb equipment field empty)
+fedb:Standing_Military_Press,ohp,standing barbell overhead press
+fedb:Seated_Barbell_Military_Press,seated-barbell-overhead-press,seated barbell press in front of the head
+fedb:Seated_Dumbbell_Press,seated-db-press,seated dumbbell shoulder press with back support
+fedb:Dumbbell_Shoulder_Press,seated-db-press,fedb text is seated; RepDB dumbbell-shoulder-press image is standing so not used
+fedb:Arnold_Dumbbell_Press,arnold-press,Arnold press
+fedb:Leverage_Shoulder_Press,machine-shoulder-press,seated machine shoulder press (lever vs selectorised; same pattern)
+fedb:Side_Lateral_Raise,lateral-raise,standing dumbbell lateral raise
+fedb:Face_Pull,face-pull,rope on high pulley
+fedb:Upright_Barbell_Row,upright-row,barbell upright row
+fedb:Reverse_Machine_Flyes,machine-reverse-fly,reverse pec deck
+fedb:Barbell_Shrug,shrug,barbell shrug
+fedb:Dumbbell_Shrug,db-shrug,dumbbell shrug
+fedb:Barbell_Curl,barbell-curl,standing barbell curl
+fedb:Dumbbell_Bicep_Curl,bicep-curl,standing dumbbell curl palms forward
+fedb:Hammer_Curls,hammer-curl,standing neutral-grip dumbbell curl
+fedb:EZ-Bar_Curl,ez-bar-curl,standing EZ-bar curl
+fedb:Concentration_Curls,concentration-curl,seated concentration curl
+fedb:Incline_Dumbbell_Curl,incline-db-curl,curl on incline bench
+fedb:Machine_Bicep_Curl,machine-bicep-curl,biceps curl machine
+fedb:Triceps_Pushdown,tricep-pushdown,straight-bar cable pushdown
+fedb:Triceps_Pushdown_-_V-Bar_Attachment,v-bar-tricep-pushdown,V-bar cable pushdown
+fedb:EZ-Bar_Skullcrusher,ez-bar-lying-tricep-extension,lying EZ-bar triceps extension (skull crusher)
+fedb:Machine_Triceps_Extension,machine-triceps-extension,triceps extension machine
+fedb:Plank,plank,forearm plank
+fedb:Crunches,crunches,floor crunch
+fedb:Sit-Up,sit-ups,anchored sit-up
+fedb:Hanging_Leg_Raise,-,BLOCK: RepDB hanging-leg-raise peak image shows bent knees (knee-raise posture); fedb is a straight-leg raise
+fedb:Cable_Crunch,cable-crunch,kneeling rope cable crunch
+fedb:Ab_Crunch_Machine,machine-seated-crunch,seated ab crunch machine
+fedb:Russian_Twist,russian-twist,seated trunk rotation
+fedb:Mountain_Climbers,mountain-climbers,same drill; primary-muscle labels differ (fedb quadriceps vs RepDB core/hip flexors)
+fedb:Hyperextensions_Back_Extensions,back-extension,hyperextension bench
+fedb:Preacher_Curl,-,BLOCK: fedb equipment says barbell but its text uses an EZ bar; RepDB has both versions
+fedb:Dips_-_Triceps_Version,-,BLOCK: RepDB 'dips' is the chest version (forward lean)
+fedb:Triceps_Pushdown_-_Rope_Attachment,-,BLOCK: RepDB pushdown uses a straight bar; no rope version
+fedb:Reverse_Flyes,-,BLOCK: fedb is chest-supported on an incline bench; RepDB reverse flies are standing hip-hinge
+fedb:Close-Grip_Front_Lat_Pulldown,-,BLOCK: fedb uses close overhand grip on a wide bar; RepDB uses a parallel V-handle
+fedb:Smith_Machine_Calf_Raise,-,BLOCK: fedb bar on shoulders; RepDB bar held behind thighs
+fedb:Donkey_Calf_Raises,-,BLOCK: fedb uses a donkey calf machine; RepDB is bodyweight
+fedb:Seated_Bent-Over_Rear_Delt_Raise,-,BLOCK: fedb seated; RepDB rear-delt-fly is standing
+fedb:Cable_Rear_Delt_Fly,-,BLOCK: fedb pulleys above head; RepDB pulleys at shoulder height
+fedb:Farmers_Walk,-,BLOCK: fedb uses farmer's walk implements; RepDB uses dumbbells
+fedb:Weighted_Pull_Ups,weighted-pull-up,pull-up with load on a dip belt in both (fedb equipment field 'other')
+fedb:Ab_Roller,ab-wheel-rollout,kneeling ab wheel rollout (fedb equipment field 'other')
+fedb:Floor_Press,floor-press,barbell floor press from a rack; primary-muscle labels differ (fedb triceps vs RepDB chest)
+fedb:Dumbbell_Floor_Press,dumbbell-floor-press,dumbbell floor press; primary-muscle labels differ (fedb triceps vs RepDB chest)
+fedb:Calf_Raise_On_A_Dumbbell,-,BLOCK: fedb stands on a dumbbell handle; RepDB holds dumbbells
+fedb:Squats_-_With_Bands,-,BLOCK: fedb band under the feet as resistance; RepDB loop band above the knees
+fedb:Cable_One_Arm_Tricep_Extension,-,BLOCK: fedb uses a supinated single-arm grip; RepDB pushdown grip differs/unspecified
+fedb:Overhead_Triceps,-,BLOCK: fedb is a partner-assisted seated stretch; RepDB is a standing self stretch
+fedb:Lying_Dumbbell_Tricep_Extension,-,BLOCK: fedb uses two dumbbells; RepDB one dumbbell held in both hands

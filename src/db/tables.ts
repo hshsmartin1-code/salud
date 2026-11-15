@@ -22,6 +22,9 @@ export const PERSONAL_TABLES = [
   'habits',
   'habitLogs',
   'importedDaily',
+  'labelImages',
+  'dayMarks',
+  'energyAdjustments',
 ] as const
 
 /** profiles = the registry of people; refFoods = public/private reference foods; meta = app settings. */
@@ -42,5 +45,7 @@ export const DATED_TABLES = [
   'recoveryLogs',
   'habitLogs',
   'importedDaily',
+  'dayMarks',
+  'energyAdjustments',
 ] as const satisfies readonly PersonalTable[]
 export type DatedTable = (typeof DATED_TABLES)[number]

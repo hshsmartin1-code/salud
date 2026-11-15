@@ -8,15 +8,17 @@ const MACROS: { code: NutrientCode; es: string; color: string }[] = [
 ]
 
 /** Compact kcal + macro line. Unknown values render as "—", never 0. */
-export function MacroLine({ n, partial = [] }: { n: NutrientMap; partial?: readonly NutrientCode[] }) {
+export function MacroLine({ n, partial = [], hideKcal = false }: { n: NutrientMap; partial?: readonly NutrientCode[]; hideKcal?: boolean }) {
   return (
     <span className="num inline-flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted">
-      <span className="font-semibold text-ink">
-        {formatNutrient('kcal', n.kcal, false)} kcal{partial.includes('kcal') ? '*' : ''}
-      </span>
+      {hideKcal ? null : (
+        <span className="font-semibold text-ink">
+          {formatNutrient('kcal', n.kcal, false)} kcal{partial.includes('kcal') ? '*' : ''}
+        </span>
+      )}
       {MACROS.map((m) => (
         <span key={m.code} className="inline-flex items-center gap-1">
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: `rgb(var(--${m.color}))` }} />
+          <span className="h-1.5 w-1.5 rounded-[2px]" style={{ background: `rgb(var(--${m.color}))` }} aria-hidden />
           {m.es[0]} {formatNutrient(m.code, n[m.code], false)}
           {partial.includes(m.code) ? '*' : ''}
         </span>

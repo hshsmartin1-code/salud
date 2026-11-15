@@ -1,8 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { listProfiles, readActiveProfileId, writeActiveProfileId } from '../db/profiles'
 import { repo, type Repo } from '../db/repo'
 import type { Profile, ProfileColor } from '../db/types'
+import { applyAccent, PROFILE_ACCENTS } from './accent'
 
 interface ProfileCtx {
   profiles: Profile[] | undefined
@@ -18,6 +19,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     if (!profiles || profiles.length === 0) return null
     return profiles.find((p) => p.id === activeId) ?? profiles[0]
   }, [profiles, activeId])
+  useEffect(() => applyAccent(active?.color), [active?.color])
   const value = useMemo<ProfileCtx>(
     () => ({
       profiles,
@@ -50,13 +52,9 @@ export function useRepo(): Repo {
   return useMemo(() => repo(p.id), [p.id])
 }
 
-export const PROFILE_COLORS: Record<ProfileColor, string> = {
-  emerald: '#10b981',
-  violet: '#8b5cf6',
-  amber: '#f59e0b',
-  sky: '#0ea5e9',
-  rose: '#f43f5e',
-}
+export const PROFILE_COLORS: Record<ProfileColor, string> = Object.fromEntries(
+  Object.entries(PROFILE_ACCENTS).map(([k, v]) => [k, v.swatch]),
+) as Record<ProfileColor, string>
 
 export function Avatar({ profile, size = 28 }: { profile: Pick<Profile, 'name' | 'color'>; size?: number }) {
   return (

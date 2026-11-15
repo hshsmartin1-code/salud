@@ -18,6 +18,7 @@ import { ExerciseLibraryPage } from './features/training/ExerciseLibrary'
 import { SessionPage } from './features/training/SessionPage'
 import { RoutineEditor as TrainingRoutineEditor, TrainingPage } from './features/training/TrainingPage'
 import { AppShell, MORE_NAV } from './ui/AppShell'
+import { AdaptiveAutoRunner } from './features/energy/AdaptiveAutoRunner'
 import { EmptyState, ListRow, PageHeader } from './ui/kit'
 
 // Charts (Recharts) load on demand so the first screen stays light.
@@ -64,6 +65,7 @@ function Gate() {
     )
   return (
     <AppShell header={<ProfileSwitcher />}>
+      {active.settings.adaptive?.mode === 'auto' ? <AdaptiveAutoRunner key={active.id} /> : null}
       <Routes key={active.id}>
         <Route path="/" element={<TodayPage />} />
         <Route path="/perfil" element={<ProfilePage />} />

@@ -9,12 +9,14 @@ import { Icon } from '../../ui/Icon'
 import { Badge, EmptyState, PageHeader, Segmented, Sheet } from '../../ui/kit'
 import { filterExercises, muscleList, TRACKING_LABEL, useExercises, type Exercise, type ExerciseFilter } from './exercises'
 import { bestE1rm, formatSet } from './sets'
+import { ExerciseIllustration, ExerciseThumb, useExerciseMedia } from './exerciseMedia'
 
 const EMPTY: ExerciseFilter = { q: '', muscle: '', equipment: '', category: '' }
 
 /** Search + filters over catalog and custom exercises. */
 export function ExercisePicker({ onSelect, selectedIds = [] }: { onSelect: (e: Exercise) => void; selectedIds?: string[] }) {
   const ex = useExercises()
+  const media = useExerciseMedia()
   const [f, setF] = useState<ExerciseFilter>(EMPTY)
   const [showFilters, setShowFilters] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
@@ -56,7 +58,8 @@ export function ExercisePicker({ onSelect, selectedIds = [] }: { onSelect: (e: E
             const sel = selectedIds.includes(e.id)
             return (
               <li key={e.id}>
-                <button className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-surface2/60" onClick={() => onSelect(e)}>
+                <button className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface2/60" onClick={() => onSelect(e)}>
+                  <ExerciseThumb media={media} item={media?.items[e.id]} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{e.nameEs}</div>
                     <div className="truncate text-xs text-muted">
@@ -146,6 +149,8 @@ function CustomExerciseSheet({
 export function ExerciseDetailSheet({ exercise, onClose }: { exercise: Exercise | null; onClose: () => void }) {
   const r = useRepo()
   const ex = useExercises()
+  const media = useExerciseMedia()
+  const item = exercise ? media?.items[exercise.id] : undefined
   const [tab, setTab] = useState<'info' | 'hist'>('hist')
   const sets = useLiveQuery(
     () => (exercise ? r.byProfileIndex('exerciseSets', 'exerciseId', exercise.id) : Promise.resolve([])),
@@ -162,6 +167,7 @@ export function ExerciseDetailSheet({ exercise, onClose }: { exercise: Exercise 
     <Sheet open={!!exercise} onClose={onClose} title={exercise?.nameEs} wide>
       {exercise ? (
         <div className="space-y-3 pb-2">
+          {custom ? null : <ExerciseIllustration key={exercise.id} media={media} item={item} />}
           <div className="flex flex-wrap gap-1.5">
             {exercise.primaryMuscles.map((m) => (
               <Badge key={m} tone="accent">
@@ -184,12 +190,15 @@ export function ExerciseDetailSheet({ exercise, onClose }: { exercise: Exercise 
             ]}
           />
           {tab === 'info' ? (
-            exercise.instructionsEs.length ? (
-              <ol className="list-decimal space-y-2 pl-5 text-sm text-muted">
-                {exercise.instructionsEs.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
+            exercise.instructionsEs.length || item?.instructionsEs?.length ? (
+              <>
+                <ol className="list-decimal space-y-2 pl-5 text-sm text-muted">
+                  {(exercise.instructionsEs.length ? exercise.instructionsEs : item!.instructionsEs!).map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ol>
+                {!exercise.instructionsEs.length ? <p className="text-[11px] text-faint">Instrucciones: RepDB (repdb.co).</p> : null}
+              </>
             ) : (
               <p className="text-sm text-muted">Sin instrucciones.</p>
             )
@@ -197,11 +206,11 @@ export function ExerciseDetailSheet({ exercise, onClose }: { exercise: Exercise 
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2 text-center">
                 <div className="rounded-xl bg-surface2 p-2">
-                  <div className="num text-lg font-semibold">{best !== null ? formatNumber(best, 1) : '—'}</div>
+                  <div className="readout text-[22px]">{best !== null ? formatNumber(best, 1) : '—'}</div>
                   <div className="text-[11px] text-muted">1RM estimado (Epley), kg</div>
                 </div>
                 <div className="rounded-xl bg-surface2 p-2">
-                  <div className="num text-lg font-semibold">{maxW !== null ? formatNumber(maxW, 2) : '—'}</div>
+                  <div className="readout text-[22px]">{maxW !== null ? formatNumber(maxW, 2) : '—'}</div>
                   <div className="text-[11px] text-muted">Peso máximo, kg</div>
                 </div>
               </div>

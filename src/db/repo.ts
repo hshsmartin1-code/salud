@@ -6,6 +6,8 @@ import type {
   BodyMeasurement,
   CustomExercise,
   CustomFood,
+  DayMark,
+  EnergyAdjustment,
   ExerciseSet,
   Favorite,
   FoodLog,
@@ -13,6 +15,7 @@ import type {
   Habit,
   HabitLog,
   ImportedDaily,
+  LabelImage,
   MealTemplate,
   Recent,
   Recipe,
@@ -41,6 +44,9 @@ export interface PersonalRows {
   habits: Habit
   habitLogs: HabitLog
   importedDaily: ImportedDaily
+  labelImages: LabelImage
+  dayMarks: DayMark
+  energyAdjustments: EnergyAdjustment
 }
 type AssertAllCovered = { [K in PersonalTable]: PersonalRows[K] }
 export type RowOf<T extends PersonalTable> = AssertAllCovered[T]

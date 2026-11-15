@@ -25,6 +25,8 @@ export interface Food {
   /** USDA rows without a curated Spanish name. */
   englishOnly: boolean
   servingGrams: number | null
+  /** What one label "serving" is, when it is not a plain serving (e.g. "envase completo"). */
+  servingLabel?: string | null
 }
 
 export const SOURCE_LABEL: Record<FoodSource, string> = {
@@ -154,6 +156,7 @@ export function fromCustomFood(c: CustomFood): Food {
     curated: false,
     englishOnly: false,
     servingGrams: c.basis === 'serving' ? null : c.servingSize,
+    servingLabel: c.basis === 'serving' ? (c.servingLabel ?? null) : null,
   }
 }
 
@@ -224,7 +227,7 @@ export function unitOptions(f: Food): UnitOption[] {
     out.push({ key: 'ml', label: 'ml', unit: 'ml', defaultQty: 100 })
     out.push({ key: 'l', label: 'litros', unit: 'l', defaultQty: 1 })
   } else {
-    out.push({ key: 'serving', label: 'porción (etiqueta)', unit: 'serving', defaultQty: 1 })
+    out.push({ key: 'serving', label: f.servingLabel ? `${f.servingLabel} (etiqueta, porción)` : 'porción (etiqueta)', unit: 'serving', defaultQty: 1 })
   }
   if (f.basis !== 'serving') {
     f.portions.forEach(([label, grams], i) => {

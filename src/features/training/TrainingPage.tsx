@@ -64,17 +64,17 @@ export function TrainingPage() {
           </Link>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-3">
-          <Card>
-            <div className="text-xs text-muted">Sesiones esta semana</div>
-            <div className="num mt-1 text-2xl font-bold">{weekSessions}</div>
-          </Card>
-          <Card>
-            <div className="text-xs text-muted">Volumen semanal</div>
-            <div className="num mt-1 text-2xl font-bold">
-              {formatNumber(weekVolume, 0)} <span className="text-sm font-medium text-muted">kg</span>
+        <div className="metric-strip grid-cols-2">
+          <div>
+            <div className="text-[13px] text-muted">Sesiones esta semana</div>
+            <div className="readout mt-2 text-[30px]">{weekSessions}</div>
+          </div>
+          <div>
+            <div className="text-[13px] text-muted">Volumen semanal</div>
+            <div className="readout mt-2 text-[30px]">
+              {formatNumber(weekVolume, 0)} <span className="text-sm font-medium tracking-normal text-muted [font-stretch:100%]">kg</span>
             </div>
-          </Card>
+          </div>
         </div>
 
         <button className="btn-primary w-full py-3" onClick={() => void start()} data-testid="start-empty-session">

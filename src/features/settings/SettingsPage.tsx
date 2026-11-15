@@ -4,6 +4,7 @@ import { useTheme, type ThemePref } from '../../app/theme'
 import { APP_VERSION } from '../../db/backup'
 import { loadManifest, type ManifestFile } from '../nutrition/catalog'
 import { loadExerciseCatalog } from '../training/exercises'
+import { REPDB_ATTRIBUTION, REPDB_URL, useExerciseMedia } from '../training/exerciseMedia'
 import { formatNumber } from '../../domain/units'
 import { Icon } from '../../ui/Icon'
 import { Card, PageHeader, Segmented } from '../../ui/kit'
@@ -28,6 +29,8 @@ export function SettingsPage() {
   const [theme, setTheme] = useTheme()
   const [files, setFiles] = useState<ManifestFile[] | null>(null)
   const [exCount, setExCount] = useState<number | null>(null)
+  const media = useExerciseMedia()
+  const mediaCount = media ? Object.keys(media.items).length : null
   useEffect(() => {
     void loadManifest()
       .then((m) => setFiles(m))
@@ -87,7 +90,23 @@ export function SettingsPage() {
             </Source>
             <Source title="Ejercicios: open-exercise-db y free-exercise-db" href="https://github.com/yuhonas/free-exercise-db">
               {exCount ? `${formatNumber(exCount, 0)} ejercicios. ` : ''}Traducción al español de open-exercise-db (licencia MIT, © 2026 cwlumm) basada en
-              free-exercise-db (Unlicense, dominio público). No se incluyen imágenes.
+              free-exercise-db (Unlicense, dominio público).
+            </Source>
+            <li className="px-4 py-3" data-testid="repdb-credit">
+              <div className="text-sm font-medium">
+                <a href={REPDB_URL} target="_blank" rel="noopener nofollow" className="underline underline-offset-2">
+                  {REPDB_ATTRIBUTION}
+                </a>
+              </div>
+              <p className="mt-0.5 text-xs text-muted">
+                Ilustraciones de ejercicios{mediaCount ? ` (${formatNumber(mediaCount, 0)} ejercicios con imagen)` : ''} de RepDB, licencia Free Tier v1.0: uso
+                dentro de la app con atribución visible; no se redistribuyen como conjunto de datos. Solo se muestran donde la correspondencia con el ejercicio
+                es segura; el resto aparece sin imagen.
+              </p>
+            </li>
+            <Source title="Reconocimiento de texto (OCR): Tesseract.js" href="https://github.com/naptha/tesseract.js">
+              Tesseract.js y tesseract.js-core (Apache 2.0) con el modelo de español «best_int» de tessdata (Apache 2.0), incluidos en la app. Las fotos de
+              etiquetas se procesan solo en este dispositivo.
             </Source>
           </ul>
         </section>

@@ -8,7 +8,7 @@ import { addDays, formatDateEs, todayLocal } from '../../domain/dates'
 import { formatNumber } from '../../domain/units'
 import { NumField, SelectField, TextArea, TextField, numStr, toNum } from '../../ui/fields'
 import { Icon } from '../../ui/Icon'
-import { Badge, Card, EmptyState, PageHeader, Segmented, Sheet } from '../../ui/kit'
+import { Badge, EmptyState, PageHeader, Segmented, Sheet } from '../../ui/kit'
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)
 
@@ -56,14 +56,14 @@ function Flags({ row }: { row: { origin?: string; approx?: boolean; excludeFromS
 
 function StatCard({ label, value, unit, hint }: { label: string; value: string; unit?: string; hint?: ReactNode }) {
   return (
-    <Card>
+    <div className="bg-surface p-4">
       <div className="text-xs text-muted">{label}</div>
-      <div className="num mt-1 text-2xl font-bold">
+      <div className="readout mt-2 text-[30px]">
         {value}
         {unit ? <span className="ml-1 text-sm font-medium text-muted">{unit}</span> : null}
       </div>
       {hint ? <div className="text-[11px] text-faint">{hint}</div> : null}
-    </Card>
+    </div>
   )
 }
 
@@ -96,7 +96,7 @@ export function ActivityPage() {
         }
       />
       <div className="space-y-5">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="metric-strip grid-cols-2">
           <StatCard label="Pasos (media 7 días)" value={avgSteps !== null ? formatNumber(avgSteps, 0) : '—'} hint={avgSteps !== null ? `${stepsByDay.size} días con dato` : 'Sin datos'} />
           <StatCard label="Minutos activos (7 días)" value={formatNumber(minutes7, 0)} unit="min" />
         </div>
@@ -245,7 +245,7 @@ export function SleepPage() {
         }
       />
       <div className="space-y-5">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="metric-strip grid-cols-2">
           <StatCard label="Sueño (media 7 días)" value={h7 !== null ? formatNumber(h7, 1) : '—'} unit="h" />
           <StatCard label="Sueño (media 30 días)" value={h30 !== null ? formatNumber(h30, 1) : '—'} unit="h" />
         </div>

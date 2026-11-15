@@ -144,7 +144,7 @@ export function mapPhase0(file: P0File, letter: string, target: Pick<Profile, 'i
   const by = (pred: (r: P0Record) => boolean) => kept.filter(pred)
   const out: Phase0Rows = { bodyMeasurements: [], trainingSessions: [], activityLogs: [], sleepLogs: [], importedDaily: [], summary: { kept: 0, dropped: 0, byKind: {} } }
   const used = new Set<string>()
-  const use = (r: P0Record) => used.add(r.record_id)
+  const markUsed = (r: P0Record) => used.add(r.record_id)
 
   // ── Body: one measurement row per date.
   const bodyRecs = file.body_measurements.filter((r) => r.profile_id === letter && keepRecord(r, today))
@@ -159,18 +159,18 @@ export function mapPhase0(file: P0File, letter: string, target: Pick<Profile, 'i
     const refs: string[] = []
     if (w) {
       refs.push(w.record_id)
-      use(w)
+      markUsed(w)
     }
     for (const r of recs) {
       if (r.value === null) continue
       if (CIRC[r.metric]) {
         circumferences[CIRC[r.metric]!] = r.value
         refs.push(r.record_id)
-        use(r)
+        markUsed(r)
       } else if (SKIN[r.metric]) {
         skinfolds[SKIN[r.metric]!] = r.value
         refs.push(r.record_id)
-        use(r)
+        markUsed(r)
       }
     }
     if (!w && !Object.keys(circumferences).length && !Object.keys(skinfolds).length) continue
@@ -213,7 +213,7 @@ export function mapPhase0(file: P0File, letter: string, target: Pick<Profile, 'i
 
   // ── Daily intake totals (no food-level detail exists for those days).
   for (const r of by((r) => r.metric === 'energy_intake' && r.value !== null)) {
-    use(r)
+    markUsed(r)
     out.importedDaily.push({
       id: id('daily', r.measurement_date!, 'kcal_intake'),
       profileId: pid,
@@ -232,7 +232,7 @@ export function mapPhase0(file: P0File, letter: string, target: Pick<Profile, 'i
 
   // ── Training: session type done per day. Rest/recovery days are kept as daily notes only.
   for (const r of by((r) => r.metric === 'session_type_done' && !!r.value_text)) {
-    use(r)
+    markUsed(r)
     const text = r.value_text!.trim()
     out.importedDaily.push({
       id: id('daily', r.measurement_date!, 'training_done'),
@@ -267,7 +267,7 @@ export function mapPhase0(file: P0File, letter: string, target: Pick<Profile, 'i
     })
   }
   for (const r of by((r) => r.metric === 'hiit_duration' && r.value !== null)) {
-    use(r)
+    markUsed(r)
     out.activityLogs.push({
       id: id('activity', r.measurement_date!, 'hiit'),
       profileId: pid,
@@ -292,8 +292,8 @@ export function mapPhase0(file: P0File, letter: string, target: Pick<Profile, 'i
     const kcal = exact[0] ?? kcalRecs[0]
     const steps = by((r) => r.measurement_date === date && r.metric === 'steps' && r.value !== null)[0]
     if (!kcal && !steps) continue
-    if (kcal) use(kcal)
-    if (steps) use(steps)
+    if (kcal) markUsed(kcal)
+    if (steps) markUsed(steps)
     const approx = kcal ? approxOf(kcal) : false
     out.activityLogs.push({
       id: id('activity', date, 'band'),
@@ -312,7 +312,7 @@ export function mapPhase0(file: P0File, letter: string, target: Pick<Profile, 'i
     })
   }
   for (const r of by((r) => (r.metric === 'hr_daily_range_low' || r.metric === 'hr_daily_range_high') && r.value !== null)) {
-    use(r)
+    markUsed(r)
     out.importedDaily.push({
       id: id('daily', r.measurement_date!, r.metric),
       profileId: pid,
@@ -335,7 +335,7 @@ export function mapPhase0(file: P0File, letter: string, target: Pick<Profile, 'i
     const hours = by((r) => r.measurement_date === date && r.metric === 'sleep_duration' && r.value !== null)[0]
     const onset = by((r) => r.measurement_date === date && r.metric === 'sleep_onset_time' && r.value !== null)[0]
     const wake = by((r) => r.measurement_date === date && r.metric === 'wake_time' && r.value !== null)[0]
-    for (const r of [hours, onset, wake]) if (r) use(r)
+    for (const r of [hours, onset, wake]) if (r) markUsed(r)
     const chartTimes = !!(onset || wake)
     out.sleepLogs.push({
       id: id('sleep', date),

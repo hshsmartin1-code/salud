@@ -2,46 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens: RGB triplets so Tailwind can apply alpha (bg-accent/10). */
+/*
+  Design tokens (RGB triplets so Tailwind can apply alpha: bg-accent/10).
+  Principles: neutral graphite surfaces; colour is reserved for data (macros, status) and for the
+  active profile (--accent), so it is always clear whose data is on screen. Primary actions are ink.
+*/
 :root {
-  --bg: 246 245 241;
+  --bg: 241 243 244;
   --surface: 255 255 255;
-  --surface2: 239 238 233;
-  --line: 226 224 218;
-  --ink: 22 24 23;
-  --muted: 96 102 98;
-  --faint: 148 152 148;
-  --accent: 20 120 84;
+  --surface2: 232 235 237;
+  --line: 216 221 225;
+  --line-strong: 186 193 199;
+  --ink: 18 26 33;
+  --ink-contrast: 255 255 255;
+  --muted: 86 97 107;
+  --faint: 138 148 156;
+  /* Set per active profile by ProfileProvider (see src/app/accent.ts). */
+  --accent: var(--accent-light, 15 122 85);
   --accent-ink: 255 255 255;
   --good: 22 128 80;
-  --warn: 180 110 0;
-  --bad: 196 48 48;
+  --warn: 176 104 0;
+  --bad: 194 44 52;
   --protein: 79 102 230;
   --carbs: 214 136 16;
   --fat: 212 72 118;
   --fiber: 56 146 88;
-  --kcal: 20 120 84;
+  --kcal: 18 26 33;
+  --shadow-pop: 0 18px 40px -12px rgb(18 26 33 / 0.28), 0 2px 6px rgb(18 26 33 / 0.08);
   color-scheme: light;
 }
 
 :root[data-theme='dark'] {
-  --bg: 11 12 14;
-  --surface: 20 22 25;
-  --surface2: 28 31 35;
-  --line: 42 46 52;
-  --ink: 236 238 240;
-  --muted: 160 166 172;
-  --faint: 112 118 124;
-  --accent: 61 220 151;
-  --accent-ink: 4 28 18;
+  --bg: 14 19 23;
+  --surface: 21 27 32;
+  --surface2: 28 36 42;
+  --line: 40 49 57;
+  --line-strong: 62 73 83;
+  --ink: 230 235 238;
+  --ink-contrast: 14 19 23;
+  --muted: 152 163 172;
+  --faint: 106 117 126;
+  --accent: var(--accent-dark, 78 211 160);
+  --accent-ink: 14 19 23;
   --good: 74 222 128;
-  --warn: 251 191 36;
+  --warn: 245 185 66;
   --bad: 248 113 113;
   --protein: 124 136 238;
   --carbs: 184 134 30;
   --fat: 210 88 143;
   --fiber: 90 220 130;
-  --kcal: 61 220 151;
+  --kcal: 230 235 238;
+  --shadow-pop: 0 18px 44px -10px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.04);
   color-scheme: dark;
 }
 
@@ -60,9 +71,14 @@
     }
   }
   body {
-    @apply bg-bg text-ink antialiased;
-    font-feature-settings: 'cv11', 'ss01';
+    @apply bg-bg text-[15px] leading-[1.45] text-ink antialiased;
+    font-optical-sizing: auto;
     overscroll-behavior-y: none;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
   }
   input,
   select,
@@ -80,44 +96,148 @@
     outline: 2px solid rgb(var(--accent));
     outline-offset: 2px;
   }
+  ::selection {
+    background: rgb(var(--accent) / 0.22);
+  }
 }
 
 @layer components {
   .num {
     font-variant-numeric: tabular-nums;
   }
+  /* Large measured values: condensed, tabular, like a scale or stopwatch readout. */
+  .readout {
+    font-variant-numeric: tabular-nums;
+    font-stretch: 76%;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+  /* Units and footnote marks inside a readout stay at normal width. */
+  .readout span {
+    font-stretch: 100%;
+    letter-spacing: 0;
+  }
+  /* One panel of metrics separated by hairlines (instead of a grid of separate cards). */
+  .metric-strip {
+    @apply grid gap-px overflow-hidden rounded-2xl border border-line bg-line;
+  }
+  .metric-strip > * {
+    @apply min-w-0 bg-surface p-4;
+  }
+  .title-wide {
+    font-stretch: 112%;
+    letter-spacing: -0.02em;
+  }
+  /* Panels: flat surface + hairline border. Shadows are reserved for floating layers. */
   .card {
-    @apply rounded-2xl border border-line bg-surface shadow-card;
+    @apply rounded-2xl border border-line bg-surface;
+  }
+  .panel-quiet {
+    @apply rounded-2xl bg-surface2/70;
   }
   .field {
-    @apply w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-[15px] outline-none transition placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/20;
+    @apply w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-[15px] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-faint hover:border-line-strong focus:border-ink/50 focus:ring-[3px] focus:ring-accent/20;
   }
   .label {
-    @apply mb-1 block text-xs font-medium uppercase tracking-wide text-muted;
+    @apply mb-1.5 block text-[13px] font-medium text-muted;
   }
   .btn {
-    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40;
+    @apply inline-flex min-h-[42px] select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-[background-color,border-color,color,transform,filter] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
   }
   .btn-primary {
+    @apply btn bg-ink text-ink-contrast hover:bg-ink/90;
+  }
+  .btn-accent {
     @apply btn bg-accent text-accent-ink hover:brightness-110;
   }
   .btn-secondary {
-    @apply btn border border-line bg-surface text-ink hover:bg-surface2;
+    @apply btn border border-line bg-surface text-ink hover:border-line-strong hover:bg-surface2/60;
   }
   .btn-ghost {
-    @apply btn text-muted hover:bg-surface2 hover:text-ink;
+    @apply btn min-h-0 text-muted hover:bg-surface2 hover:text-ink;
   }
   .btn-danger {
     @apply btn bg-bad/10 text-bad hover:bg-bad/15;
   }
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-muted;
+    @apply inline-flex min-h-[32px] items-center gap-1 rounded-full border border-line bg-surface px-3 py-1 text-[13px] font-medium text-muted transition-colors hover:border-line-strong hover:text-ink;
   }
   .chip-on {
-    @apply border-accent/40 bg-accent/10 text-accent;
+    @apply border-ink bg-ink text-ink-contrast hover:border-ink hover:text-ink-contrast;
   }
   .section-title {
-    @apply text-[13px] font-semibold uppercase tracking-wide text-muted;
+    @apply text-[15px] font-semibold text-ink;
+  }
+  .divide-rows > * + * {
+    @apply border-t border-line;
+  }
+  /* Graduated scale track (tape-measure ticks every 10 %) used by progress readouts. */
+  .scale-track {
+    background-color: rgb(var(--surface2));
+    background-image: repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(10% - 1px),
+      rgb(var(--line-strong) / 0.9) calc(10% - 1px),
+      rgb(var(--line-strong) / 0.9) 10%
+    );
+  }
+}
+
+@layer utilities {
+  .shadow-pop {
+    box-shadow: var(--shadow-pop);
+  }
+}
+
+/* Motion: short, state-explaining; disabled when the user prefers less motion. */
+@keyframes sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.anim-sheet {
+  animation: sheet-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.anim-fade {
+  animation: fade-in 160ms ease-out;
+}
+.anim-pop {
+  animation: pop 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-sheet,
+  .anim-fade,
+  .anim-pop {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
   }
 }
 

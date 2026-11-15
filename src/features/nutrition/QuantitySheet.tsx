@@ -159,21 +159,52 @@ export function QuantitySheet({
           <NumField label="Cantidad" value={qty} onChange={setQty} autoFocus name="qty" />
           <SelectField label="Unidad" value={opt?.key ?? ''} onChange={setUnitKey} options={options.map((o) => ({ value: o.key, label: o.label }))} />
         </div>
+        <div className="-mt-1 flex gap-1.5 overflow-x-auto pb-0.5" aria-label="Cantidades rápidas">
+          {quickQtys(opt?.unit).map((v) => (
+            <button
+              key={v}
+              type="button"
+              className={`chip num shrink-0 ${toNum(qty) === v ? 'chip-on' : ''}`}
+              onClick={() => setQty(numStr(v, 3))}
+            >
+              {numStr(v, 3)}
+              {opt && (opt.unit === 'g' || opt.unit === 'ml') ? ` ${opt.unit}` : ''}
+            </button>
+          ))}
+        </div>
         {mode === 'log' ? (
-          <SelectField<MealKey> label="Comida" value={meal} onChange={setMeal} options={MEALS.map((m) => ({ value: m.key, label: m.es }))} />
+          <div>
+            <span className="label" id="meal-label">
+              Comida
+            </span>
+            <div role="radiogroup" aria-labelledby="meal-label" className="flex flex-wrap gap-1.5">
+              {MEALS.map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={meal === m.key}
+                  className={`chip ${meal === m.key ? 'chip-on' : ''}`}
+                  onClick={() => setMeal(m.key)}
+                >
+                  {m.es}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : null}
 
-        <div className="rounded-2xl bg-surface2/60 p-3">
+        <div className="rounded-xl border border-line bg-surface2/50 p-3.5">
           {err ? (
             <p className="text-sm text-bad">{err}</p>
           ) : ok ? (
             <>
-              <div className="flex items-baseline justify-between">
-                <span className="num text-2xl font-bold">{formatNutrient('kcal', ok.nutrients.kcal, false)}</span>
-                <span className="text-xs text-muted">kcal</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="readout text-[40px]">{formatNutrient('kcal', ok.nutrients.kcal, false)}</span>
+                <span className="text-sm text-muted">kcal</span>
               </div>
-              <div className="mt-1">
-                <MacroLine n={ok.nutrients} />
+              <div className="mt-2">
+                <MacroLine n={ok.nutrients} hideKcal />
               </div>
               {ok.missing.length ? (
                 <p className="mt-2 text-xs text-warn">Sin dato en la fuente: {ok.missing.map((c) => nutrientEs(c)).join(', ')}.</p>
@@ -194,6 +225,15 @@ export function QuantitySheet({
       </div>
     </Sheet>
   )
+}
+
+/** One-tap amounts for the selected unit (grams/ml or servings). */
+function quickQtys(unit: string | undefined): number[] {
+  if (unit === 'g' || unit === 'ml') return [50, 100, 150, 200, 250, 300]
+  if (unit === 'kg' || unit === 'l') return [0.25, 0.5, 1]
+  if (unit === 'oz') return [1, 2, 4, 8]
+  if (unit === 'lb') return [0.25, 0.5, 1]
+  return [0.5, 1, 1.5, 2, 3]
 }
 
 const ES_N: Record<string, string> = {

@@ -10,7 +10,7 @@ import type { Profile } from './types'
 
 export const BACKUP_FORMAT = 'pho-backup'
 export const BACKUP_VERSION = 1
-export const APP_VERSION = '1.0.0'
+export const APP_VERSION = '1.1.0'
 
 type Row = Record<string, unknown> & { id: string; profileId: string; updatedAt?: string }
 

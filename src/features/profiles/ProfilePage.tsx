@@ -12,6 +12,7 @@ import { NumField, SelectField, TextField, numStr, toNum } from '../../ui/fields
 import { Icon } from '../../ui/Icon'
 import { Badge, Card, EmptyState, PageHeader, Segmented, Sheet, Toggle } from '../../ui/kit'
 import { GoalEditor } from './GoalEditor'
+import { AdaptiveEnergyCard } from '../energy/AdaptiveEnergyCard'
 
 export function ProfilePage() {
   const profile = useProfile()
@@ -74,7 +75,7 @@ export function ProfilePage() {
                     {GOAL_LABELS[g.goal]} · <span className="num">{formatNumber(g.kcal, 0)} kcal</span>
                   </div>
                   <div className="text-xs text-muted">
-                    Desde {formatDateEs(g.validFrom)} · {g.method === 'calculated' ? 'Calculado' : 'Manual'}
+                    Desde {formatDateEs(g.validFrom)} · {g.adaptive ? 'Ajuste adaptativo' : g.method === 'calculated' ? 'Calculado' : 'Manual'}
                     {g.origin === 'phase0' ? ' · Importado' : ''}
                   </div>
                 </div>
@@ -94,6 +95,10 @@ export function ProfilePage() {
           </div>
         </>
       ) : null}
+
+      <div className="mt-6">
+        <AdaptiveEnergyCard />
+      </div>
 
       <h2 className="section-title mb-2 mt-6">Preferencias del perfil</h2>
       <Card>
@@ -163,7 +168,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
     <Card>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="font-semibold">{GOAL_LABELS[goal.goal]}</span>
-        <Badge tone={goal.method === 'calculated' ? 'accent' : 'muted'}>{goal.method === 'calculated' ? 'Mifflin-St Jeor' : 'Manual'}</Badge>
+        <Badge tone={goal.method === 'calculated' ? 'accent' : 'muted'}>{goal.adaptive ? 'Ajuste adaptativo' : goal.method === 'calculated' ? 'Mifflin-St Jeor' : 'Manual'}</Badge>
         <span className="text-xs text-muted">desde {formatDateEs(goal.validFrom)}</span>
       </div>
       <div className="grid grid-cols-5 gap-2 text-center">
@@ -190,7 +195,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
 function Cell({ v, l, u }: { v: number | null; l: string; u?: string }) {
   return (
     <div>
-      <div className="num text-lg font-semibold">{v === null ? '—' : formatNumber(v, 0)}</div>
+      <div className="readout text-[22px]">{v === null ? '—' : formatNumber(v, 0)}</div>
       <div className="text-[11px] text-muted">
         {l}
         {u ? ` (${u})` : ''}

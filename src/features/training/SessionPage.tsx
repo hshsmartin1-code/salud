@@ -11,6 +11,7 @@ import { numStr } from '../../ui/fields'
 import { Icon } from '../../ui/Icon'
 import { Badge, EmptyState, PageHeader, Sheet } from '../../ui/kit'
 import { ExerciseDetailSheet, ExercisePicker } from './ExerciseLibrary'
+import { ExerciseThumb, useExerciseMedia } from './exerciseMedia'
 import { useExercises, type Exercise } from './exercises'
 import { addPendingSets, deleteSession, DEFAULT_REST, finishSession, lastPerformance } from './session'
 import { formatDuration, formatSet, PR_LABEL, prsBySet } from './sets'
@@ -130,23 +131,23 @@ export function SessionPage() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-3 gap-2 text-center">
-        <div className="card p-3">
-          <div className="num text-lg font-semibold">{elapsed !== null ? formatDuration(elapsed / 1000) : s.durationMin ? `${s.durationMin} min` : '—'}</div>
-          <div className="text-[11px] text-muted">Duración</div>
+      <div className="card mb-4 grid grid-cols-3 divide-x divide-line">
+        <div className="p-3.5">
+          <div className="text-[13px] text-muted">Duración</div>
+          <div className="readout mt-1.5 text-[26px]">{elapsed !== null ? formatDuration(elapsed / 1000) : s.durationMin ? `${s.durationMin} min` : '—'}</div>
         </div>
-        <div className="card p-3">
-          <div className="num text-lg font-semibold" data-testid="session-volume">
+        <div className="p-3.5">
+          <div className="text-[13px] text-muted">Volumen, kg</div>
+          <div className="readout mt-1.5 text-[26px]" data-testid="session-volume">
             {formatNumber(volume, 0)}
           </div>
-          <div className="text-[11px] text-muted">Volumen (kg)</div>
         </div>
-        <div className="card p-3">
-          <div className="num text-lg font-semibold">
+        <div className="p-3.5">
+          <div className="text-[13px] text-muted">Series hechas</div>
+          <div className="readout mt-1.5 text-[26px]">
             {doneSets.length}
-            {prCount ? <span className="ml-1 text-sm text-warn">· {prCount} PR</span> : null}
+            {prCount ? <span className="ml-1.5 text-sm tracking-normal text-warn [font-stretch:100%]">{prCount} PR</span> : null}
           </div>
-          <div className="text-[11px] text-muted">Series hechas</div>
         </div>
       </div>
 
@@ -203,6 +204,15 @@ function RestTimer({ session, now }: { session: TrainingSession; now: number }) 
   const r = useRepo()
   const left = session.restEndsAt ? Math.ceil((session.restEndsAt - now) / 1000) : null
   const buzzed = useRef<number | null>(null)
+  // Longest remaining time seen for the current timer, used to draw the depleting bar.
+  const maxLeft = useRef(0)
+  const timerKey = useRef<number | null>(null)
+  if (timerKey.current !== session.restEndsAt) {
+    const prevEnd = timerKey.current
+    timerKey.current = session.restEndsAt
+    // A new timer (not a ±15 s nudge) restarts the bar.
+    if (prevEnd === null || session.restEndsAt === null || Math.abs(session.restEndsAt - prevEnd) > 16000) maxLeft.current = 0
+  }
   useEffect(() => {
     if (left !== null && left <= 0 && session.restEndsAt && buzzed.current !== session.restEndsAt) {
       buzzed.current = session.restEndsAt
@@ -213,33 +223,42 @@ function RestTimer({ session, now }: { session: TrainingSession; now: number }) 
       }
     }
   }, [left, session.restEndsAt])
+  if (left !== null && left > maxLeft.current) maxLeft.current = left
   if (left === null || left < -30) return null
   const over = left <= 0
+  const total = maxLeft.current
   return (
     <div
-      className={`sticky top-2 z-20 mb-3 flex items-center gap-3 rounded-2xl border px-4 py-2.5 shadow-lg backdrop-blur ${over ? 'border-accent/50 bg-accent/15' : 'border-line bg-surface/95'}`}
+      className={`sticky top-[4.25rem] z-20 mb-3 overflow-hidden rounded-2xl border shadow-pop lg:top-3 ${over ? 'border-accent bg-accent text-accent-ink' : 'border-line bg-surface'}`}
       role="timer"
       aria-live="polite"
       data-testid="rest-timer"
     >
-      <Icon name="timer" size={20} className={over ? 'text-accent' : 'text-muted'} />
-      <div className="flex-1">
-        <div className="text-xs text-muted">{over ? 'Descanso terminado' : 'Descanso'}</div>
-        <div className="num text-xl font-bold leading-tight">{over ? '¡Siguiente serie!' : formatDuration(left)}</div>
-      </div>
+      <div className="flex items-center gap-3 px-4 py-2.5">
+        <Icon name="timer" size={20} className={over ? '' : 'text-muted'} />
+        <div className="flex-1">
+          <div className={`text-[13px] ${over ? '' : 'text-muted'}`}>{over ? 'Descanso terminado' : 'Descanso'}</div>
+          <div className="readout text-[30px]">{over ? 'Siguiente serie' : formatDuration(left)}</div>
+        </div>
       {!over ? (
         <>
-          <button className="btn-ghost px-2 py-1 text-sm" onClick={() => void r.update('trainingSessions', session.id, { restEndsAt: (session.restEndsAt ?? Date.now()) - 15000 })}>
+          <button className="btn-secondary num min-h-[36px] px-2.5 py-1 text-sm" aria-label="Restar 15 segundos" onClick={() => void r.update('trainingSessions', session.id, { restEndsAt: (session.restEndsAt ?? Date.now()) - 15000 })}>
             −15
           </button>
-          <button className="btn-ghost px-2 py-1 text-sm" onClick={() => void r.update('trainingSessions', session.id, { restEndsAt: (session.restEndsAt ?? Date.now()) + 15000 })}>
+          <button className="btn-secondary num min-h-[36px] px-2.5 py-1 text-sm" aria-label="Sumar 15 segundos" onClick={() => void r.update('trainingSessions', session.id, { restEndsAt: (session.restEndsAt ?? Date.now()) + 15000 })}>
             +15
           </button>
         </>
       ) : null}
-      <button className="btn-ghost p-1.5" aria-label="Cerrar temporizador" onClick={() => void r.update('trainingSessions', session.id, { restEndsAt: null })}>
-        <Icon name="x" size={18} />
-      </button>
+        <button className={`btn-ghost p-1.5 ${over ? 'text-accent-ink hover:bg-black/10 hover:text-accent-ink' : ''}`} aria-label="Cerrar temporizador" onClick={() => void r.update('trainingSessions', session.id, { restEndsAt: null })}>
+          <Icon name="x" size={18} />
+        </button>
+      </div>
+      {!over && total > 0 ? (
+        <div className="h-1 bg-surface2">
+          <div className="h-full bg-accent transition-[width] duration-1000 ease-linear" style={{ width: `${Math.max(0, Math.min(100, (left / total) * 100))}%` }} />
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -264,6 +283,7 @@ function ExerciseBlock({
   onRemove: () => void
 }) {
   const r = useRepo()
+  const media = useExerciseMedia()
   const [menu, setMenu] = useState(false)
   const prev = useLiveQuery(() => lastPerformance(r, item.exerciseId, session.date, session.id), [r, item.exerciseId, session.date, session.id])
   const t = item.trackingType
@@ -271,6 +291,9 @@ function ExerciseBlock({
   return (
     <section className="card overflow-hidden" data-testid="exercise-block">
       <div className="flex items-start gap-2 px-4 pb-2 pt-3">
+        <button type="button" className="mt-0.5 shrink-0" onClick={onInfo} aria-label={`Ver ${item.name}`} tabIndex={-1}>
+          <ExerciseThumb media={media} item={media?.items[item.exerciseId]} size={40} />
+        </button>
         <button className="min-w-0 flex-1 text-left" onClick={onInfo}>
           <h3 className="truncate font-semibold">{item.name}</h3>
           <p className="truncate text-xs text-muted">
@@ -328,7 +351,7 @@ function ExerciseBlock({
         </div>
       ) : null}
       <div className="px-2 pb-2">
-        <div className="grid grid-cols-[2rem_1fr_1fr_2.75rem] items-center gap-2 px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-faint">
+        <div className="grid grid-cols-[2.25rem_1fr_1fr_3rem] items-center gap-2 px-2 pb-1 text-xs font-medium text-faint">
           <span>Serie</span>
           <span>{cols[0]}</span>
           <span>{cols[1]}</span>
@@ -450,9 +473,9 @@ function SetRow({
     }
   }
 
-  const inputCls = `field num h-10 px-2 text-center ${invalid ? 'border-bad' : ''} ${set.done ? 'bg-accent/5' : ''}`
+  const inputCls = `field num h-11 px-2 text-center text-base font-semibold ${invalid ? 'border-bad' : ''} ${set.done ? 'border-transparent bg-transparent' : ''}`
   return (
-    <div className={`grid grid-cols-[2rem_1fr_1fr_2.75rem] items-center gap-2 rounded-xl px-2 py-1 ${set.done ? 'bg-accent/10' : ''}`} data-testid="set-row">
+    <div className={`grid grid-cols-[2.25rem_1fr_1fr_3rem] items-center gap-2 rounded-xl px-2 py-1 transition-colors ${set.done ? 'bg-accent/10' : ''}`} data-testid="set-row">
       <button
         className={`num text-center text-sm font-semibold ${set.isWarmup ? 'text-warn' : 'text-muted'}`}
         title="Tocar para marcar como calentamiento; mantener para eliminar"
@@ -480,14 +503,14 @@ function SetRow({
       )}
       <div className="flex items-center justify-center gap-0.5">
         <button
-          className={`flex h-9 w-9 items-center justify-center rounded-xl border transition ${set.done ? 'border-accent bg-accent text-accent-ink' : 'border-line text-faint hover:text-ink'} disabled:opacity-40`}
+          className={`flex h-11 w-11 items-center justify-center rounded-xl border-2 transition-colors ${set.done ? 'border-accent bg-accent text-accent-ink' : 'border-line-strong text-faint hover:border-ink hover:text-ink'} disabled:opacity-40`}
           aria-label={set.done ? 'Marcar como no hecha' : 'Marcar serie como hecha'}
           aria-pressed={set.done}
           disabled={!set.done && !canComplete}
           onClick={() => void toggleDone()}
           data-testid="set-done"
         >
-          <Icon name="check" size={18} />
+          <Icon name="check" size={20} className={set.done ? 'anim-pop' : ''} />
         </button>
       </div>
     </div>

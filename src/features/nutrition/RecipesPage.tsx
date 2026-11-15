@@ -149,15 +149,15 @@ export function RecipeEditor() {
           <Card className="space-y-3">
             <div className="grid grid-cols-3 gap-2 text-center text-xs text-muted">
               <div>
-                <div className="num text-lg font-semibold text-ink">{t.totals.kcal !== undefined ? formatNumber(t.totals.kcal, 0) : '—'}</div>
+                <div className="readout text-[22px] text-ink">{t.totals.kcal !== undefined ? formatNumber(t.totals.kcal, 0) : '—'}</div>
                 kcal total
               </div>
               <div>
-                <div className="num text-lg font-semibold text-ink">{t.perServing.kcal !== undefined ? formatNumber(t.perServing.kcal, 0) : '—'}</div>
+                <div className="readout text-[22px] text-ink">{t.perServing.kcal !== undefined ? formatNumber(t.perServing.kcal, 0) : '—'}</div>
                 kcal / porción
               </div>
               <div>
-                <div className="num text-lg font-semibold text-ink">{t.per100g?.kcal !== undefined ? formatNumber(t.per100g.kcal, 0) : '—'}</div>
+                <div className="readout text-[22px] text-ink">{t.per100g?.kcal !== undefined ? formatNumber(t.per100g.kcal, 0) : '—'}</div>
                 kcal / 100 g cocido
               </div>
             </div>

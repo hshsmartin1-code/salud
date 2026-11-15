@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createDB, IsolationError, STORES_V1, type SaludDB } from './schema'
+import { createDB, IsolationError, STORES, STORES_V1, type SaludDB } from './schema'
 import { DATED_TABLES, PERSONAL_TABLES, SHARED_TABLES, type PersonalTable } from './tables'
 import { createProfile, deleteProfile } from './profiles'
 import { repo, type NewRow, type RowOf } from './repo'
@@ -32,16 +32,19 @@ async function twoProfiles() {
 
 describe('table registry', () => {
   it('classifies every schema table exactly once', () => {
-    const schemaTables = Object.keys(STORES_V1).sort()
+    const schemaTables = Object.keys(STORES).sort()
     const registry = [...PERSONAL_TABLES, ...SHARED_TABLES].sort()
     expect(registry).toEqual(schemaTables)
     expect(new Set(registry).size).toBe(registry.length)
   })
   it('every personal table indexes profileId', () => {
-    for (const t of PERSONAL_TABLES) expect(STORES_V1[t]).toMatch(/(^|,\s*)profileId(,|$)/)
+    for (const t of PERSONAL_TABLES) expect(STORES[t]).toMatch(/(^|,\s*)profileId(,|$)/)
   })
   it('every dated table has the [profileId+date] index', () => {
-    for (const t of DATED_TABLES) expect(STORES_V1[t]).toContain('[profileId+date]')
+    for (const t of DATED_TABLES) expect(STORES[t]).toContain('[profileId+date]')
+  })
+  it('v2 only adds tables: every v1 store keeps its exact index definition', () => {
+    for (const [t, def] of Object.entries(STORES_V1)) expect(STORES[t]).toBe(def)
   })
 })
 

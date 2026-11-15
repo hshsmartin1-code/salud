@@ -14,15 +14,15 @@ import { useRangeStats, weightSeries } from './useRangeStats'
 
 function Tile({ to, icon, label, value, unit, hint, testId }: { to: string; icon: IconName; label: string; value: ReactNode; unit?: string; hint?: ReactNode; testId?: string }) {
   return (
-    <Link to={to} className="card block p-4 transition hover:border-accent/40" data-testid={testId}>
-      <div className="flex items-center gap-1.5 text-xs text-muted">
-        <Icon name={icon} size={14} /> {label}
+    <Link to={to} className="group block min-w-0 transition-colors hover:!bg-surface2/60" data-testid={testId}>
+      <div className="flex items-center gap-1.5 text-[13px] text-muted">
+        <Icon name={icon} size={15} /> {label}
       </div>
-      <div className="num mt-1 text-xl font-bold">
+      <div className="readout mt-2 text-[28px]">
         {value}
-        {unit ? <span className="ml-1 text-xs font-medium text-muted">{unit}</span> : null}
+        {unit ? <span className="ml-1 text-xs font-medium tracking-normal text-muted [font-stretch:100%]">{unit}</span> : null}
       </div>
-      {hint ? <div className="mt-0.5 truncate text-[11px] text-faint">{hint}</div> : null}
+      {hint ? <div className="mt-1 truncate text-xs text-faint">{hint}</div> : null}
     </Link>
   )
 }
@@ -48,15 +48,16 @@ export function TodayPage() {
   const [range, setRange] = useState<'7' | '30' | '90'>('7')
   const stats = useRangeStats(Number(range), today)
   const data = useLiveQuery(async () => {
-    const [sessions, body, sleep, acts, habits, habitLogs] = await Promise.all([
+    const [sessions, body, sleep, acts, habits, habitLogs, adjust] = await Promise.all([
       r.latest('trainingSessions', 10),
       r.range('bodyMeasurements', addDays(today, -60), today),
       r.latest('sleepLogs', 3),
       r.onDate('activityLogs', today),
       r.all('habits'),
       r.onDate('habitLogs', today),
+      r.range('energyAdjustments', addDays(today, -6), today),
     ])
-    return { sessions, body, sleep, acts, habits, habitLogs }
+    return { sessions, body, sleep, acts, habits, habitLogs, adjust }
   }, [r, today])
 
   const active = data?.sessions.find((s) => s.status === 'active')
@@ -72,6 +73,7 @@ export function TodayPage() {
   const actKcal = data?.acts.filter((a) => a.activeKcal !== null).reduce((s, a) => s + (a.activeKcal as number), 0)
   const habitsActive = data?.habits.filter((h) => h.active) ?? []
   const habitsDone = habitsActive.filter((h) => (data?.habitLogs ?? []).filter((l) => l.habitId === h.id).reduce((s, l) => s + l.value, 0) >= h.target).length
+  const autoAdj = data?.adjust.filter((a) => a.applied === 'auto').sort((a, b) => b.date.localeCompare(a.date))[0]
   const hour = new Date().getHours()
   const greet = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
 
@@ -79,21 +81,30 @@ export function TodayPage() {
     <>
       <PageHeader title={`${greet}, ${profile.name}`} subtitle={formatDateEs(today, 'long')} />
       <div className="space-y-5" data-testid="dashboard">
+        {autoAdj ? (
+          <Link to="/perfil" className="card flex items-center gap-3 p-3 text-sm" data-testid="adaptive-notice">
+            <Icon name="target" size={18} className="shrink-0 text-accent" />
+            <span className="min-w-0 flex-1">
+              Tu meta se ajustó automáticamente el {formatDateEs(autoAdj.date)}: {formatNumber(autoAdj.fromKcal, 0)} → <strong className="num">{formatNumber(autoAdj.toKcal, 0)} kcal</strong>. Es una estimación.
+            </span>
+            <Icon name="chevronRight" size={16} className="shrink-0 text-muted" />
+          </Link>
+        ) : null}
         <section>
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2.5 flex items-center justify-between">
             <h2 className="section-title">Nutrición de hoy</h2>
-            <Link to="/comida" className="text-sm font-medium text-accent">
-              Ver comidas
+            <Link to="/comida" className="flex items-center gap-0.5 text-sm font-medium text-accent">
+              Diario <Icon name="chevronRight" size={16} />
             </Link>
           </div>
           {day ? <DaySummary day={day} compact /> : <div className="card h-40 animate-pulse" />}
         </section>
 
         <section>
-          <h2 className="section-title mb-2">Entreno</h2>
+          <h2 className="section-title mb-2.5">Entreno</h2>
           {active ? (
-            <Link to={`/entreno/sesion/${active.id}`} className="card flex items-center gap-3 border-accent/40 p-4">
-              <span className="rounded-xl bg-accent/15 p-2 text-accent">
+            <Link to={`/entreno/sesion/${active.id}`} className="card flex items-center gap-3 border-accent/50 p-4">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-ink">
                 <Icon name="play" size={20} />
               </span>
               <div className="min-w-0 flex-1">
@@ -104,7 +115,7 @@ export function TodayPage() {
             </Link>
           ) : (
             <div className="card flex items-center gap-3 p-4">
-              <span className="rounded-xl bg-surface2 p-2 text-muted">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface2 text-muted">
                 <Icon name="dumbbell" size={20} />
               </span>
               <div className="min-w-0 flex-1">
@@ -124,7 +135,7 @@ export function TodayPage() {
           )}
         </section>
 
-        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <section className="metric-strip grid-cols-2 lg:grid-cols-4">
           <Tile
             to="/cuerpo"
             icon="scale"
@@ -152,9 +163,10 @@ export function TodayPage() {
           <Tile to="/habitos" icon="check" label="Hábitos hoy" value={habitsActive.length ? `${habitsDone}/${habitsActive.length}` : '—'} hint={habitsActive.length ? (habitsDone === habitsActive.length ? '¡Completos!' : 'Pendientes') : 'Crea tus hábitos'} />
         </section>
 
-        <section className="card p-4">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h2 className="font-semibold">Resumen</h2>
+        <section className="card p-4 sm:p-5">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="section-title">Promedios del periodo</h2>
+            <div className="w-full sm:w-64">
             <Segmented<'7' | '30' | '90'>
               value={range}
               onChange={setRange}
@@ -166,6 +178,7 @@ export function TodayPage() {
                 { value: '90', label: '90 días' },
               ]}
             />
+            </div>
           </div>
           {stats ? (
             <div className="divide-y divide-line" data-testid="range-stats">

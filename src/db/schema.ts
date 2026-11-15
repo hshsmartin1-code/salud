@@ -5,6 +5,8 @@ import type {
   BodyMeasurement,
   CustomExercise,
   CustomFood,
+  DayMark,
+  EnergyAdjustment,
   ExerciseSet,
   Favorite,
   FoodLog,
@@ -12,6 +14,7 @@ import type {
   Habit,
   HabitLog,
   ImportedDaily,
+  LabelImage,
   MealTemplate,
   MetaRow,
   Profile,
@@ -24,7 +27,7 @@ import type {
   TrainingSession,
 } from './types'
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 export const DB_NAME = 'salud-pho'
 
 export type SaludDB = Dexie & {
@@ -48,6 +51,9 @@ export type SaludDB = Dexie & {
   habits: EntityTable<Habit, 'id'>
   habitLogs: EntityTable<HabitLog, 'id'>
   importedDaily: EntityTable<ImportedDaily, 'id'>
+  labelImages: EntityTable<LabelImage, 'id'>
+  dayMarks: EntityTable<DayMark, 'id'>
+  energyAdjustments: EntityTable<EnergyAdjustment, 'id'>
   meta: EntityTable<MetaRow, 'key'>
 }
 
@@ -75,6 +81,17 @@ export const STORES_V1: Record<string, string> = {
   meta: 'key',
 }
 
+/** v2 (V1.1): additive only — label photos, day completeness marks, adaptive energy history. */
+export const STORES_V2: Record<string, string> = {
+  ...STORES_V1,
+  labelImages: 'id, profileId, foodId',
+  dayMarks: 'id, profileId, [profileId+date]',
+  energyAdjustments: 'id, profileId, [profileId+date]',
+}
+
+/** Latest store definitions. */
+export const STORES = STORES_V2
+
 export class IsolationError extends Error {
   constructor(message: string) {
     super(message)
@@ -86,7 +103,9 @@ export class IsolationError extends Error {
 export function createDB(name = DB_NAME): SaludDB {
   const db = new Dexie(name) as SaludDB
   db.version(1).stores(STORES_V1)
-  // Future migrations: db.version(2).stores({...}).upgrade(tx => ...)
+  // v2 only adds tables; existing rows need no upgrade function.
+  db.version(2).stores(STORES_V2)
+  // Future migrations: db.version(3).stores({...}).upgrade(tx => ...)
 
   for (const t of PERSONAL_TABLES) {
     const table = db.table(t)

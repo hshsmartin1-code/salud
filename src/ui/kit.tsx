@@ -40,21 +40,21 @@ export function Sheet({
   if (!open) return null
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
-      <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="anim-fade absolute inset-0 bg-[rgb(8_12_16/0.5)]" onClick={onClose} />
       <div
         ref={ref}
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        className={`relative flex max-h-[92dvh] w-full flex-col rounded-t-3xl border border-line bg-surface shadow-pop outline-none sm:rounded-3xl ${
+        className={`anim-sheet relative flex max-h-[92dvh] w-full flex-col rounded-t-3xl border border-line bg-surface shadow-pop outline-none sm:rounded-2xl ${
           wide ? 'sm:max-w-2xl' : 'sm:max-w-lg'
         }`}
       >
-        <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-line sm:hidden" />
+        <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-line-strong/70 sm:hidden" />
         {title ? (
           <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-3 sm:pt-5">
-            <h2 id={titleId} className="text-lg font-semibold">
+            <h2 id={titleId} className="text-[19px] font-semibold tracking-tight">
               {title}
             </h2>
             <button className="btn-ghost -mr-2 p-2" onClick={onClose} aria-label="Cerrar">
@@ -82,7 +82,7 @@ export function PageHeader({
   actions?: ReactNode
 }) {
   return (
-    <div className="mb-4 flex items-start justify-between gap-3">
+    <div className="mb-5 flex items-start justify-between gap-3">
       <div className="flex min-w-0 items-start gap-1">
         {back ? (
           <Link to={back} className="btn-ghost -ml-3 mt-0.5 p-2" aria-label="Volver">
@@ -90,8 +90,8 @@ export function PageHeader({
           </Link>
         ) : null}
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-bold tracking-tight">{title}</h1>
-          {subtitle ? <p className="mt-0.5 text-sm text-muted">{subtitle}</p> : null}
+          <h1 className="title-wide text-balance break-words text-[24px] font-bold leading-[1.15] sm:text-[26px]">{title}</h1>
+          {subtitle ? <p className="mt-1 text-sm text-muted">{subtitle}</p> : null}
         </div>
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
@@ -120,10 +120,10 @@ export function Stat({
     tone === 'good' ? 'text-good' : tone === 'warn' ? 'text-warn' : tone === 'bad' ? 'text-bad' : tone === 'accent' ? 'text-accent' : ''
   return (
     <div className="min-w-0">
-      <div className="truncate text-xs font-medium text-muted">{label}</div>
-      <div className={`num mt-0.5 truncate text-xl font-semibold ${toneCls}`}>
+      <div className="truncate text-[13px] font-medium text-muted">{label}</div>
+      <div className={`readout mt-1.5 truncate text-[28px] ${toneCls}`}>
         {value}
-        {unit ? <span className="ml-1 text-sm font-medium text-muted">{unit}</span> : null}
+        {unit ? <span className="ml-1 text-sm font-medium tracking-normal text-muted [font-stretch:100%]">{unit}</span> : null}
       </div>
       {hint ? <div className="mt-0.5 truncate text-xs text-faint">{hint}</div> : null}
     </div>
@@ -142,9 +142,9 @@ export function EmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-dashed border-line px-6 py-10 text-center">
-      <div className="mb-3 rounded-full bg-surface2 p-3 text-muted">
-        <Icon name={icon} size={22} />
+    <div className="flex flex-col items-start rounded-2xl border border-line bg-surface px-5 py-6 sm:items-center sm:px-6 sm:py-9 sm:text-center">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-surface2 text-muted">
+        <Icon name={icon} size={20} />
       </div>
       <div className="font-semibold">{title}</div>
       {children ? <div className="mt-1 max-w-sm text-sm text-muted">{children}</div> : null}
@@ -167,7 +167,7 @@ export function Segmented<T extends string>({
   ariaLabel?: string
 }) {
   return (
-    <div role="radiogroup" aria-label={ariaLabel} className="inline-flex w-full rounded-xl bg-surface2 p-1">
+    <div role="radiogroup" aria-label={ariaLabel} className="inline-flex w-full rounded-xl bg-surface2 p-[3px]">
       {options.map((o) => (
         <button
           key={o.value}
@@ -175,9 +175,9 @@ export function Segmented<T extends string>({
           role="radio"
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
-          className={`flex-1 whitespace-nowrap rounded-lg font-medium transition ${
-            size === 'sm' ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'
-          } ${value === o.value ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'}`}
+          className={`flex-1 whitespace-nowrap rounded-lg font-medium transition-colors ${
+            size === 'sm' ? 'min-h-[30px] px-2 py-1 text-xs' : 'min-h-[36px] px-3 py-1.5 text-sm'
+          } ${value === o.value ? 'bg-surface text-ink shadow-lift ring-1 ring-line' : 'text-muted hover:text-ink'}`}
         >
           {o.label}
         </button>
@@ -259,7 +259,7 @@ export function ListRow({
   const inner = (
     <>
       {icon ? (
-        <span className="rounded-xl bg-surface2 p-2 text-muted">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface2 text-muted">
           <Icon name={icon} size={18} />
         </span>
       ) : null}
@@ -270,7 +270,7 @@ export function ListRow({
       {right ?? (to || onClick ? <Icon name="chevronRight" size={18} className="text-faint" /> : null)}
     </>
   )
-  const cls = 'flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-surface2/60'
+  const cls = 'flex min-h-[56px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface2/50'
   if (to)
     return (
       <Link to={to} className={cls}>
@@ -295,4 +295,43 @@ export function Badge({ children, tone = 'muted' }: { children: ReactNode; tone?
     good: 'bg-good/10 text-good',
   }[tone]
   return <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${cls}`}>{children}</span>
+}
+
+/**
+ * Graduated progress readout (tape-measure ticks every 10 % of the target). The fill stops at the
+ * target; anything above it is drawn as an overflow segment in the warning colour, never hidden.
+ */
+export function ScaleBar({
+  value,
+  target,
+  colorVar = 'ink',
+  height = 10,
+  label,
+}: {
+  value: number | undefined
+  target: number | undefined
+  colorVar?: string
+  height?: number
+  label?: string
+}) {
+  const has = value !== undefined && !!target && target > 0
+  const ratio = has ? value! / target! : 0
+  const pct = Math.min(100, Math.max(0, ratio * 100))
+  const over = has && ratio > 1.05
+  return (
+    <div
+      className="scale-track relative w-full overflow-hidden rounded-[3px]"
+      style={{ height }}
+      role="meter"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={target ?? 0}
+      aria-valuenow={value ?? 0}
+    >
+      <div
+        className="absolute inset-y-0 left-0 transition-[width] duration-500 ease-out"
+        style={{ width: `${pct}%`, background: over ? 'rgb(var(--warn))' : `rgb(var(--${colorVar}))` }}
+      />
+    </div>
+  )
 }

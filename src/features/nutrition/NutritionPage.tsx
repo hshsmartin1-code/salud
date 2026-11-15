@@ -73,31 +73,52 @@ export function NutritionPage() {
         </div>
       ) : null}
 
-      <div className="mt-4 space-y-3">
+      <div className="card mt-4 overflow-hidden divide-rows">
         {MEALS.map((m) => {
           const entries = (day?.logs ?? []).filter((l) => l.meal === m.key)
           const { totals, partial } = sumNutrients(entries)
           return (
-            <section key={m.key} className="card overflow-hidden" data-testid={`meal-${m.key}`}>
-              <div className="flex items-center gap-2 px-4 pb-2 pt-3">
-                <h2 className="flex-1 font-semibold">{m.es}</h2>
-                {entries.length ? <MacroLine n={totals} partial={partial} /> : null}
+            <section key={m.key} data-testid={`meal-${m.key}`}>
+              <div className="flex min-h-[52px] items-center gap-2 py-1.5 pl-4 pr-2">
+                <div className="min-w-0 flex-1">
+                  <h2 className={`font-semibold ${entries.length ? '' : 'text-muted'}`}>{m.es}</h2>
+                  {entries.length ? (
+                    <div className="mt-0.5">
+                      <MacroLine n={totals} partial={partial} hideKcal />
+                    </div>
+                  ) : null}
+                </div>
+                {entries.length ? (
+                  <span className="readout mr-1 text-[20px]">
+                    {formatNutrient('kcal', totals.kcal, false)}
+                    {partial.includes('kcal') ? '*' : ''}
+                  </span>
+                ) : null}
                 <MealMenu
                   hasEntries={entries.length > 0}
                   onCopy={() => void copyFromYesterday(m.key)}
                   onSaveTpl={() => setSaveTpl(m.key)}
                   onApplyTpl={() => setApplyTpl(m.key)}
                 />
+                <Link
+                  to={`/comida/buscar?d=${date}&meal=${m.key}`}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-accent transition-colors hover:bg-accent/10"
+                  aria-label={`Agregar a ${m.es.toLowerCase()}`}
+                  title={`Agregar a ${m.es.toLowerCase()}`}
+                >
+                  <Icon name="plus" size={20} />
+                </Link>
               </div>
               {entries.length ? (
-                <ul className="divide-y divide-line border-t border-line">
+                <ul className="pb-1.5">
                   {entries.map((l) => (
                     <li key={l.id}>
-                      <button type="button" onClick={() => setEditing(l)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-surface2/60">
+                      <button type="button" onClick={() => setEditing(l)} className="flex w-full items-center gap-3 py-2 pl-4 pr-4 text-left transition-colors hover:bg-surface2/50">
+                        <span className="h-8 w-[3px] shrink-0 rounded-full bg-line" aria-hidden />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[15px] font-medium">{l.name}</span>
                           <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
-                            <span>{describeQty(l)}</span>
+                            <span className="num">{describeQty(l)}</span>
                             <Badge>{SOURCE_SHORT[l.source]}</Badge>
                             {l.missing.length ? <span className="text-warn" title={`Sin dato: ${l.missing.join(', ')}`}>datos incompletos</span> : null}
                           </span>
@@ -108,26 +129,22 @@ export function NutritionPage() {
                   ))}
                 </ul>
               ) : null}
-              <Link
-                to={`/comida/buscar?d=${date}&meal=${m.key}`}
-                className="flex items-center gap-2 border-t border-line px-4 py-2.5 text-sm font-medium text-accent hover:bg-accent/5"
-              >
-                <Icon name="plus" size={16} /> Agregar a {m.es.toLowerCase()}
-              </Link>
             </section>
           )
         })}
       </div>
 
-      <div className="mt-5 grid grid-cols-3 gap-2">
-        <Link to="/comida/recetas" className="btn-secondary flex-col gap-1 py-3 text-xs">
+      {day && (day.logs.length > 0 || day.imported.length > 0) ? <DayCompleteMark date={date} /> : null}
+
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <Link to="/comida/recetas" className="btn-secondary flex-col gap-1 py-3 text-[13px]">
           <Icon name="book" /> Recetas
         </Link>
-        <Link to="/comida/plantillas" className="btn-secondary flex-col gap-1 py-3 text-xs">
+        <Link to="/comida/plantillas" className="btn-secondary flex-col gap-1 py-3 text-[13px]">
           <Icon name="layers" /> Plantillas
         </Link>
-        <Link to="/comida/etiqueta" className="btn-secondary flex-col gap-1 py-3 text-xs">
-          <Icon name="tag" /> Etiqueta
+        <Link to="/comida/etiqueta" className="btn-secondary flex-col gap-1 py-3 text-[13px]">
+          <Icon name="tag" /> Desde etiqueta
         </Link>
       </div>
 
@@ -308,5 +325,51 @@ export function FoodSearchPage() {
       <FoodSearch onSelect={setFood} autoScan={params.get('scan') === '1'} />
       <QuantitySheet open={!!food} food={food} date={date} meal={meal} onClose={() => setFood(null)} onSaved={() => nav(`/comida?d=${date}`)} />
     </>
+  )
+}
+
+/**
+ * Lets the person say whether the day's log is complete. Adaptive energy only trusts confirmed or
+ * plausible days; "incompleto" removes the day from that estimate. Not marking is fine.
+ */
+function DayCompleteMark({ date }: { date: string }) {
+  const r = useRepo()
+  const mark = useLiveQuery(async () => (await r.onDate('dayMarks', date))[0] ?? null, [r, date])
+  if (mark === undefined) return null
+  const value: 'none' | 'complete' | 'incomplete' = mark === null ? 'none' : mark.complete ? 'complete' : 'incomplete'
+  async function set(v: 'none' | 'complete' | 'incomplete') {
+    const rows = await r.onDate('dayMarks', date)
+    if (v === 'none') {
+      for (const row of rows) await r.remove('dayMarks', row.id)
+      return
+    }
+    if (rows[0]) await r.update('dayMarks', rows[0].id, { complete: v === 'complete' })
+    else await r.add('dayMarks', { date, complete: v === 'complete' })
+  }
+  const opts = [
+    { v: 'complete', l: 'Completo' },
+    { v: 'incomplete', l: 'Incompleto' },
+  ] as const
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 px-1" data-testid="day-complete">
+      <span className="text-sm text-muted" id={`day-mark-${date}`}>
+        ¿Registraste todo lo de este día?
+      </span>
+      <div className="flex gap-2" role="radiogroup" aria-labelledby={`day-mark-${date}`}>
+        {opts.map((o) => (
+          <button
+            key={o.v}
+            type="button"
+            role="radio"
+            aria-checked={value === o.v}
+            className={`chip ${value === o.v ? 'chip-on' : ''}`}
+            onClick={() => void set(value === o.v ? 'none' : o.v)}
+          >
+            {value === o.v ? <Icon name="check" size={14} /> : null}
+            {o.l}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }

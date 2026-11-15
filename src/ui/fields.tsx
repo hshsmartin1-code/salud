@@ -14,12 +14,15 @@ export function Field({
   label,
   hint,
   error,
+  flag,
   children,
   htmlFor,
 }: {
   label?: ReactNode
   hint?: ReactNode
   error?: ReactNode
+  /** Needs review (e.g. an assumption made while reading a label). */
+  flag?: ReactNode
   children: ReactNode
   htmlFor?: string
 }) {
@@ -33,6 +36,8 @@ export function Field({
       {children}
       {error ? (
         <p className="mt-1 text-xs text-bad">{error}</p>
+      ) : flag ? (
+        <p className="mt-1 text-xs text-warn">{flag}</p>
       ) : hint ? (
         <p className="mt-1 text-xs text-faint">{hint}</p>
       ) : null}
@@ -53,6 +58,7 @@ export function NumField({
   ariaLabel,
   className = '',
   compact = false,
+  flag,
 }: {
   label?: ReactNode
   value: string
@@ -61,6 +67,7 @@ export function NumField({
   placeholder?: string
   hint?: ReactNode
   error?: ReactNode
+  flag?: ReactNode
   autoFocus?: boolean
   name?: string
   ariaLabel?: string
@@ -70,7 +77,7 @@ export function NumField({
   const id = useId()
   const invalid = value.trim() !== '' && parseDecimal(value) === null
   return (
-    <Field label={label} hint={hint} error={error ?? (invalid ? 'Número no válido' : undefined)} htmlFor={id}>
+    <Field label={label} hint={hint} flag={flag} error={error ?? (invalid ? 'Número no válido' : undefined)} htmlFor={id}>
       <div className={`relative ${className}`}>
         <input
           id={id}
@@ -81,7 +88,7 @@ export function NumField({
           aria-label={ariaLabel}
           aria-invalid={invalid || !!error}
           data-autofocus={autoFocus ? '' : undefined}
-          className={`field num ${unit ? 'pr-12' : ''} ${compact ? 'px-2 py-2 text-center' : ''}`}
+          className={`field num ${unit ? 'pr-12' : ''} ${compact ? 'px-2 py-2 text-center' : ''} ${flag ? 'border-warn/70 bg-warn/5' : ''}`}
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
@@ -172,17 +179,23 @@ export function TextArea({
   onChange,
   placeholder,
   rows = 2,
+  testId,
+  hint,
+  resize = false,
 }: {
   label?: ReactNode
   value: string
   onChange: (v: string) => void
   placeholder?: string
   rows?: number
+  testId?: string
+  hint?: ReactNode
+  resize?: boolean
 }) {
   const id = useId()
   return (
-    <Field label={label} htmlFor={id}>
-      <textarea id={id} rows={rows} className="field resize-none" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+    <Field label={label} htmlFor={id} hint={hint}>
+      <textarea id={id} rows={rows} className={`field ${resize ? 'resize-y' : 'resize-none'}`} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} data-testid={testId} spellCheck={false} />
     </Field>
   )
 }

@@ -34,6 +34,9 @@ export const TABLE_LABEL: Record<PersonalTable, string> = {
   habits: 'Hábitos',
   habitLogs: 'Registros de hábitos',
   importedDaily: 'Valores diarios importados',
+  labelImages: 'Fotos de etiquetas',
+  dayMarks: 'Días marcados como completos',
+  energyAdjustments: 'Ajustes de energía',
 }
 
 const COLORS: ProfileColor[] = ['emerald', 'violet', 'amber', 'sky', 'rose']

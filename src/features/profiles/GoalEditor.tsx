@@ -288,7 +288,7 @@ export function GoalEditor({
 function TargetCell({ label, value, unit }: { label: string; value: number; unit?: string }) {
   return (
     <div>
-      <div className="num text-lg font-semibold leading-tight">{formatNumber(value, 0)}</div>
+      <div className="readout text-[22px]">{formatNumber(value, 0)}</div>
       <div className="text-[11px] text-muted">
         {label}
         {unit ? ` (${unit})` : ''}

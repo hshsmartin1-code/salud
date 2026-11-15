@@ -1,0 +1,395 @@
+en_term,es_terms
+chicken,pollo
+broilers or fryers,pollo
+breast,pechuga
+thigh,contramuslo muslo pernil
+drumstick,muslo pierna
+leg,pierna pernil
+wing,ala alas
+wings,alas
+skin,piel
+skinless,sin piel
+meat,carne
+meat only,sin piel
+liver,higado
+gizzard,molleja
+heart,corazon
+giblets,menudencias
+kidneys,rinon rinones
+tongue,lengua
+tripe,callo mondongo panza
+variety meats,visceras
+ground,molida molido
+beef,res carne
+pork,cerdo marrano
+turkey,pavo
+lamb,cordero
+veal,ternera
+goat,cabro chivo
+rabbit,conejo
+duck,pato
+quail,codorniz
+game meat,carne caza
+ham,jamon
+bacon,tocineta tocino
+sausage,salchicha embutido
+frankfurter,salchicha
+chorizo,chorizo
+bologna,mortadela salchichon
+mortadella,mortadela
+blood sausage,morcilla rellena
+salami,salami
+pork skins,chicharron
+fish,pescado
+tuna,atun
+salmon,salmon
+sardine,sardina
+sardines,sardinas
+cod,bacalao
+tilapia,tilapia mojarra
+catfish,bagre
+trout,trucha
+snapper,pargo
+grouper,mero
+mackerel,sierra caballa macarela
+shrimp,camaron camarones
+crab,cangrejo jaiba
+lobster,langosta
+squid,calamar
+octopus,pulpo
+clam,almeja
+mussel,mejillon
+oyster,ostra
+crustaceans,mariscos
+mollusks,mariscos
+egg,huevo
+eggs,huevos
+yolk,yema
+egg white,clara
+milk,leche
+cheese,queso
+yogurt,yogur yogurt
+cream,crema
+sour cream,crema agria
+butter,mantequilla
+margarine,margarina
+oil,aceite
+olive,oliva aceituna
+olives,aceitunas
+rice,arroz
+brown rice,arroz integral
+wild rice,arroz salvaje
+whole wheat,integral trigo
+whole-wheat,integral trigo
+whole grain,integral
+wheat,trigo
+bread,pan
+flour,harina
+corn,maiz mazorca
+sweet corn,mazorca maiz tierno
+cornmeal,harina maiz
+cornstarch,maicena fecula maiz
+oats,avena
+oatmeal,avena
+pasta,pasta
+spaghetti,espagueti
+noodles,fideos
+macaroni,macarrones
+tortilla,tortilla
+tortillas,tortillas
+cereal,cereal
+cereals,cereal
+crackers,galletas
+cookies,galletas
+cake,torta ponque
+pie,pastel pie
+potato,papa
+potatoes,papa papas
+sweet potato,batata
+cassava,yuca
+yuca,yuca
+plantain,platano
+plantains,platano
+banana,banano
+bananas,banano
+beans,frijol frijoles
+kidney beans,frijol rojo
+beans kidney,frijol rojo
+black beans,frijol negro
+beans black,frijol negro
+snap beans,habichuela
+beans snap,habichuela
+lentils,lenteja lentejas
+chickpeas,garbanzo garbanzos
+garbanzo,garbanzo
+peas,arveja arvejas
+split,partida
+soybeans,soya
+soy,soya
+soymilk,leche soya bebida
+tofu,tofu
+peanut,mani
+peanuts,mani
+peanut butter,mantequilla mani
+almonds,almendras
+walnuts,nueces
+cashew,maranon
+nuts,nueces frutos secos
+seeds,semillas
+chia,chia
+flaxseed,linaza
+sesame,ajonjoli
+sunflower,girasol
+pumpkin,ahuyama calabaza
+squash,ahuyama calabacin
+zucchini,calabacin
+tomato,tomate
+tomatoes,tomate
+onion,cebolla
+onions,cebolla
+scallions,cebolla larga
+garlic,ajo
+carrot,zanahoria
+carrots,zanahoria
+lettuce,lechuga
+cabbage,repollo
+broccoli,brocoli
+cauliflower,coliflor
+spinach,espinaca
+cucumber,pepino cohombro
+peppers,pimenton aji
+pepper,pimienta pimenton
+sweet peppers,pimenton
+peppers sweet,pimenton
+hot chili,aji picante
+celery,apio
+beets,remolacha
+eggplant,berenjena
+mushrooms,champinones hongos
+asparagus,esparragos
+radishes,rabano
+chayote,guatila cidra
+okra,quimbombo
+kale,col rizada
+coriander,cilantro
+cilantro,cilantro
+parsley,perejil
+avocado,aguacate
+avocados,aguacate
+mango,mango
+mangos,mango
+papaya,papaya
+papayas,papaya
+pineapple,pina
+guava,guayaba
+guavas,guayaba
+passion fruit,maracuya gulupa
+passion-fruit,maracuya gulupa
+naranjilla,lulo
+soursop,guanabana
+cherimoya,chirimoya
+strawberries,fresas
+blackberries,moras
+blueberries,arandanos
+raspberries,frambuesas
+grapes,uvas
+watermelon,patilla sandia
+melon,melon
+melons,melon
+cantaloupe,melon
+peaches,durazno
+pears,pera
+apples,manzana
+apple,manzana
+oranges,naranja
+orange,naranja
+tangerines,mandarina
+lemon,limon
+lemons,limon
+lime,limon lima
+limes,limon lima
+grapefruit,toronja
+coconut,coco
+plums,ciruelas
+kiwifruit,kiwi
+cherries,cerezas
+raisins,uvas pasas
+dates,datiles
+fruit,fruta
+juice,jugo
+nectar,nectar
+water,agua
+coffee,cafe tinto
+tea,te aromatica
+beer,cerveza
+wine,vino
+carbonated,gaseosa
+cola,gaseosa cola
+chocolate,chocolate
+cocoa,cacao chocolate
+sugar,azucar
+sugars,azucar
+honey,miel
+syrup,jarabe miel
+syrups,jarabe miel
+jams,mermelada
+preserves,mermelada
+candies,dulces confites
+ice cream,helado
+ice creams,helado
+dessert,postre
+pudding,pudin
+gelatin,gelatina
+salt,sal
+vinegar,vinagre
+sauce,salsa
+soup,sopa
+broth,caldo
+mayonnaise,mayonesa
+mustard,mostaza
+catsup,salsa tomate
+ketchup,salsa tomate
+snacks,pasabocas
+chips,paquete
+popcorn,crispetas palomitas
+fried,frito frita
+pan-fried,frito sarten
+roasted,asado asada
+baked,horneado horno
+boiled,hervido cocido
+cooked,cocido cocinado
+raw,crudo cruda
+grilled,asado parrilla
+broiled,asado
+pan-broiled,plancha
+steamed,vapor
+stewed,guisado sudado
+braised,sudado estofado
+microwaved,microondas
+sauteed,salteado
+toasted,tostado
+poached,pochado
+scrambled,revuelto
+simmered,cocido
+smoked,ahumado
+dried,seco deshidratado
+dry,seco
+canned,enlatado lata
+frozen,congelado
+fresh,fresco
+drained,escurrido
+salted,con sal
+with salt,con sal
+without salt,sin sal
+sweetened,endulzado
+unsweetened,sin azucar
+lean,magro
+fat,grasa
+nonfat,descremado
+fat free,descremado
+lowfat,bajo grasa
+low fat,bajo grasa
+skim,descremada
+reduced fat,semidescremada
+light,light
+plain,natural
+mixed,mixto
+chopped,picado
+sliced,tajado
+diced,cubos
+mashed,pure
+whole,entero
+boneless,sin hueso
+bone-in,con hueso
+steak,filete bistec
+chops,chuleta
+loin,lomo
+tenderloin,lomo fino solomito
+sirloin,solomo
+eye of round,muchacho
+round,bola
+flank,sobrebarriga
+skirt,falda entrana
+brisket,pecho
+spareribs,costilla
+ribs,costilla
+shoulder,paleta brazo
+belly,barriga tocino
+fillet,filete
+fillets,filetes
+patty,hamburguesa
+hamburger,hamburguesa
+burger,hamburguesa
+pizza,pizza
+sandwich,sandwich sanduche
+hotdog,perro caliente
+taco,taco
+burrito,burrito
+empanada,empanada
+empanadas,empanada
+tamale,tamal
+arepa,arepa
+salad,ensalada
+dressing,aderezo
+babyfood,bebe infantil
+infant formula,formula infantil
+beverage,bebida
+beverages,bebidas
+drink,bebida
+energy drink,bebida energetica
+sports drink,bebida deportiva
+protein,proteina
+powder,polvo
+bar,barra
+bars,barras
+granola,granola
+muffins,ponquecito muffin
+doughnuts,donas
+croissants,croissant
+pancakes,pancakes
+waffles,waffles
+biscuits,bizcochos
+bagels,bagel
+rolls,pan pancito
+buns,pan
+french fried,papas fritas francesa
+toast,tostada
+nuggets,nuggets
+breaded,apanado
+batter,apanado
+vegetables,verduras
+vegetable,verdura vegetal
+legumes,leguminosas
+mature seeds,grano seco
+green,verde
+red,rojo roja
+yellow,amarillo amarilla
+black,negro negra
+white,blanco blanca
+brown,integral moreno
+pink,rosado
+purple,morado
+dark,oscuro
+large,grande
+small,pequeno
+enriched,enriquecido
+fortified,fortificado
+instant,instantaneo
+prepared,preparado
+home-prepared,casero
+homemade,casero
+commercially prepared,comercial
+restaurant,restaurante
+fast foods,comida rapida
+latino,latino
+mexican,mexicano
+puerto rican,puertorriqueno
+quinoa,quinua
+barley,cebada
+couscous,cuscus
+tapioca,tapioca
+arrowroot,arrurruz
+yam,name
+taro,malanga
+whey,suero
+kefir,kefir

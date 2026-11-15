@@ -15,7 +15,7 @@ import { GoalEditor } from './GoalEditor'
 const COLORS = Object.keys(PROFILE_COLORS) as ProfileColor[]
 
 /** Create a profile: basics → targets (optional) → done. Nothing is pre-filled with invented values. */
-export function Onboarding({ embedded = false }: { embedded?: boolean }) {
+export function Onboarding({ embedded = false, onFinish }: { embedded?: boolean; onFinish?: () => void }) {
   const { profiles, setActive } = useProfiles()
   const nav = useNavigate()
   const used = new Set((profiles ?? []).map((p) => p.color))
@@ -199,13 +199,19 @@ export function Onboarding({ embedded = false }: { embedded?: boolean }) {
                     setActivity('')
                     setCreated(null)
                     setColor(COLORS.find((c) => c !== created.color && !used.has(c)) ?? 'violet')
-                    if (!embedded) nav('/perfiles/nuevo')
                   }}
                 >
                   <Icon name="users" size={18} /> Agregar segundo perfil
                 </button>
               ) : null}
-              <button type="button" className="btn-primary flex-1" onClick={() => nav('/')}>
+              <button
+                type="button"
+                className="btn-primary flex-1"
+                onClick={() => {
+                  onFinish?.()
+                  nav('/')
+                }}
+              >
                 Empezar
               </button>
             </div>

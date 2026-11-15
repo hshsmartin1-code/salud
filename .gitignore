@@ -1,0 +1,30 @@
+# deps / build
+node_modules
+dist
+dev-dist
+*.local
+coverage
+test-results
+playwright-report
+.vite
+
+# editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.log
+
+# --- PRIVACY GUARDS: personal health data and non-redistributable sources must never be committed ---
+*.xlsx
+*.xls
+*.jpeg
+*.jpg
+*.pdf
+extraction/
+private-data/
+backups/
+*import*.json
+*backup*.json
+data-pipeline/raw/
+data-pipeline/__pycache__/

@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens: RGB triplets so Tailwind can apply alpha (bg-accent/10). */
+:root {
+  --bg: 246 245 241;
+  --surface: 255 255 255;
+  --surface2: 239 238 233;
+  --line: 226 224 218;
+  --ink: 22 24 23;
+  --muted: 96 102 98;
+  --faint: 148 152 148;
+  --accent: 20 120 84;
+  --accent-ink: 255 255 255;
+  --good: 22 128 80;
+  --warn: 180 110 0;
+  --bad: 196 48 48;
+  --protein: 79 102 230;
+  --carbs: 214 136 16;
+  --fat: 212 72 118;
+  --fiber: 56 146 88;
+  --kcal: 20 120 84;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: 11 12 14;
+  --surface: 20 22 25;
+  --surface2: 28 31 35;
+  --line: 42 46 52;
+  --ink: 236 238 240;
+  --muted: 160 166 172;
+  --faint: 112 118 124;
+  --accent: 61 220 151;
+  --accent-ink: 4 28 18;
+  --good: 74 222 128;
+  --warn: 251 191 36;
+  --bad: 248 113 113;
+  --protein: 140 150 250;
+  --carbs: 250 190 60;
+  --fat: 244 120 180;
+  --fiber: 90 220 130;
+  --kcal: 61 220 151;
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-bg text-ink antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    overscroll-behavior-y: none;
+  }
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  .card {
+    @apply rounded-2xl border border-line bg-surface shadow-card;
+  }
+  .field {
+    @apply w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-[15px] outline-none transition placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/20;
+  }
+  .label {
+    @apply mb-1 block text-xs font-medium uppercase tracking-wide text-muted;
+  }
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-accent-ink hover:brightness-110;
+  }
+  .btn-secondary {
+    @apply btn border border-line bg-surface text-ink hover:bg-surface2;
+  }
+  .btn-ghost {
+    @apply btn text-muted hover:bg-surface2 hover:text-ink;
+  }
+  .btn-danger {
+    @apply btn bg-bad/10 text-bad hover:bg-bad/15;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-muted;
+  }
+  .chip-on {
+    @apply border-accent/40 bg-accent/10 text-accent;
+  }
+  .section-title {
+    @apply text-[13px] font-semibold uppercase tracking-wide text-muted;
+  }
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}

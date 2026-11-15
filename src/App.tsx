@@ -9,6 +9,8 @@ import { ProfileSwitcher } from './features/profiles/ProfileSwitcher'
 import { FoodSearchPage, NutritionPage } from './features/nutrition/NutritionPage'
 import { LabelPage } from './features/nutrition/LabelPage'
 import { RecipeEditor, RecipesPage, TemplatesPage } from './features/nutrition/RecipesPage'
+import { BackupPage } from './features/backup/BackupPage'
+import { BodyPage, MeasurementEditor } from './features/body/BodyPage'
 import { ExerciseLibraryPage } from './features/training/ExerciseLibrary'
 import { SessionPage } from './features/training/SessionPage'
 import { RoutineEditor as TrainingRoutineEditor, TrainingPage } from './features/training/TrainingPage'
@@ -50,7 +52,7 @@ function Gate() {
   if (firstRun || !active)
     return (
       <Routes>
-        <Route path="/respaldo" element={<Placeholder title="Respaldo" />} />
+        <Route path="/respaldo" element={<BackupPage />} />
         <Route path="*" element={<Onboarding onFinish={() => setFirstRun(false)} />} />
       </Routes>
     )
@@ -70,6 +72,9 @@ function Gate() {
         <Route path="/entreno/ejercicios" element={<ExerciseLibraryPage />} />
         <Route path="/entreno/rutinas/:id" element={<TrainingRoutineEditor />} />
         <Route path="/entreno/sesion/:id" element={<SessionPage />} />
+        <Route path="/cuerpo" element={<BodyPage />} />
+        <Route path="/cuerpo/:id" element={<MeasurementEditor />} />
+        <Route path="/respaldo" element={<BackupPage />} />
         <Route path="/mas" element={<MorePage />} />
         <Route path="*" element={<Placeholder title="Salud" />} />
       </Routes>

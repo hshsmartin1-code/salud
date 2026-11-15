@@ -49,6 +49,15 @@
   html {
     -webkit-tap-highlight-color: transparent;
     text-size-adjust: 100%;
+    /* Keep focused/scrolled-to controls clear of the fixed top bar and bottom navigation. */
+    scroll-padding-top: 4.5rem;
+    scroll-padding-bottom: 7rem;
+  }
+  @media (min-width: 1024px) {
+    html {
+      scroll-padding-top: 1rem;
+      scroll-padding-bottom: 1rem;
+    }
   }
   body {
     @apply bg-bg text-ink antialiased;

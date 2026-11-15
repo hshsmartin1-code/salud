@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { Icon } from '../ui/Icon'
 
@@ -13,10 +14,16 @@ export function UpdatePrompt() {
       if (reg) window.setInterval(() => void reg.update(), 60 * 60 * 1000)
     },
   })
+  // The "ready offline" note is informational: hide it on its own after a few seconds.
+  useEffect(() => {
+    if (!offlineReady || needRefresh) return
+    const t = window.setTimeout(() => setOfflineReady(false), 5000)
+    return () => window.clearTimeout(t)
+  }, [offlineReady, needRefresh, setOfflineReady])
   if (!offlineReady && !needRefresh) return null
   return (
-    <div className="fixed inset-x-0 bottom-20 z-50 flex justify-center px-4 lg:bottom-6" role="status">
-      <div className="card flex max-w-md items-center gap-3 px-4 py-3 shadow-pop">
+    <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4 lg:bottom-6" role="status">
+      <div className="card pointer-events-auto flex max-w-md items-center gap-3 px-4 py-3 shadow-pop">
         <Icon name={needRefresh ? 'refresh' : 'check'} className="text-accent" />
         <div className="flex-1 text-sm">
           {needRefresh ? 'Hay una versión nueva de la aplicación.' : 'Lista para usarse sin conexión.'}

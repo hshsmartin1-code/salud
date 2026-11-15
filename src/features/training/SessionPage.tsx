@@ -388,13 +388,16 @@ function SetRow({
   }
   const [a, setA] = useState(init()[0])
   const [b, setB] = useState(init()[1])
+  // Values this row wrote itself; echoes of our own saves must not overwrite what is being typed.
+  const lastSaved = useRef<string | null>(null)
+  const stored = JSON.stringify([set.weight, set.reps, set.durationSec, set.distanceM])
   useEffect(() => {
+    if (lastSaved.current === stored) return
     const [x, y] = init()
     setA(x)
     setB(y)
-    // re-sync only when the stored values change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [set.weight, set.reps, set.durationSec, set.distanceM])
+  }, [stored])
 
   function parsed(): Partial<ExerciseSet> | null {
     switch (tracking) {
@@ -424,12 +427,19 @@ function SetRow({
     !!p &&
     (tracking === 'weight_reps' ? p.weight != null && p.reps != null : tracking === 'bodyweight_reps' ? p.reps != null : tracking === 'time' ? p.durationSec != null : p.distanceM != null || p.durationSec != null)
 
+  function remember(v: Partial<ExerciseSet>) {
+    const pick = <K extends 'weight' | 'reps' | 'durationSec' | 'distanceM'>(k: K) => (k in v ? (v[k] ?? null) : set[k])
+    lastSaved.current = JSON.stringify([pick('weight'), pick('reps'), pick('durationSec'), pick('distanceM')])
+  }
   async function save() {
-    if (p) await r.update('exerciseSets', set.id, p)
+    if (!p) return
+    remember(p)
+    await r.update('exerciseSets', set.id, p)
   }
   async function toggleDone() {
     if (!set.done && !canComplete) return
     const next = !set.done
+    if (p) remember(p)
     await r.update('exerciseSets', set.id, { ...(p ?? {}), done: next })
     const following = nextSet
     if (next && p && following && !following.done && following.weight === null && following.reps === null && following.durationSec === null && following.distanceM === null) {

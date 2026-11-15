@@ -1,6 +1,10 @@
 import { Route, Routes } from 'react-router-dom'
+import { ProfileProvider, useProfiles } from './app/profile'
 import { UpdatePrompt } from './app/UpdatePrompt'
 import { useTheme } from './app/theme'
+import { Onboarding } from './features/profiles/Onboarding'
+import { ProfilePage } from './features/profiles/ProfilePage'
+import { ProfileSwitcher } from './features/profiles/ProfileSwitcher'
 import { AppShell, MORE_NAV } from './ui/AppShell'
 import { EmptyState, ListRow, PageHeader } from './ui/kit'
 
@@ -28,18 +32,35 @@ function MorePage() {
   )
 }
 
+function Gate() {
+  const { profiles, active } = useProfiles()
+  if (profiles === undefined) return <div className="min-h-dvh bg-bg" />
+  if (!active)
+    return (
+      <Routes>
+        <Route path="/respaldo" element={<Placeholder title="Respaldo" />} />
+        <Route path="*" element={<Onboarding />} />
+      </Routes>
+    )
+  return (
+    <AppShell header={<ProfileSwitcher />}>
+      <Routes key={active.id}>
+        <Route path="/" element={<Placeholder title="Hoy" />} />
+        <Route path="/perfil" element={<ProfilePage />} />
+        <Route path="/perfiles/nuevo" element={<Onboarding embedded />} />
+        <Route path="/mas" element={<MorePage />} />
+        <Route path="*" element={<Placeholder title="Salud" />} />
+      </Routes>
+    </AppShell>
+  )
+}
+
 export default function App() {
   useTheme()
   return (
-    <>
-      <AppShell header={<span className="text-lg font-bold tracking-tight">Salud</span>}>
-        <Routes>
-          <Route path="/" element={<Placeholder title="Hoy" />} />
-          <Route path="/mas" element={<MorePage />} />
-          <Route path="*" element={<Placeholder title="Salud" />} />
-        </Routes>
-      </AppShell>
+    <ProfileProvider>
+      <Gate />
       <UpdatePrompt />
-    </>
+    </ProfileProvider>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { ProfileProvider, useProfiles } from './app/profile'
 import { UpdatePrompt } from './app/UpdatePrompt'
@@ -11,7 +11,6 @@ import { LabelPage } from './features/nutrition/LabelPage'
 import { RecipeEditor, RecipesPage, TemplatesPage } from './features/nutrition/RecipesPage'
 import { TodayPage } from './features/dashboard/TodayPage'
 import { ActivityPage, HabitsPage, SleepPage } from './features/health/HealthPages'
-import { ProgressPage } from './features/progress/ProgressPage'
 import { SettingsPage } from './features/settings/SettingsPage'
 import { BackupPage } from './features/backup/BackupPage'
 import { BodyPage, MeasurementEditor } from './features/body/BodyPage'
@@ -21,12 +20,15 @@ import { RoutineEditor as TrainingRoutineEditor, TrainingPage } from './features
 import { AppShell, MORE_NAV } from './ui/AppShell'
 import { EmptyState, ListRow, PageHeader } from './ui/kit'
 
-function Placeholder({ title }: { title: string }) {
+// Charts (Recharts) load on demand so the first screen stays light.
+const ProgressPage = lazy(() => import('./features/progress/ProgressPage').then((m) => ({ default: m.ProgressPage })))
+
+function NotFound() {
   return (
     <>
-      <PageHeader title={title} />
-      <EmptyState icon="info" title="Sección en construcción">
-        Esta pantalla todavía no está implementada.
+      <PageHeader title="No encontrado" />
+      <EmptyState icon="info" title="Esta página no existe">
+        Revisa la dirección o vuelve al inicio desde el menú.
       </EmptyState>
     </>
   )
@@ -79,13 +81,20 @@ function Gate() {
         <Route path="/cuerpo" element={<BodyPage />} />
         <Route path="/cuerpo/:id" element={<MeasurementEditor />} />
         <Route path="/respaldo" element={<BackupPage />} />
-        <Route path="/progreso" element={<ProgressPage />} />
+        <Route
+          path="/progreso"
+          element={
+            <Suspense fallback={<p className="p-4 text-sm text-muted">Cargando gráficas…</p>}>
+              <ProgressPage />
+            </Suspense>
+          }
+        />
         <Route path="/actividad" element={<ActivityPage />} />
         <Route path="/sueno" element={<SleepPage />} />
         <Route path="/habitos" element={<HabitsPage />} />
         <Route path="/ajustes" element={<SettingsPage />} />
         <Route path="/mas" element={<MorePage />} />
-        <Route path="*" element={<Placeholder title="Salud" />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </AppShell>
   )

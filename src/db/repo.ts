@@ -115,6 +115,10 @@ export function repo(profileId: string, database: SaludDB = defaultDb) {
       const rows = await tbl(t).where(index).equals(value).toArray()
       return rows.filter((r) => r.profileId === profileId)
     },
+    /** Uses a compound index `[profileId+field]` (must exist in the schema). */
+    async byProfileIndex<T extends PersonalTable>(t: T, field: string, value: string): Promise<RowOf<T>[]> {
+      return tbl(t).where(`[profileId+${field}]`).equals([profileId, value]).toArray()
+    },
     async add<T extends PersonalTable>(t: T, data: NewRow<RowOf<T>>): Promise<RowOf<T>> {
       const row = stamp<T>(data)
       await tbl(t).add(row)

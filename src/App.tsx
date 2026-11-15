@@ -9,6 +9,9 @@ import { ProfileSwitcher } from './features/profiles/ProfileSwitcher'
 import { FoodSearchPage, NutritionPage } from './features/nutrition/NutritionPage'
 import { LabelPage } from './features/nutrition/LabelPage'
 import { RecipeEditor, RecipesPage, TemplatesPage } from './features/nutrition/RecipesPage'
+import { ExerciseLibraryPage } from './features/training/ExerciseLibrary'
+import { SessionPage } from './features/training/SessionPage'
+import { RoutineEditor as TrainingRoutineEditor, TrainingPage } from './features/training/TrainingPage'
 import { AppShell, MORE_NAV } from './ui/AppShell'
 import { EmptyState, ListRow, PageHeader } from './ui/kit'
 
@@ -63,6 +66,10 @@ function Gate() {
         <Route path="/comida/recetas" element={<RecipesPage />} />
         <Route path="/comida/recetas/:id" element={<RecipeEditor />} />
         <Route path="/comida/plantillas" element={<TemplatesPage />} />
+        <Route path="/entreno" element={<TrainingPage />} />
+        <Route path="/entreno/ejercicios" element={<ExerciseLibraryPage />} />
+        <Route path="/entreno/rutinas/:id" element={<TrainingRoutineEditor />} />
+        <Route path="/entreno/sesion/:id" element={<SessionPage />} />
         <Route path="/mas" element={<MorePage />} />
         <Route path="*" element={<Placeholder title="Salud" />} />
       </Routes>

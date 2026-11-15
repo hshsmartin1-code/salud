@@ -9,6 +9,10 @@ import { ProfileSwitcher } from './features/profiles/ProfileSwitcher'
 import { FoodSearchPage, NutritionPage } from './features/nutrition/NutritionPage'
 import { LabelPage } from './features/nutrition/LabelPage'
 import { RecipeEditor, RecipesPage, TemplatesPage } from './features/nutrition/RecipesPage'
+import { TodayPage } from './features/dashboard/TodayPage'
+import { ActivityPage, HabitsPage, SleepPage } from './features/health/HealthPages'
+import { ProgressPage } from './features/progress/ProgressPage'
+import { SettingsPage } from './features/settings/SettingsPage'
 import { BackupPage } from './features/backup/BackupPage'
 import { BodyPage, MeasurementEditor } from './features/body/BodyPage'
 import { ExerciseLibraryPage } from './features/training/ExerciseLibrary'
@@ -59,7 +63,7 @@ function Gate() {
   return (
     <AppShell header={<ProfileSwitcher />}>
       <Routes key={active.id}>
-        <Route path="/" element={<Placeholder title="Hoy" />} />
+        <Route path="/" element={<TodayPage />} />
         <Route path="/perfil" element={<ProfilePage />} />
         <Route path="/perfiles/nuevo" element={<Onboarding embedded />} />
         <Route path="/comida" element={<NutritionPage />} />
@@ -75,6 +79,11 @@ function Gate() {
         <Route path="/cuerpo" element={<BodyPage />} />
         <Route path="/cuerpo/:id" element={<MeasurementEditor />} />
         <Route path="/respaldo" element={<BackupPage />} />
+        <Route path="/progreso" element={<ProgressPage />} />
+        <Route path="/actividad" element={<ActivityPage />} />
+        <Route path="/sueno" element={<SleepPage />} />
+        <Route path="/habitos" element={<HabitsPage />} />
+        <Route path="/ajustes" element={<SettingsPage />} />
         <Route path="/mas" element={<MorePage />} />
         <Route path="*" element={<Placeholder title="Salud" />} />
       </Routes>

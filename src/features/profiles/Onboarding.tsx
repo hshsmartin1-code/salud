@@ -88,6 +88,11 @@ export function Onboarding({ embedded = false, onFinish }: { embedded?: boolean;
             <div>
               <h2 className="text-lg font-semibold">{(profiles?.length ?? 0) === 0 ? 'Primer perfil' : 'Nuevo perfil'}</h2>
               <p className="text-sm text-muted">Cada perfil tiene sus propios registros, objetivos e historial.</p>
+              {(profiles?.length ?? 0) === 0 ? (
+                <Link to="/respaldo" className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-accent" data-testid="restore-link">
+                  <Icon name="upload" size={14} /> ¿Ya usabas la app? Restaurar un respaldo
+                </Link>
+              ) : null}
             </div>
             <TextField label="Nombre" value={name} onChange={setName} autoFocus placeholder="Nombre o apodo" />
             <div>

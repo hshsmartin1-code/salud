@@ -71,7 +71,7 @@ export function BackupPage() {
   const { profiles, active, setActive } = useProfiles()
   return (
     <>
-      <PageHeader title="Respaldo e importación" subtitle="Los datos viven solo en este dispositivo" back={active ? '/mas' : undefined} />
+      <PageHeader title="Respaldo e importación" subtitle="Los datos viven solo en este dispositivo" back={active ? '/mas' : '/'} />
       <div className="space-y-5">
         <Card className="flex gap-3 border-warn/30 bg-warn/5">
           <Icon name="shield" className="mt-0.5 shrink-0 text-warn" />

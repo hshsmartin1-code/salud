@@ -1,0 +1,2671 @@
+{
+ "source": "BodyParts3D 4.0 (isa tree), (c) The Database Center for Life Science, CC BY 4.0",
+ "elements": {
+  "FJ1289": {
+   "kind": "eye",
+   "part": "left cornea",
+   "side": "left"
+  },
+  "FJ1317": {
+   "kind": "eye",
+   "part": "left sclera",
+   "side": "left"
+  },
+  "FJ1340": {
+   "kind": "eye",
+   "part": "right cornea",
+   "side": "right"
+  },
+  "FJ1368": {
+   "kind": "eye",
+   "part": "right sclera",
+   "side": "right"
+  },
+  "FJ1394": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "right",
+   "part": "lateral head of right gastrocnemius"
+  },
+  "FJ1394M": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "left",
+   "part": "lateral head of left gastrocnemius"
+  },
+  "FJ1395": {
+   "kind": "muscle",
+   "muscle": "hamstrings",
+   "side": "right",
+   "part": "long head of right biceps femoris"
+  },
+  "FJ1395M": {
+   "kind": "muscle",
+   "muscle": "hamstrings",
+   "side": "left",
+   "part": "long head of left biceps femoris"
+  },
+  "FJ1397": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "right",
+   "part": "medial head of right gastrocnemius"
+  },
+  "FJ1397M": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "left",
+   "part": "medial head of left gastrocnemius"
+  },
+  "FJ1401": {
+   "kind": "muscle",
+   "muscle": "adductors",
+   "side": "right",
+   "part": "right adductor brevis"
+  },
+  "FJ1401M": {
+   "kind": "muscle",
+   "muscle": "adductors",
+   "side": "left",
+   "part": "left adductor brevis"
+  },
+  "FJ1402": {
+   "kind": "muscle",
+   "muscle": "adductors",
+   "side": "right",
+   "part": "right adductor longus"
+  },
+  "FJ1402M": {
+   "kind": "muscle",
+   "muscle": "adductors",
+   "side": "left",
+   "part": "left adductor longus"
+  },
+  "FJ1403": {
+   "kind": "muscle",
+   "muscle": "adductors",
+   "side": "right",
+   "part": "right adductor magnus"
+  },
+  "FJ1403M": {
+   "kind": "muscle",
+   "muscle": "adductors",
+   "side": "left",
+   "part": "left adductor magnus"
+  },
+  "FJ1404": {
+   "kind": "muscle",
+   "muscle": "adductors",
+   "side": "right",
+   "part": "right adductor minimus"
+  },
+  "FJ1404M": {
+   "kind": "muscle",
+   "muscle": "adductors",
+   "side": "left",
+   "part": "left adductor minimus"
+  },
+  "FJ1405": {
+   "kind": "tissue",
+   "part": "right calcaneal tendon",
+   "side": "right"
+  },
+  "FJ1405M": {
+   "kind": "tissue",
+   "part": "left calcaneal tendon",
+   "side": "left"
+  },
+  "FJ1406": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "right",
+   "part": "right extensor digitorum longus"
+  },
+  "FJ1406M": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "left",
+   "part": "left extensor digitorum longus"
+  },
+  "FJ1408": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "right",
+   "part": "right extensor hallucis longus"
+  },
+  "FJ1408M": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "left",
+   "part": "left extensor hallucis longus"
+  },
+  "FJ1409": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "right",
+   "part": "right fibularis brevis"
+  },
+  "FJ1409M": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "left",
+   "part": "left fibularis brevis"
+  },
+  "FJ1410": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "right",
+   "part": "right fibularis longus"
+  },
+  "FJ1410M": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "left",
+   "part": "left fibularis longus"
+  },
+  "FJ1411": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "right",
+   "part": "right fibularis tertius"
+  },
+  "FJ1411M": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "left",
+   "part": "left fibularis tertius"
+  },
+  "FJ1414": {
+   "kind": "neutral",
+   "part": "right flexor digitorum longus",
+   "side": "right"
+  },
+  "FJ1414M": {
+   "kind": "neutral",
+   "part": "left flexor digitorum longus",
+   "side": "left"
+  },
+  "FJ1415": {
+   "kind": "neutral",
+   "part": "right flexor hallucis longus",
+   "side": "right"
+  },
+  "FJ1415M": {
+   "kind": "neutral",
+   "part": "left flexor hallucis longus",
+   "side": "left"
+  },
+  "FJ1416": {
+   "kind": "neutral",
+   "part": "right gemellus inferior",
+   "side": "right"
+  },
+  "FJ1416M": {
+   "kind": "neutral",
+   "part": "left gemellus inferior",
+   "side": "left"
+  },
+  "FJ1417": {
+   "kind": "neutral",
+   "part": "right gemellus superior",
+   "side": "right"
+  },
+  "FJ1417M": {
+   "kind": "neutral",
+   "part": "left gemellus superior",
+   "side": "left"
+  },
+  "FJ1418": {
+   "kind": "muscle",
+   "muscle": "glutes",
+   "side": "right",
+   "part": "right gluteus maximus"
+  },
+  "FJ1418M": {
+   "kind": "muscle",
+   "muscle": "glutes",
+   "side": "left",
+   "part": "left gluteus maximus"
+  },
+  "FJ1419": {
+   "kind": "muscle",
+   "muscle": "abductors",
+   "side": "right",
+   "part": "right gluteus medius"
+  },
+  "FJ1419M": {
+   "kind": "muscle",
+   "muscle": "abductors",
+   "side": "left",
+   "part": "left gluteus medius"
+  },
+  "FJ1420": {
+   "kind": "muscle",
+   "muscle": "abductors",
+   "side": "right",
+   "part": "right gluteus minimus"
+  },
+  "FJ1420M": {
+   "kind": "muscle",
+   "muscle": "abductors",
+   "side": "left",
+   "part": "left gluteus minimus"
+  },
+  "FJ1421": {
+   "kind": "muscle",
+   "muscle": "adductors",
+   "side": "right",
+   "part": "right gracilis"
+  },
+  "FJ1421M": {
+   "kind": "muscle",
+   "muscle": "adductors",
+   "side": "left",
+   "part": "left gracilis"
+  },
+  "FJ1422": {
+   "kind": "neutral",
+   "part": "right iliacus",
+   "side": "right"
+  },
+  "FJ1422M": {
+   "kind": "neutral",
+   "part": "left iliacus",
+   "side": "left"
+  },
+  "FJ1424": {
+   "kind": "tissue",
+   "part": "right long plantar ligament",
+   "side": "right"
+  },
+  "FJ1424M": {
+   "kind": "tissue",
+   "part": "left long plantar ligament",
+   "side": "left"
+  },
+  "FJ1426": {
+   "kind": "neutral",
+   "part": "right obturator internus",
+   "side": "right"
+  },
+  "FJ1426M": {
+   "kind": "neutral",
+   "part": "left obturator internus",
+   "side": "left"
+  },
+  "FJ1427": {
+   "kind": "muscle",
+   "muscle": "adductors",
+   "side": "right",
+   "part": "right pectineus"
+  },
+  "FJ1427M": {
+   "kind": "muscle",
+   "muscle": "adductors",
+   "side": "left",
+   "part": "left pectineus"
+  },
+  "FJ1428": {
+   "kind": "neutral",
+   "part": "right piriformis",
+   "side": "right"
+  },
+  "FJ1428M": {
+   "kind": "neutral",
+   "part": "left piriformis",
+   "side": "left"
+  },
+  "FJ1429": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "right",
+   "part": "right plantaris"
+  },
+  "FJ1429M": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "left",
+   "part": "left plantaris"
+  },
+  "FJ1430": {
+   "kind": "neutral",
+   "part": "right popliteus",
+   "side": "right"
+  },
+  "FJ1430M": {
+   "kind": "neutral",
+   "part": "left popliteus",
+   "side": "left"
+  },
+  "FJ1431": {
+   "kind": "neutral",
+   "part": "right psoas major",
+   "side": "right"
+  },
+  "FJ1431M": {
+   "kind": "neutral",
+   "part": "left psoas major",
+   "side": "left"
+  },
+  "FJ1432": {
+   "kind": "neutral",
+   "part": "right quadratus femoris",
+   "side": "right"
+  },
+  "FJ1432M": {
+   "kind": "neutral",
+   "part": "left quadratus femoris",
+   "side": "left"
+  },
+  "FJ1433": {
+   "kind": "muscle",
+   "muscle": "quadriceps",
+   "side": "right",
+   "part": "right rectus femoris"
+  },
+  "FJ1433M": {
+   "kind": "muscle",
+   "muscle": "quadriceps",
+   "side": "left",
+   "part": "left rectus femoris"
+  },
+  "FJ1434": {
+   "kind": "neutral",
+   "part": "right sartorius",
+   "side": "right"
+  },
+  "FJ1434M": {
+   "kind": "neutral",
+   "part": "left sartorius",
+   "side": "left"
+  },
+  "FJ1435": {
+   "kind": "muscle",
+   "muscle": "hamstrings",
+   "side": "right",
+   "part": "right semimembranosus"
+  },
+  "FJ1435M": {
+   "kind": "muscle",
+   "muscle": "hamstrings",
+   "side": "left",
+   "part": "left semimembranosus"
+  },
+  "FJ1436": {
+   "kind": "muscle",
+   "muscle": "hamstrings",
+   "side": "right",
+   "part": "right semitendinosus"
+  },
+  "FJ1436M": {
+   "kind": "muscle",
+   "muscle": "hamstrings",
+   "side": "left",
+   "part": "left semitendinosus"
+  },
+  "FJ1437": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "right",
+   "part": "right soleus"
+  },
+  "FJ1437M": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "left",
+   "part": "left soleus"
+  },
+  "FJ1438": {
+   "kind": "muscle",
+   "muscle": "abductors",
+   "side": "right",
+   "part": "right tensor fasciae latae"
+  },
+  "FJ1438M": {
+   "kind": "muscle",
+   "muscle": "abductors",
+   "side": "left",
+   "part": "left tensor fasciae latae"
+  },
+  "FJ1439": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "right",
+   "part": "right tibialis anterior"
+  },
+  "FJ1439M": {
+   "kind": "muscle",
+   "muscle": "calves",
+   "side": "left",
+   "part": "left tibialis anterior"
+  },
+  "FJ1440": {
+   "kind": "neutral",
+   "part": "right tibialis posterior",
+   "side": "right"
+  },
+  "FJ1440M": {
+   "kind": "neutral",
+   "part": "left tibialis posterior",
+   "side": "left"
+  },
+  "FJ1441": {
+   "kind": "muscle",
+   "muscle": "quadriceps",
+   "side": "right",
+   "part": "right vastus intermedius"
+  },
+  "FJ1441M": {
+   "kind": "muscle",
+   "muscle": "quadriceps",
+   "side": "left",
+   "part": "left vastus intermedius"
+  },
+  "FJ1442": {
+   "kind": "muscle",
+   "muscle": "quadriceps",
+   "side": "right",
+   "part": "right vastus lateralis"
+  },
+  "FJ1442M": {
+   "kind": "muscle",
+   "muscle": "quadriceps",
+   "side": "left",
+   "part": "left vastus lateralis"
+  },
+  "FJ1443": {
+   "kind": "muscle",
+   "muscle": "quadriceps",
+   "side": "right",
+   "part": "right vastus medialis"
+  },
+  "FJ1443M": {
+   "kind": "muscle",
+   "muscle": "quadriceps",
+   "side": "left",
+   "part": "left vastus medialis"
+  },
+  "FJ1444": {
+   "kind": "muscle",
+   "muscle": "hamstrings",
+   "side": "right",
+   "part": "short head of right biceps femoris"
+  },
+  "FJ1444M": {
+   "kind": "muscle",
+   "muscle": "hamstrings",
+   "side": "left",
+   "part": "short head of left biceps femoris"
+  },
+  "FJ1446": {
+   "kind": "muscle",
+   "muscle": "chest",
+   "side": "right",
+   "part": "abdominal part of right pectoralis major"
+  },
+  "FJ1446M": {
+   "kind": "muscle",
+   "muscle": "chest",
+   "side": "left",
+   "part": "abdominal part of left pectoralis major"
+  },
+  "FJ1447": {
+   "kind": "muscle",
+   "muscle": "chest",
+   "side": "right",
+   "part": "clavicular part of right pectoralis major"
+  },
+  "FJ1447M": {
+   "kind": "muscle",
+   "muscle": "chest",
+   "side": "left",
+   "part": "clavicular part of left pectoralis major"
+  },
+  "FJ1448": {
+   "kind": "tissue",
+   "part": "linea alba",
+   "side": null
+  },
+  "FJ1452": {
+   "kind": "muscle",
+   "muscle": "abdominals",
+   "side": "right",
+   "part": "right external oblique"
+  },
+  "FJ1452M": {
+   "kind": "muscle",
+   "muscle": "abdominals",
+   "side": "left",
+   "part": "left external oblique"
+  },
+  "FJ1456": {
+   "kind": "neutral",
+   "part": "right pectoralis minor",
+   "side": "right"
+  },
+  "FJ1456M": {
+   "kind": "neutral",
+   "part": "left pectoralis minor",
+   "side": "left"
+  },
+  "FJ1459": {
+   "kind": "muscle",
+   "muscle": "abdominals",
+   "side": "right",
+   "part": "right serratus anterior"
+  },
+  "FJ1459M": {
+   "kind": "muscle",
+   "muscle": "abdominals",
+   "side": "left",
+   "part": "left serratus anterior"
+  },
+  "FJ1464": {
+   "kind": "muscle",
+   "muscle": "chest",
+   "side": "right",
+   "part": "sternocostal part of right pectoralis major"
+  },
+  "FJ1464M": {
+   "kind": "muscle",
+   "muscle": "chest",
+   "side": "left",
+   "part": "sternocostal part of left pectoralis major"
+  },
+  "FJ1467": {
+   "kind": "muscle",
+   "muscle": "shoulders",
+   "side": "right",
+   "part": "acromial part of right deltoid"
+  },
+  "FJ1467M": {
+   "kind": "muscle",
+   "muscle": "shoulders",
+   "side": "left",
+   "part": "acromial part of left deltoid"
+  },
+  "FJ1468": {
+   "kind": "muscle",
+   "muscle": "shoulders",
+   "side": "right",
+   "part": "clavicular part of right deltoid"
+  },
+  "FJ1468M": {
+   "kind": "muscle",
+   "muscle": "shoulders",
+   "side": "left",
+   "part": "clavicular part of left deltoid"
+  },
+  "FJ1471": {
+   "kind": "tissue",
+   "part": "flexor retinaculum of right wrist",
+   "side": "right"
+  },
+  "FJ1471M": {
+   "kind": "tissue",
+   "part": "flexor retinaculum of left wrist",
+   "side": "left"
+  },
+  "FJ1472": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right extensor carpi ulnaris"
+  },
+  "FJ1472M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left extensor carpi ulnaris"
+  },
+  "FJ1473": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "humeral head of right flexor carpi ulnaris"
+  },
+  "FJ1473M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "humeral head of left flexor carpi ulnaris"
+  },
+  "FJ1474": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "humeral head of right pronator teres"
+  },
+  "FJ1474M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "humeral head of left pronator teres"
+  },
+  "FJ1475": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right flexor digitorum superficialis"
+  },
+  "FJ1475M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left flexor digitorum superficialis"
+  },
+  "FJ1477": {
+   "kind": "muscle",
+   "muscle": "triceps",
+   "side": "right",
+   "part": "lateral head of right triceps brachii"
+  },
+  "FJ1477M": {
+   "kind": "muscle",
+   "muscle": "triceps",
+   "side": "left",
+   "part": "lateral head of left triceps brachii"
+  },
+  "FJ1478": {
+   "kind": "muscle",
+   "muscle": "biceps",
+   "side": "right",
+   "part": "long head of right biceps brachii"
+  },
+  "FJ1478M": {
+   "kind": "muscle",
+   "muscle": "biceps",
+   "side": "left",
+   "part": "long head of left biceps brachii"
+  },
+  "FJ1479": {
+   "kind": "muscle",
+   "muscle": "triceps",
+   "side": "right",
+   "part": "long head of right triceps brachii"
+  },
+  "FJ1479M": {
+   "kind": "muscle",
+   "muscle": "triceps",
+   "side": "left",
+   "part": "long head of left triceps brachii"
+  },
+  "FJ1480": {
+   "kind": "muscle",
+   "muscle": "triceps",
+   "side": "right",
+   "part": "medial head of right triceps brachii"
+  },
+  "FJ1480M": {
+   "kind": "muscle",
+   "muscle": "triceps",
+   "side": "left",
+   "part": "medial head of left triceps brachii"
+  },
+  "FJ1484": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right abductor pollicis longus"
+  },
+  "FJ1484M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left abductor pollicis longus"
+  },
+  "FJ1485": {
+   "kind": "muscle",
+   "muscle": "triceps",
+   "side": "right",
+   "part": "right anconeus"
+  },
+  "FJ1485M": {
+   "kind": "muscle",
+   "muscle": "triceps",
+   "side": "left",
+   "part": "left anconeus"
+  },
+  "FJ1486": {
+   "kind": "muscle",
+   "muscle": "biceps",
+   "side": "right",
+   "part": "right brachialis"
+  },
+  "FJ1486M": {
+   "kind": "muscle",
+   "muscle": "biceps",
+   "side": "left",
+   "part": "left brachialis"
+  },
+  "FJ1487": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right brachioradialis"
+  },
+  "FJ1487M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left brachioradialis"
+  },
+  "FJ1488": {
+   "kind": "muscle",
+   "muscle": "biceps",
+   "side": "right",
+   "part": "right coracobrachialis"
+  },
+  "FJ1488M": {
+   "kind": "muscle",
+   "muscle": "biceps",
+   "side": "left",
+   "part": "left coracobrachialis"
+  },
+  "FJ1489": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right extensor carpi radialis brevis"
+  },
+  "FJ1489M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left extensor carpi radialis brevis"
+  },
+  "FJ1490": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right extensor carpi radialis longus"
+  },
+  "FJ1490M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left extensor carpi radialis longus"
+  },
+  "FJ1491": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right extensor digiti minimi"
+  },
+  "FJ1491M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left extensor digiti minimi"
+  },
+  "FJ1492": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right extensor digitorum"
+  },
+  "FJ1492M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left extensor digitorum"
+  },
+  "FJ1493": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right extensor indicis"
+  },
+  "FJ1493M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left extensor indicis"
+  },
+  "FJ1494": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right extensor pollicis brevis"
+  },
+  "FJ1494M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left extensor pollicis brevis"
+  },
+  "FJ1495": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right extensor pollicis longus"
+  },
+  "FJ1495M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left extensor pollicis longus"
+  },
+  "FJ1496": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right flexor carpi radialis"
+  },
+  "FJ1496M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left flexor carpi radialis"
+  },
+  "FJ1497": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right flexor digitorum profundus"
+  },
+  "FJ1497M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left flexor digitorum profundus"
+  },
+  "FJ1498": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right flexor pollicis longus"
+  },
+  "FJ1498M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left flexor pollicis longus"
+  },
+  "FJ1499": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right flexor digitorum superficialis"
+  },
+  "FJ1499M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left flexor digitorum superficialis"
+  },
+  "FJ1500": {
+   "kind": "muscle",
+   "muscle": "shoulders",
+   "side": "right",
+   "part": "right infraspinatus muscle"
+  },
+  "FJ1500M": {
+   "kind": "muscle",
+   "muscle": "shoulders",
+   "side": "left",
+   "part": "left infraspinatus muscle"
+  },
+  "FJ1502": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right palmaris longus"
+  },
+  "FJ1502M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left palmaris longus"
+  },
+  "FJ1504": {
+   "kind": "neutral",
+   "part": "right subscapularis",
+   "side": "right"
+  },
+  "FJ1504M": {
+   "kind": "neutral",
+   "part": "left subscapularis",
+   "side": "left"
+  },
+  "FJ1505": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right supinator"
+  },
+  "FJ1505M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left supinator"
+  },
+  "FJ1506": {
+   "kind": "muscle",
+   "muscle": "shoulders",
+   "side": "right",
+   "part": "right supraspinatus"
+  },
+  "FJ1506M": {
+   "kind": "muscle",
+   "muscle": "shoulders",
+   "side": "left",
+   "part": "left supraspinatus"
+  },
+  "FJ1507": {
+   "kind": "muscle",
+   "muscle": "lats",
+   "side": "right",
+   "part": "right teres major"
+  },
+  "FJ1507M": {
+   "kind": "muscle",
+   "muscle": "lats",
+   "side": "left",
+   "part": "left teres major"
+  },
+  "FJ1508": {
+   "kind": "muscle",
+   "muscle": "shoulders",
+   "side": "right",
+   "part": "right teres minor"
+  },
+  "FJ1508M": {
+   "kind": "muscle",
+   "muscle": "shoulders",
+   "side": "left",
+   "part": "left teres minor"
+  },
+  "FJ1512": {
+   "kind": "muscle",
+   "muscle": "biceps",
+   "side": "right",
+   "part": "short head of right biceps brachii"
+  },
+  "FJ1512M": {
+   "kind": "muscle",
+   "muscle": "biceps",
+   "side": "left",
+   "part": "short head of left biceps brachii"
+  },
+  "FJ1513": {
+   "kind": "muscle",
+   "muscle": "shoulders",
+   "side": "right",
+   "part": "spinal part of right deltoid"
+  },
+  "FJ1513M": {
+   "kind": "muscle",
+   "muscle": "shoulders",
+   "side": "left",
+   "part": "spinal part of left deltoid"
+  },
+  "FJ1516": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "ulnar head of right pronator teres"
+  },
+  "FJ1516M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "ulnar head of left pronator teres"
+  },
+  "FJ1517": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "right extensor carpi ulnaris"
+  },
+  "FJ1517M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "left extensor carpi ulnaris"
+  },
+  "FJ1518": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "right",
+   "part": "ulnar head of right flexor carpi ulnaris"
+  },
+  "FJ1518M": {
+   "kind": "muscle",
+   "muscle": "forearms",
+   "side": "left",
+   "part": "ulnar head of left flexor carpi ulnaris"
+  },
+  "FJ1520": {
+   "kind": "muscle",
+   "muscle": "traps",
+   "side": "right",
+   "part": "ascending part of right trapezius"
+  },
+  "FJ1520M": {
+   "kind": "muscle",
+   "muscle": "traps",
+   "side": "left",
+   "part": "ascending part of left trapezius"
+  },
+  "FJ1521": {
+   "kind": "muscle",
+   "muscle": "traps",
+   "side": "right",
+   "part": "descending part of right trapezius"
+  },
+  "FJ1521M": {
+   "kind": "muscle",
+   "muscle": "traps",
+   "side": "left",
+   "part": "descending part of left trapezius"
+  },
+  "FJ1526": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "right",
+   "part": "right iliocostalis cervicis"
+  },
+  "FJ1526M": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "left",
+   "part": "left iliocostalis cervicis"
+  },
+  "FJ1527": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "right",
+   "part": "right iliocostalis lumborum"
+  },
+  "FJ1527M": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "left",
+   "part": "left iliocostalis lumborum"
+  },
+  "FJ1528": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "right",
+   "part": "right iliocostalis thoracis"
+  },
+  "FJ1528M": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "left",
+   "part": "left iliocostalis thoracis"
+  },
+  "FJ1532": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "right",
+   "part": "right levator scapulae"
+  },
+  "FJ1532M": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "left",
+   "part": "left levator scapulae"
+  },
+  "FJ1533": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "right",
+   "part": "right longissimus capitis"
+  },
+  "FJ1533M": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "left",
+   "part": "left longissimus capitis"
+  },
+  "FJ1534": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "right",
+   "part": "right longissimus cervicis"
+  },
+  "FJ1534M": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "left",
+   "part": "left longissimus cervicis"
+  },
+  "FJ1535": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "right",
+   "part": "right longissimus thoracis"
+  },
+  "FJ1535M": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "left",
+   "part": "left longissimus thoracis"
+  },
+  "FJ1536": {
+   "kind": "muscle",
+   "muscle": "middle back",
+   "side": "right",
+   "part": "right rhomboid major"
+  },
+  "FJ1536M": {
+   "kind": "muscle",
+   "muscle": "middle back",
+   "side": "left",
+   "part": "left rhomboid major"
+  },
+  "FJ1537": {
+   "kind": "muscle",
+   "muscle": "middle back",
+   "side": "right",
+   "part": "right rhomboid minor"
+  },
+  "FJ1537M": {
+   "kind": "muscle",
+   "muscle": "middle back",
+   "side": "left",
+   "part": "left rhomboid minor"
+  },
+  "FJ1538": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "right",
+   "part": "semispinalis"
+  },
+  "FJ1538M": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "left",
+   "part": "semispinalis"
+  },
+  "FJ1539": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "right",
+   "part": "right semispinalis cervicis"
+  },
+  "FJ1539M": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "left",
+   "part": "left semispinalis cervicis"
+  },
+  "FJ1540": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "right",
+   "part": "right semispinalis thoracis"
+  },
+  "FJ1540M": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "left",
+   "part": "left semispinalis thoracis"
+  },
+  "FJ1541": {
+   "kind": "neutral",
+   "part": "right serratus posterior inferior",
+   "side": "right"
+  },
+  "FJ1541M": {
+   "kind": "neutral",
+   "part": "left serratus posterior inferior",
+   "side": "left"
+  },
+  "FJ1542": {
+   "kind": "neutral",
+   "part": "right serratus posterior superior",
+   "side": "right"
+  },
+  "FJ1542M": {
+   "kind": "neutral",
+   "part": "left serratus posterior superior",
+   "side": "left"
+  },
+  "FJ1543": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": null,
+   "part": "spinalis"
+  },
+  "FJ1543M": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": null,
+   "part": "spinalis"
+  },
+  "FJ1544": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "right",
+   "part": "right spinalis thoracis"
+  },
+  "FJ1544M": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "left",
+   "part": "left spinalis thoracis"
+  },
+  "FJ1545": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "right",
+   "part": "right splenius capitis"
+  },
+  "FJ1545M": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "left",
+   "part": "left splenius capitis"
+  },
+  "FJ1546": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "right",
+   "part": "right splenius cervicis"
+  },
+  "FJ1546M": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "left",
+   "part": "left splenius cervicis"
+  },
+  "FJ1551": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "right",
+   "part": "right interspinalis thoracis"
+  },
+  "FJ1551M": {
+   "kind": "muscle",
+   "muscle": "lower back",
+   "side": "left",
+   "part": "left interspinalis thoracis"
+  },
+  "FJ1554": {
+   "kind": "muscle",
+   "muscle": "traps",
+   "side": "right",
+   "part": "transverse part of right trapezius"
+  },
+  "FJ1554M": {
+   "kind": "muscle",
+   "muscle": "traps",
+   "side": "left",
+   "part": "transverse part of left trapezius"
+  },
+  "FJ1555": {
+   "kind": "neutral",
+   "part": "left digastric",
+   "side": "left"
+  },
+  "FJ1556": {
+   "kind": "neutral",
+   "part": "right digastric",
+   "side": "right"
+  },
+  "FJ1560": {
+   "kind": "neutral",
+   "part": "left digastric",
+   "side": "left"
+  },
+  "FJ1562": {
+   "kind": "neutral",
+   "part": "left mylohyoid",
+   "side": "left"
+  },
+  "FJ1565": {
+   "kind": "neutral",
+   "part": "left omohyoid",
+   "side": "left"
+  },
+  "FJ1570": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "left",
+   "part": "left scalenus anterior"
+  },
+  "FJ1571": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "left",
+   "part": "left scalenus medius"
+  },
+  "FJ1572": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "left",
+   "part": "left scalenus posterior"
+  },
+  "FJ1573": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "left",
+   "part": "left sternocleidomastoid"
+  },
+  "FJ1574": {
+   "kind": "neutral",
+   "part": "left sternohyoid",
+   "side": "left"
+  },
+  "FJ1575": {
+   "kind": "neutral",
+   "part": "left sternothyroid",
+   "side": "left"
+  },
+  "FJ1577": {
+   "kind": "neutral",
+   "part": "left thyrohyoid",
+   "side": "left"
+  },
+  "FJ1578": {
+   "kind": "neutral",
+   "part": "left digastric",
+   "side": "left"
+  },
+  "FJ1579": {
+   "kind": "neutral",
+   "part": "right digastric",
+   "side": "right"
+  },
+  "FJ1583": {
+   "kind": "neutral",
+   "part": "right mylohyoid",
+   "side": "right"
+  },
+  "FJ1586": {
+   "kind": "neutral",
+   "part": "right omohyoid",
+   "side": "right"
+  },
+  "FJ1592": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "right",
+   "part": "right scalenus anterior"
+  },
+  "FJ1593": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "right",
+   "part": "right scalenus medius"
+  },
+  "FJ1594": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "right",
+   "part": "right scalenus posterior"
+  },
+  "FJ1595": {
+   "kind": "muscle",
+   "muscle": "neck",
+   "side": "right",
+   "part": "right sternocleidomastoid"
+  },
+  "FJ1596": {
+   "kind": "neutral",
+   "part": "right sternohyoid",
+   "side": "right"
+  },
+  "FJ1597": {
+   "kind": "neutral",
+   "part": "right sternothyroid",
+   "side": "right"
+  },
+  "FJ1599": {
+   "kind": "neutral",
+   "part": "right thyrohyoid",
+   "side": "right"
+  },
+  "FJ2440": {
+   "kind": "tissue",
+   "part": "cricoid cartilage",
+   "side": null
+  },
+  "FJ2541": {
+   "kind": "tissue",
+   "part": "trachea",
+   "side": null
+  },
+  "FJ2769": {
+   "kind": "tissue",
+   "part": "cricoid cartilage",
+   "side": null
+  },
+  "FJ2772": {
+   "kind": "tissue",
+   "part": "hyoid bone",
+   "side": null
+  },
+  "FJ2779": {
+   "kind": "neutral",
+   "part": "left lateral thyrohyoid ligament",
+   "side": "left"
+  },
+  "FJ2790": {
+   "kind": "neutral",
+   "part": "median thyrohyoid ligament",
+   "side": null
+  },
+  "FJ2797": {
+   "kind": "neutral",
+   "part": "right lateral thyrohyoid ligament",
+   "side": "right"
+  },
+  "FJ2808": {
+   "kind": "tissue",
+   "part": "thyroid cartilage",
+   "side": null
+  },
+  "FJ2810": {
+   "kind": "skin",
+   "part": "skin"
+  },
+  "FJ3152": {
+   "kind": "bone",
+   "part": "right hip bone",
+   "side": "right"
+  },
+  "FJ3153": {
+   "kind": "bone",
+   "part": "xiphoid process",
+   "side": null
+  },
+  "FJ3154": {
+   "kind": "bone",
+   "part": "tenth thoracic vertebra",
+   "side": null
+  },
+  "FJ3155": {
+   "kind": "bone",
+   "part": "eleventh thoracic vertebra",
+   "side": null
+  },
+  "FJ3156": {
+   "kind": "bone",
+   "part": "twelfth thoracic vertebra",
+   "side": null
+  },
+  "FJ3157": {
+   "kind": "bone",
+   "part": "first lumbar vertebra",
+   "side": null
+  },
+  "FJ3158": {
+   "kind": "bone",
+   "part": "first thoracic vertebra",
+   "side": null
+  },
+  "FJ3159": {
+   "kind": "bone",
+   "part": "second lumbar vertebra",
+   "side": null
+  },
+  "FJ3160": {
+   "kind": "bone",
+   "part": "second thoracic vertebra",
+   "side": null
+  },
+  "FJ3161": {
+   "kind": "bone",
+   "part": "third cervical vertebra",
+   "side": null
+  },
+  "FJ3162": {
+   "kind": "bone",
+   "part": "third lumbar vertebra",
+   "side": null
+  },
+  "FJ3163": {
+   "kind": "bone",
+   "part": "third thoracic vertebra",
+   "side": null
+  },
+  "FJ3164": {
+   "kind": "bone",
+   "part": "fourth cervical vertebra",
+   "side": null
+  },
+  "FJ3165": {
+   "kind": "bone",
+   "part": "fourth lumbar vertebra",
+   "side": null
+  },
+  "FJ3166": {
+   "kind": "bone",
+   "part": "fourth thoracic vertebra",
+   "side": null
+  },
+  "FJ3167": {
+   "kind": "bone",
+   "part": "fifth cervical vertebra",
+   "side": null
+  },
+  "FJ3168": {
+   "kind": "bone",
+   "part": "fifth lumbar vertebra",
+   "side": null
+  },
+  "FJ3169": {
+   "kind": "bone",
+   "part": "fifth thoracic vertebra",
+   "side": null
+  },
+  "FJ3170": {
+   "kind": "bone",
+   "part": "sixth cervical vertebra",
+   "side": null
+  },
+  "FJ3171": {
+   "kind": "bone",
+   "part": "sixth thoracic vertebra",
+   "side": null
+  },
+  "FJ3172": {
+   "kind": "bone",
+   "part": "seventh cervical vertebra",
+   "side": null
+  },
+  "FJ3173": {
+   "kind": "bone",
+   "part": "seventh thoracic vertebra",
+   "side": null
+  },
+  "FJ3174": {
+   "kind": "bone",
+   "part": "eighth thoracic vertebra",
+   "side": null
+  },
+  "FJ3175": {
+   "kind": "bone",
+   "part": "ninth thoracic vertebra",
+   "side": null
+  },
+  "FJ3176": {
+   "kind": "bone",
+   "part": "atlas",
+   "side": null
+  },
+  "FJ3177": {
+   "kind": "bone",
+   "part": "axis",
+   "side": null
+  },
+  "FJ3178": {
+   "kind": "bone",
+   "part": "body of sternum",
+   "side": null
+  },
+  "FJ3179": {
+   "kind": "bone",
+   "part": "distal phalanx of left second toe",
+   "side": "left"
+  },
+  "FJ3180": {
+   "kind": "bone",
+   "part": "distal phalanx of left third toe",
+   "side": "left"
+  },
+  "FJ3181": {
+   "kind": "bone",
+   "part": "distal phalanx of left fourth toe",
+   "side": "left"
+  },
+  "FJ3182": {
+   "kind": "bone",
+   "part": "distal phalanx of left big toe",
+   "side": "left"
+  },
+  "FJ3183": {
+   "kind": "bone",
+   "part": "distal phalanx of left index finger",
+   "side": "left"
+  },
+  "FJ3184": {
+   "kind": "bone",
+   "part": "distal phalanx of left little finger",
+   "side": "left"
+  },
+  "FJ3185": {
+   "kind": "bone",
+   "part": "distal phalanx of left little toe",
+   "side": "left"
+  },
+  "FJ3186": {
+   "kind": "bone",
+   "part": "distal phalanx of left middle finger",
+   "side": "left"
+  },
+  "FJ3187": {
+   "kind": "bone",
+   "part": "distal phalanx of left ring finger",
+   "side": "left"
+  },
+  "FJ3188": {
+   "kind": "bone",
+   "part": "distal phalanx of left thumb",
+   "side": "left"
+  },
+  "FJ3189": {
+   "kind": "bone",
+   "part": "distal phalanx of right second toe",
+   "side": "right"
+  },
+  "FJ3190": {
+   "kind": "bone",
+   "part": "distal phalanx of right third toe",
+   "side": "right"
+  },
+  "FJ3191": {
+   "kind": "bone",
+   "part": "distal phalanx of right fourth toe",
+   "side": "right"
+  },
+  "FJ3192": {
+   "kind": "bone",
+   "part": "distal phalanx of right big toe",
+   "side": "right"
+  },
+  "FJ3193": {
+   "kind": "bone",
+   "part": "distal phalanx of right index finger",
+   "side": "right"
+  },
+  "FJ3194": {
+   "kind": "bone",
+   "part": "distal phalanx of right little finger",
+   "side": "right"
+  },
+  "FJ3195": {
+   "kind": "bone",
+   "part": "distal phalanx of right little toe",
+   "side": "right"
+  },
+  "FJ3196": {
+   "kind": "bone",
+   "part": "distal phalanx of right middle finger",
+   "side": "right"
+  },
+  "FJ3197": {
+   "kind": "bone",
+   "part": "distal phalanx of right ring finger",
+   "side": "right"
+  },
+  "FJ3198": {
+   "kind": "bone",
+   "part": "distal phalanx of right thumb",
+   "side": "right"
+  },
+  "FJ3201": {
+   "kind": "tissue",
+   "part": "hyoid bone",
+   "side": null
+  },
+  "FJ3202": {
+   "kind": "tissue",
+   "part": "intervertebral disk of axis",
+   "side": null
+  },
+  "FJ3203": {
+   "kind": "bone",
+   "part": "intervertebral disk of fourth thoracic vertebra",
+   "side": null
+  },
+  "FJ3204": {
+   "kind": "bone",
+   "part": "intervertebral disk of fifth thoracic vertebra",
+   "side": null
+  },
+  "FJ3205": {
+   "kind": "bone",
+   "part": "intervertebral disk of sixth thoracic vertebra",
+   "side": null
+  },
+  "FJ3206": {
+   "kind": "bone",
+   "part": "intervertebral disk of seventh thoracic vertebra",
+   "side": null
+  },
+  "FJ3207": {
+   "kind": "bone",
+   "part": "intervertebral disk of eighth thoracic vertebra",
+   "side": null
+  },
+  "FJ3208": {
+   "kind": "bone",
+   "part": "intervertebral disk of ninth thoracic vertebra",
+   "side": null
+  },
+  "FJ3209": {
+   "kind": "bone",
+   "part": "intervertebral disk of tenth thoracic vertebra",
+   "side": null
+  },
+  "FJ3210": {
+   "kind": "bone",
+   "part": "intervertebral disk of eleventh thoracic vertebra",
+   "side": null
+  },
+  "FJ3211": {
+   "kind": "tissue",
+   "part": "intervertebral disk",
+   "side": null
+  },
+  "FJ3212": {
+   "kind": "bone",
+   "part": "intervertebral disk of first lumbar vertebra",
+   "side": null
+  },
+  "FJ3213": {
+   "kind": "bone",
+   "part": "intervertebral disk of third cervical vertebra",
+   "side": null
+  },
+  "FJ3214": {
+   "kind": "bone",
+   "part": "intervertebral disk of second lumbar vertebra",
+   "side": null
+  },
+  "FJ3215": {
+   "kind": "bone",
+   "part": "intervertebral disk of third lumbar vertebra",
+   "side": null
+  },
+  "FJ3216": {
+   "kind": "bone",
+   "part": "intervertebral disk of fourth lumbar vertebra",
+   "side": null
+  },
+  "FJ3217": {
+   "kind": "bone",
+   "part": "intervertebral disk of fifth lumbar vertebra",
+   "side": null
+  },
+  "FJ3218": {
+   "kind": "bone",
+   "part": "intervertebral disk of fourth cervical vertebra",
+   "side": null
+  },
+  "FJ3219": {
+   "kind": "bone",
+   "part": "intervertebral disk of fifth cervical vertebra",
+   "side": null
+  },
+  "FJ3220": {
+   "kind": "bone",
+   "part": "intervertebral disk of sixth cervical vertebra",
+   "side": null
+  },
+  "FJ3221": {
+   "kind": "bone",
+   "part": "intervertebral disk of seventh cervical vertebra",
+   "side": null
+  },
+  "FJ3222": {
+   "kind": "bone",
+   "part": "intervertebral disk of first thoracic vertebra",
+   "side": null
+  },
+  "FJ3223": {
+   "kind": "bone",
+   "part": "intervertebral disk of second thoracic vertebra",
+   "side": null
+  },
+  "FJ3224": {
+   "kind": "bone",
+   "part": "intervertebral disk of third thoracic vertebra",
+   "side": null
+  },
+  "FJ3225": {
+   "kind": "bone",
+   "part": "left tenth rib",
+   "side": "left"
+  },
+  "FJ3226": {
+   "kind": "bone",
+   "part": "left eleventh rib",
+   "side": "left"
+  },
+  "FJ3227": {
+   "kind": "bone",
+   "part": "left twelfth rib",
+   "side": "left"
+  },
+  "FJ3228": {
+   "kind": "bone",
+   "part": "left first rib",
+   "side": "left"
+  },
+  "FJ3229": {
+   "kind": "bone",
+   "part": "left second rib",
+   "side": "left"
+  },
+  "FJ3230": {
+   "kind": "bone",
+   "part": "left third rib",
+   "side": "left"
+  },
+  "FJ3231": {
+   "kind": "bone",
+   "part": "left fourth rib",
+   "side": "left"
+  },
+  "FJ3232": {
+   "kind": "bone",
+   "part": "left fifth rib",
+   "side": "left"
+  },
+  "FJ3233": {
+   "kind": "bone",
+   "part": "left sixth rib",
+   "side": "left"
+  },
+  "FJ3234": {
+   "kind": "bone",
+   "part": "left seventh rib",
+   "side": "left"
+  },
+  "FJ3235": {
+   "kind": "bone",
+   "part": "left eighth rib",
+   "side": "left"
+  },
+  "FJ3236": {
+   "kind": "bone",
+   "part": "left ninth rib",
+   "side": "left"
+  },
+  "FJ3237": {
+   "kind": "bone",
+   "part": "left clavicle",
+   "side": "left"
+  },
+  "FJ3239": {
+   "kind": "tissue",
+   "part": "left first costal cartilage",
+   "side": "left"
+  },
+  "FJ3240": {
+   "kind": "bone",
+   "part": "left first metacarpal bone",
+   "side": "left"
+  },
+  "FJ3241": {
+   "kind": "bone",
+   "part": "left first metatarsal bone",
+   "side": "left"
+  },
+  "FJ3242": {
+   "kind": "tissue",
+   "part": "left second costal cartilage",
+   "side": "left"
+  },
+  "FJ3243": {
+   "kind": "bone",
+   "part": "left second metacarpal bone",
+   "side": "left"
+  },
+  "FJ3244": {
+   "kind": "bone",
+   "part": "left second metatarsal bone",
+   "side": "left"
+  },
+  "FJ3245": {
+   "kind": "tissue",
+   "part": "left third costal cartilage",
+   "side": "left"
+  },
+  "FJ3246": {
+   "kind": "bone",
+   "part": "left third metacarpal bone",
+   "side": "left"
+  },
+  "FJ3247": {
+   "kind": "bone",
+   "part": "left third metatarsal bone",
+   "side": "left"
+  },
+  "FJ3248": {
+   "kind": "tissue",
+   "part": "left fourth costal cartilage",
+   "side": "left"
+  },
+  "FJ3249": {
+   "kind": "bone",
+   "part": "left fourth metacarpal bone",
+   "side": "left"
+  },
+  "FJ3250": {
+   "kind": "bone",
+   "part": "left fourth metatarsal bone",
+   "side": "left"
+  },
+  "FJ3251": {
+   "kind": "tissue",
+   "part": "left fifth costal cartilage",
+   "side": "left"
+  },
+  "FJ3252": {
+   "kind": "bone",
+   "part": "left fifth metacarpal bone",
+   "side": "left"
+  },
+  "FJ3253": {
+   "kind": "bone",
+   "part": "left fifth metatarsal bone",
+   "side": "left"
+  },
+  "FJ3254": {
+   "kind": "tissue",
+   "part": "left sixth costal cartilage",
+   "side": "left"
+  },
+  "FJ3255": {
+   "kind": "tissue",
+   "part": "left seventh costal cartilage",
+   "side": "left"
+  },
+  "FJ3256": {
+   "kind": "bone",
+   "part": "left calcaneus",
+   "side": "left"
+  },
+  "FJ3257": {
+   "kind": "bone",
+   "part": "left capitate",
+   "side": "left"
+  },
+  "FJ3258": {
+   "kind": "bone",
+   "part": "left cuboid bone",
+   "side": "left"
+  },
+  "FJ3259": {
+   "kind": "bone",
+   "part": "left femur",
+   "side": "left"
+  },
+  "FJ3260": {
+   "kind": "bone",
+   "part": "left fibula",
+   "side": "left"
+  },
+  "FJ3261": {
+   "kind": "bone",
+   "part": "left hamate",
+   "side": "left"
+  },
+  "FJ3262": {
+   "kind": "bone",
+   "part": "left humerus",
+   "side": "left"
+  },
+  "FJ3264": {
+   "kind": "bone",
+   "part": "left intermediate cuneiform bone",
+   "side": "left"
+  },
+  "FJ3267": {
+   "kind": "bone",
+   "part": "left lateral cuneiform bone",
+   "side": "left"
+  },
+  "FJ3268": {
+   "kind": "bone",
+   "part": "left lunate",
+   "side": "left"
+  },
+  "FJ3271": {
+   "kind": "bone",
+   "part": "left medial cuneiform bone",
+   "side": "left"
+  },
+  "FJ3275": {
+   "kind": "bone",
+   "part": "left patella",
+   "side": "left"
+  },
+  "FJ3276": {
+   "kind": "bone",
+   "part": "left pisiform",
+   "side": "left"
+  },
+  "FJ3277": {
+   "kind": "bone",
+   "part": "left radius",
+   "side": "left"
+  },
+  "FJ3278": {
+   "kind": "bone",
+   "part": "left scaphoid",
+   "side": "left"
+  },
+  "FJ3279": {
+   "kind": "bone",
+   "part": "left scapula",
+   "side": "left"
+  },
+  "FJ3280": {
+   "kind": "bone",
+   "part": "left talus",
+   "side": "left"
+  },
+  "FJ3282": {
+   "kind": "bone",
+   "part": "left tibia",
+   "side": "left"
+  },
+  "FJ3283": {
+   "kind": "bone",
+   "part": "left trapezium",
+   "side": "left"
+  },
+  "FJ3284": {
+   "kind": "bone",
+   "part": "left trapezoid",
+   "side": "left"
+  },
+  "FJ3285": {
+   "kind": "bone",
+   "part": "left triquetral",
+   "side": "left"
+  },
+  "FJ3286": {
+   "kind": "bone",
+   "part": "left ulna",
+   "side": "left"
+  },
+  "FJ3288": {
+   "kind": "bone",
+   "part": "left hip bone",
+   "side": "left"
+  },
+  "FJ3289": {
+   "kind": "bone",
+   "part": "mandible",
+   "side": null
+  },
+  "FJ3290": {
+   "kind": "bone",
+   "part": "manubrium",
+   "side": null
+  },
+  "FJ3291": {
+   "kind": "bone",
+   "part": "middle phalanx of left ring finger",
+   "side": "left"
+  },
+  "FJ3292": {
+   "kind": "bone",
+   "part": "middle phalanx of right ring finger",
+   "side": "right"
+  },
+  "FJ3293": {
+   "kind": "bone",
+   "part": "middle phalanx of left second toe",
+   "side": "left"
+  },
+  "FJ3294": {
+   "kind": "bone",
+   "part": "middle phalanx of left third toe",
+   "side": "left"
+  },
+  "FJ3295": {
+   "kind": "bone",
+   "part": "middle phalanx of left fourth toe",
+   "side": "left"
+  },
+  "FJ3296": {
+   "kind": "bone",
+   "part": "middle phalanx of left index finger",
+   "side": "left"
+  },
+  "FJ3297": {
+   "kind": "bone",
+   "part": "middle phalanx of left little finger",
+   "side": "left"
+  },
+  "FJ3298": {
+   "kind": "bone",
+   "part": "middle phalanx of left little toe",
+   "side": "left"
+  },
+  "FJ3299": {
+   "kind": "bone",
+   "part": "middle phalanx of left middle finger",
+   "side": "left"
+  },
+  "FJ3300": {
+   "kind": "bone",
+   "part": "middle phalanx of right second toe",
+   "side": "right"
+  },
+  "FJ3301": {
+   "kind": "bone",
+   "part": "middle phalanx of right third toe",
+   "side": "right"
+  },
+  "FJ3302": {
+   "kind": "bone",
+   "part": "middle phalanx of right fourth toe",
+   "side": "right"
+  },
+  "FJ3303": {
+   "kind": "bone",
+   "part": "middle phalanx of right index finger",
+   "side": "right"
+  },
+  "FJ3304": {
+   "kind": "bone",
+   "part": "middle phalanx of right little finger",
+   "side": "right"
+  },
+  "FJ3305": {
+   "kind": "bone",
+   "part": "middle phalanx of right little toe",
+   "side": "right"
+  },
+  "FJ3306": {
+   "kind": "bone",
+   "part": "middle phalanx of right middle finger",
+   "side": "right"
+  },
+  "FJ3310": {
+   "kind": "bone",
+   "part": "proximal phalanx of right big toe",
+   "side": "right"
+  },
+  "FJ3311": {
+   "kind": "bone",
+   "part": "proximal phalanx of left third toe",
+   "side": "left"
+  },
+  "FJ3312": {
+   "kind": "bone",
+   "part": "proximal phalanx of left fourth toe",
+   "side": "left"
+  },
+  "FJ3313": {
+   "kind": "bone",
+   "part": "proximal phalanx of left index finger",
+   "side": "left"
+  },
+  "FJ3314": {
+   "kind": "bone",
+   "part": "proximal phalanx of left little finger",
+   "side": "left"
+  },
+  "FJ3315": {
+   "kind": "bone",
+   "part": "proximal phalanx of left little toe",
+   "side": "left"
+  },
+  "FJ3316": {
+   "kind": "bone",
+   "part": "proximal phalanx of left middle finger",
+   "side": "left"
+  },
+  "FJ3317": {
+   "kind": "bone",
+   "part": "proximal phalanx of left ring finger",
+   "side": "left"
+  },
+  "FJ3318": {
+   "kind": "bone",
+   "part": "proximal phalanx of left thumb",
+   "side": "left"
+  },
+  "FJ3319": {
+   "kind": "bone",
+   "part": "proximal phalanx of right second toe",
+   "side": "right"
+  },
+  "FJ3320": {
+   "kind": "bone",
+   "part": "proximal phalanx of right third toe",
+   "side": "right"
+  },
+  "FJ3321": {
+   "kind": "bone",
+   "part": "proximal phalanx of right fourth toe",
+   "side": "right"
+  },
+  "FJ3322": {
+   "kind": "bone",
+   "part": "proximal phalanx of right index finger",
+   "side": "right"
+  },
+  "FJ3323": {
+   "kind": "bone",
+   "part": "proximal phalanx of right little finger",
+   "side": "right"
+  },
+  "FJ3324": {
+   "kind": "bone",
+   "part": "proximal phalanx of right little toe",
+   "side": "right"
+  },
+  "FJ3325": {
+   "kind": "bone",
+   "part": "proximal phalanx of right middle finger",
+   "side": "right"
+  },
+  "FJ3326": {
+   "kind": "bone",
+   "part": "proximal phalanx of right ring finger",
+   "side": "right"
+  },
+  "FJ3327": {
+   "kind": "bone",
+   "part": "proximal phalanx of right thumb",
+   "side": "right"
+  },
+  "FJ3328": {
+   "kind": "bone",
+   "part": "proximal phalanx of left second toe",
+   "side": "left"
+  },
+  "FJ3329": {
+   "kind": "bone",
+   "part": "proximal phalanx of left big toe",
+   "side": "left"
+  },
+  "FJ3330": {
+   "kind": "bone",
+   "part": "right tenth rib",
+   "side": "right"
+  },
+  "FJ3331": {
+   "kind": "bone",
+   "part": "right eleventh rib",
+   "side": "right"
+  },
+  "FJ3332": {
+   "kind": "bone",
+   "part": "right twelfth rib",
+   "side": "right"
+  },
+  "FJ3333": {
+   "kind": "tissue",
+   "part": "right first costal cartilage",
+   "side": "right"
+  },
+  "FJ3334": {
+   "kind": "bone",
+   "part": "right first rib",
+   "side": "right"
+  },
+  "FJ3335": {
+   "kind": "tissue",
+   "part": "right second costal cartilage",
+   "side": "right"
+  },
+  "FJ3336": {
+   "kind": "bone",
+   "part": "right second rib",
+   "side": "right"
+  },
+  "FJ3337": {
+   "kind": "tissue",
+   "part": "right third costal cartilage",
+   "side": "right"
+  },
+  "FJ3338": {
+   "kind": "bone",
+   "part": "right third rib",
+   "side": "right"
+  },
+  "FJ3339": {
+   "kind": "tissue",
+   "part": "right fourth costal cartilage",
+   "side": "right"
+  },
+  "FJ3340": {
+   "kind": "bone",
+   "part": "right fourth rib",
+   "side": "right"
+  },
+  "FJ3341": {
+   "kind": "tissue",
+   "part": "right fifth costal cartilage",
+   "side": "right"
+  },
+  "FJ3342": {
+   "kind": "bone",
+   "part": "right fifth rib",
+   "side": "right"
+  },
+  "FJ3343": {
+   "kind": "tissue",
+   "part": "right sixth costal cartilage",
+   "side": "right"
+  },
+  "FJ3344": {
+   "kind": "bone",
+   "part": "right sixth rib",
+   "side": "right"
+  },
+  "FJ3345": {
+   "kind": "tissue",
+   "part": "right seventh costal cartilage",
+   "side": "right"
+  },
+  "FJ3346": {
+   "kind": "bone",
+   "part": "right seventh rib",
+   "side": "right"
+  },
+  "FJ3347": {
+   "kind": "bone",
+   "part": "right eighth rib",
+   "side": "right"
+  },
+  "FJ3348": {
+   "kind": "bone",
+   "part": "right ninth rib",
+   "side": "right"
+  },
+  "FJ3349": {
+   "kind": "bone",
+   "part": "right radius",
+   "side": "right"
+  },
+  "FJ3350": {
+   "kind": "bone",
+   "part": "right first metacarpal bone",
+   "side": "right"
+  },
+  "FJ3351": {
+   "kind": "bone",
+   "part": "right first metatarsal bone",
+   "side": "right"
+  },
+  "FJ3352": {
+   "kind": "bone",
+   "part": "right second metacarpal bone",
+   "side": "right"
+  },
+  "FJ3353": {
+   "kind": "bone",
+   "part": "right second metatarsal bone",
+   "side": "right"
+  },
+  "FJ3354": {
+   "kind": "bone",
+   "part": "right third metacarpal bone",
+   "side": "right"
+  },
+  "FJ3355": {
+   "kind": "bone",
+   "part": "right third metatarsal bone",
+   "side": "right"
+  },
+  "FJ3356": {
+   "kind": "bone",
+   "part": "right fourth metacarpal bone",
+   "side": "right"
+  },
+  "FJ3357": {
+   "kind": "bone",
+   "part": "right fourth metatarsal bone",
+   "side": "right"
+  },
+  "FJ3358": {
+   "kind": "bone",
+   "part": "right fifth metacarpal bone",
+   "side": "right"
+  },
+  "FJ3359": {
+   "kind": "bone",
+   "part": "right fifth metatarsal bone",
+   "side": "right"
+  },
+  "FJ3360": {
+   "kind": "bone",
+   "part": "right calcaneus",
+   "side": "right"
+  },
+  "FJ3361": {
+   "kind": "bone",
+   "part": "right capitate",
+   "side": "right"
+  },
+  "FJ3362": {
+   "kind": "bone",
+   "part": "right clavicle",
+   "side": "right"
+  },
+  "FJ3364": {
+   "kind": "bone",
+   "part": "right cuboid bone",
+   "side": "right"
+  },
+  "FJ3365": {
+   "kind": "bone",
+   "part": "right femur",
+   "side": "right"
+  },
+  "FJ3366": {
+   "kind": "bone",
+   "part": "right fibula",
+   "side": "right"
+  },
+  "FJ3367": {
+   "kind": "bone",
+   "part": "right hamate",
+   "side": "right"
+  },
+  "FJ3368": {
+   "kind": "bone",
+   "part": "right humerus",
+   "side": "right"
+  },
+  "FJ3370": {
+   "kind": "bone",
+   "part": "right intermediate cuneiform bone",
+   "side": "right"
+  },
+  "FJ3373": {
+   "kind": "bone",
+   "part": "right lateral cuneiform bone",
+   "side": "right"
+  },
+  "FJ3374": {
+   "kind": "bone",
+   "part": "right lunate",
+   "side": "right"
+  },
+  "FJ3377": {
+   "kind": "bone",
+   "part": "right medial cuneiform bone",
+   "side": "right"
+  },
+  "FJ3381": {
+   "kind": "bone",
+   "part": "right patella",
+   "side": "right"
+  },
+  "FJ3382": {
+   "kind": "bone",
+   "part": "right pisiform",
+   "side": "right"
+  },
+  "FJ3383": {
+   "kind": "bone",
+   "part": "right scaphoid",
+   "side": "right"
+  },
+  "FJ3384": {
+   "kind": "bone",
+   "part": "right scapula",
+   "side": "right"
+  },
+  "FJ3385": {
+   "kind": "bone",
+   "part": "right talus",
+   "side": "right"
+  },
+  "FJ3387": {
+   "kind": "bone",
+   "part": "right tibia",
+   "side": "right"
+  },
+  "FJ3388": {
+   "kind": "bone",
+   "part": "right trapezium",
+   "side": "right"
+  },
+  "FJ3389": {
+   "kind": "bone",
+   "part": "right trapezoid",
+   "side": "right"
+  },
+  "FJ3390": {
+   "kind": "bone",
+   "part": "right triquetral",
+   "side": "right"
+  },
+  "FJ3391": {
+   "kind": "bone",
+   "part": "right ulna",
+   "side": "right"
+  },
+  "FJ3393": {
+   "kind": "bone",
+   "part": "sacrum",
+   "side": null
+  }
+ },
+ "coverage": {
+  "chest": [
+   "abdominal part of pectoralis major",
+   "clavicular part of pectoralis major",
+   "sternocostal part of pectoralis major"
+  ],
+  "lats": [
+   "teres major"
+  ],
+  "middle back": [
+   "rhomboid major",
+   "rhomboid minor"
+  ],
+  "lower back": [
+   "iliocostalis cervicis",
+   "iliocostalis lumborum",
+   "iliocostalis thoracis",
+   "interspinalis thoracis",
+   "longissimus capitis",
+   "longissimus cervicis",
+   "longissimus thoracis",
+   "semispinalis",
+   "semispinalis cervicis",
+   "semispinalis thoracis",
+   "spinalis",
+   "spinalis thoracis"
+  ],
+  "traps": [
+   "ascending part of trapezius",
+   "descending part of trapezius",
+   "transverse part of trapezius"
+  ],
+  "shoulders": [
+   "acromial part of deltoid",
+   "clavicular part of deltoid",
+   "infraspinatus muscle",
+   "spinal part of deltoid",
+   "supraspinatus",
+   "teres minor"
+  ],
+  "neck": [
+   "levator scapulae",
+   "scalenus anterior",
+   "scalenus medius",
+   "scalenus posterior",
+   "splenius capitis",
+   "splenius cervicis",
+   "sternocleidomastoid"
+  ],
+  "biceps": [
+   "brachialis",
+   "coracobrachialis",
+   "long head of biceps brachii",
+   "short head of biceps brachii"
+  ],
+  "triceps": [
+   "anconeus",
+   "lateral head of triceps brachii",
+   "long head of triceps brachii",
+   "medial head of triceps brachii"
+  ],
+  "forearms": [
+   "abductor pollicis longus",
+   "brachioradialis",
+   "extensor carpi radialis brevis",
+   "extensor carpi radialis longus",
+   "extensor carpi ulnaris",
+   "extensor digiti minimi",
+   "extensor digitorum",
+   "extensor indicis",
+   "extensor pollicis brevis",
+   "extensor pollicis longus",
+   "flexor carpi radialis",
+   "flexor digitorum profundus",
+   "flexor digitorum superficialis",
+   "flexor pollicis longus",
+   "humeral head of flexor carpi ulnaris",
+   "humeral head of pronator teres",
+   "palmaris longus",
+   "supinator",
+   "ulnar head of flexor carpi ulnaris",
+   "ulnar head of pronator teres"
+  ],
+  "abdominals": [
+   "external oblique",
+   "serratus anterior"
+  ],
+  "quadriceps": [
+   "rectus femoris",
+   "vastus intermedius",
+   "vastus lateralis",
+   "vastus medialis"
+  ],
+  "hamstrings": [
+   "long head of biceps femoris",
+   "semimembranosus",
+   "semitendinosus",
+   "short head of biceps femoris"
+  ],
+  "calves": [
+   "extensor digitorum longus",
+   "extensor hallucis longus",
+   "fibularis brevis",
+   "fibularis longus",
+   "fibularis tertius",
+   "lateral head of gastrocnemius",
+   "medial head of gastrocnemius",
+   "plantaris",
+   "soleus",
+   "tibialis anterior"
+  ],
+  "adductors": [
+   "adductor brevis",
+   "adductor longus",
+   "adductor magnus",
+   "adductor minimus",
+   "gracilis",
+   "pectineus"
+  ],
+  "abductors": [
+   "gluteus medius",
+   "gluteus minimus",
+   "tensor fasciae latae"
+  ],
+  "glutes": [
+   "gluteus maximus"
+  ]
+ },
+ "missing": []
+}

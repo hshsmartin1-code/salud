@@ -1,0 +1,17 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "rows",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "t", "order": "ASCENDING" },
+        { "fieldPath": "del", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    { "collectionGroup": "rows", "fieldPath": "d", "indexes": [] },
+    { "collectionGroup": "rows", "fieldPath": "h", "indexes": [] },
+    { "collectionGroup": "rows", "fieldPath": "id", "indexes": [] }
+  ]
+}

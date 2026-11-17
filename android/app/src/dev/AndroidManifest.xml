@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Salud Dev" only (gradle -PsaludDev=true): cleartext HTTP is allowed to localhost / 127.0.0.1 alone,
+     for the OTA tests through `adb reverse`. Never part of the normal build. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:networkSecurityConfig="@xml/network_security_config_dev" />
+</manifest>

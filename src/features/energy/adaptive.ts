@@ -21,7 +21,8 @@ import {
   type ObservedTdeeResult,
   type WeighIn,
 } from '../../domain/adaptiveEnergy'
-import { addDays, formatDateEs, todayLocal } from '../../domain/dates'
+import { addDays, dateRange, formatDateEs, todayLocal } from '../../domain/dates'
+import { activeKcalByDay, sourcesLabel } from '../dashboard/controlCenter'
 import { ACTIVITY_LEVELS, ageFromBirthDate, mifflinStJeor } from '../../domain/energy'
 import { sumNutrients } from '../../domain/nutrients'
 import { formatNumber } from '../../domain/units'
@@ -48,6 +49,33 @@ export interface AdaptiveState {
   observed: ObservedTdeeResult | null
   proposal: AdjustmentProposal | null
   history: EnergyAdjustment[]
+  /** The same estimate recomputed at the end of each of the last 8 weeks (oldest first). */
+  weekly: WeeklyTdeePoint[]
+  /** Recorded activity in the window — context only, never added to the estimate (it is already inside it). */
+  activity: { meanKcal: number | null; days: number; sources: string }
+}
+
+export interface WeeklyTdeePoint {
+  /** Last day of the window this point summarises. */
+  to: string
+  status: ObservedTdeeResult['status']
+  observed: number | null
+  observedSe: number | null
+  blended: number | null
+  confidence: ObservedTdeeResult['confidence']
+  validIntakeDays: number
+  weighIns: number
+}
+
+/**
+ * Recomputes the observed expenditure at several window ends (e.g. weekly) to show how the estimate
+ * has evolved. Uses the same rules as the current estimate; points without enough data stay empty.
+ */
+export function observedHistory(args: { intake: IntakeDay[]; weights: WeighIn[]; ends: string[]; formulaTdee: number; bmr: number; settings: AdaptiveSettings }): WeeklyTdeePoint[] {
+  return args.ends.map((to) => {
+    const o = estimateObservedTdee({ intake: args.intake, weights: args.weights.filter((w) => w.date <= to), to, formulaTdee: args.formulaTdee, bmr: args.bmr, settings: args.settings })
+    return { to, status: o.status, observed: o.observedTdee, observedSe: o.observedSe, blended: o.blendedTdee, confidence: o.confidence, validIntakeDays: o.validIntakeDays, weighIns: o.weighIns }
+  })
 }
 
 /** One IntakeDay per date with food logs (or a Phase 0 daily total when there are no logs that day). */
@@ -118,30 +146,32 @@ export async function loadAdaptiveState(r: Repo, profile: Profile, today: string
   const settings = resolveSettings(goal, stored)
   const to = addDays(today, -1)
   const from = addDays(to, -(settings.windowDays - 1))
-  // A little history before the window tells the module whether the record reaches back far enough.
-  const lookback = addDays(from, -45)
-  const [logs, imported, marks, body, history] = await Promise.all([
+  // History before the window: tells the module whether the record reaches back far enough, and
+  // feeds the weekly evolution (8 windows ending one week apart).
+  const lookback = addDays(from, -60)
+  const [logs, imported, marks, body, history, acts, health] = await Promise.all([
     r.range('foodLogs', lookback, to),
     r.range('importedDaily', lookback, to),
     r.range('dayMarks', lookback, to),
     r.all('bodyMeasurements'),
     r.all('energyAdjustments'),
+    r.range('activityLogs', from, to),
+    r.range('healthRecords', from, to),
   ])
   history.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
   const weight = latestWeighIn(body.filter((m) => m.date <= today))
   const { formula, missing } = formulaEstimate(profile, goal, weight, today)
-  const state: AdaptiveState = { today, to, goal, settings, stored, weight, formula, missing, observed: null, proposal: null, history }
+  const actDays = activeKcalByDay(acts, health, dateRange(from, to))
+  const actVals = actDays.filter((d) => d.value !== null).map((d) => d.value as number)
+  const activity = { meanKcal: actVals.length ? actVals.reduce((a, b) => a + b, 0) / actVals.length : null, days: actVals.length, sources: sourcesLabel(actDays) }
+  const state: AdaptiveState = { today, to, goal, settings, stored, weight, formula, missing, observed: null, proposal: null, history, weekly: [], activity }
   if (!formula) return state
 
-  const observed = estimateObservedTdee({
-    intake: buildIntakeDays(logs, imported, marks),
-    weights: buildWeighIns(body),
-    to,
-    formulaTdee: formula.tdee,
-    bmr: formula.bmr,
-    settings,
-  })
+  const intake = buildIntakeDays(logs, imported, marks)
+  const weights = buildWeighIns(body)
+  const observed = estimateObservedTdee({ intake, weights, to, formulaTdee: formula.tdee, bmr: formula.bmr, settings })
   state.observed = observed
+  state.weekly = observedHistory({ intake, weights, ends: Array.from({ length: 8 }, (_, i) => addDays(to, -7 * (7 - i))), formulaTdee: formula.tdee, bmr: formula.bmr, settings })
   if (!goal || goal.kcal <= 0 || !weight) return state
 
   const records: AdjustmentRecord[] = history.map((h) => ({ date: h.date, fromKcal: h.fromKcal, toKcal: h.toKcal, tdee: h.blendedTdee ?? 0, reason: h.reason, applied: h.applied }))

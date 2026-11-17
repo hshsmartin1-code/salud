@@ -22,11 +22,15 @@ test('routine → live session with sets → PR → finished session in history'
   await expect(page.getByTestId('pr-badge')).toHaveCount(1)
   await expect(page.getByTestId('session-volume')).toHaveText('1.000')
 
-  page.once('dialog', (d) => void d.accept())
   await page.getByTestId('finish-session').click()
-  await expect(page.getByTestId('set-row')).toHaveCount(2)
+  await expect(page.getByTestId('finish-discarded')).toContainText('1 serie')
+  await page.getByTestId('finish-confirm').click()
+  await expect(page.getByTestId('done-session')).toBeVisible()
+  await expect(page.getByTestId('done-set')).toHaveCount(2) // the row left undone was discarded
+  await expect(page.getByTestId('pr-badge')).toHaveCount(1)
+  await expect(page.getByTestId('session-volume')).toHaveText('1.000')
   await page.goto('./#/entreno')
-  await expect(page.getByText('2 series · 1.000 kg')).toBeVisible()
+  await expect(page.getByTestId('recent-history')).toContainText('1.000 kg')
 })
 
 test('body measurement with skinfolds stores an estimated result apart from raw data', async ({ page }) => {

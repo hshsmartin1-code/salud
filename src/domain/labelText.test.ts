@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { NutrientCode } from '../db/catalogTypes';
 import { parseLabelText } from './labelText';
 import type { LabelColumnBasis, ParsedLabel, ParsedNutrient } from './labelText';
+import evaluationFixtures from '../../scripts/fixtures/ocr-text-evaluation.json';
 
 function get(p: ParsedLabel, code: NutrientCode, basis?: LabelColumnBasis): ParsedNutrient | undefined {
   return p.nutrients.find((n) => n.code === code && (basis === undefined || n.basis === basis));
@@ -368,10 +369,12 @@ Sodio 1.250 mg
 Energía 1 250 kJ / 299 kcal`);
     expect(p.byBasis['100g']).toEqual({ protein: 2.5, fat: 2.5, sodium: 1250, kj: 1250, kcal: 299 });
   });
-  it('thousands with mg/µg/kJ/kcal are not uncertain when the label is consistent', () => {
+  it('dot thousands with mg/µg/kJ/kcal are not uncertain; comma thousands need confirmation', () => {
     const p = parseLabelText('Por 100 g\nSodio 1.250 mg\nPotasio 1,200 mg\nEnergía 1.046 kJ');
     expect(get(p, 'sodium')).toMatchObject({ value: 1250, uncertain: false });
-    expect(get(p, 'potassium')).toMatchObject({ value: 1200, uncertain: false });
+    // A manual "1,200" is 1,2 (comma = decimal): the OCR keeps 1200 but asks the person to confirm.
+    expect(get(p, 'potassium')).toMatchObject({ value: 1200, uncertain: true });
+    expect(get(p, 'potassium')?.note).toMatch(/Confírmalo/);
     expect(get(p, 'kj')).toMatchObject({ value: 1046, uncertain: false });
   });
   it('a comma read as thousands is uncertain when the label uses decimal commas elsewhere', () => {
@@ -568,3 +571,69 @@ describe('parseLabelText: líneas no reconocidas y entrada no confiable', () => 
     expect(Date.now() - t0).toBeLessThan(3000);
   });
 });
+
+describe('reproducible synthetic label text evaluation', () => {
+  it('reports field results and fails closed on known ambiguities', () => {
+    let expectedFields = 0
+    let exactFields = 0
+    let missingFields = 0
+    let wrongFields = 0
+    let extraFields = 0
+    let rejectedAmbiguousFields = 0
+    let silentlyAcceptedAmbiguousFields = 0
+    let elapsedMs = 0
+    const byCase = [] as { id: string; kind: string; expected: number; exact: number; missing: number; wrong: number; extra: number; elapsedMs: number }[]
+
+    for (const fixture of evaluationFixtures) {
+      const start = performance.now()
+      const parsed = parseLabelText(fixture.text)
+      const ms = performance.now() - start
+      elapsedMs += ms
+      const found = new Map(parsed.nutrients.map((n) => [`${n.basis}:${n.code}`, n]))
+      const expected = Object.entries(fixture.expected)
+      let exact = 0, missing = 0, wrong = 0
+      for (const [key, truth] of expected) {
+        const actual = found.get(key)
+        if (!actual) missing++
+        else if (actual.value === truth.value && actual.sourceUnit === truth.sourceUnit &&
+          (!('uncertain' in truth) || actual.uncertain === truth.uncertain)) exact++
+        else wrong++
+      }
+      const extra = [...found.keys()].filter((key) => !(key in fixture.expected)).length
+      expectedFields += expected.length
+      exactFields += exact
+      missingFields += missing
+      wrongFields += wrong
+      extraFields += extra
+      byCase.push({ id: fixture.id, kind: fixture.kind, expected: expected.length, exact, missing, wrong, extra, elapsedMs: Number(ms.toFixed(2)) })
+
+      if ('expectedServingSize' in fixture) {
+        expect(parsed.servingSize, fixture.id).toBe(fixture.expectedServingSize)
+        expect(parsed.servingUnit, fixture.id).toBe(fixture.expectedServingUnit)
+      }
+      if (fixture.mustReject) for (const key of fixture.mustReject) {
+        if (found.has(key)) silentlyAcceptedAmbiguousFields++
+        else rejectedAmbiguousFields++
+        expect(found.has(key), `${fixture.id}: ${key} must not be imported`).toBe(false)
+      }
+      if ('mustWarn' in fixture) expect(
+        [...parsed.warnings, ...parsed.nutrients.map((n) => n.note ?? '')].join(' '), fixture.id,
+      ).toContain(fixture.mustWarn)
+      if (fixture.id === 'ambiguous-gram-thousands') {
+        expect(found.get('100g:carbs')?.uncertain).toBe(true)
+      }
+    }
+
+    const report = {
+      corpus: 'synthetic transcriptions only; no photographs', photoCorpusCount: 0,
+      photoFieldAccuracy: 'N/A', photoCorrectionTimeMs: 'N/A', photoOcrTimeMs: 'N/A',
+      textCaseCount: evaluationFixtures.length, expectedFields, exactFields, missingFields, wrongFields, extraFields,
+      exactFieldRate: exactFields / expectedFields, rejectedAmbiguousFields, silentlyAcceptedAmbiguousFields,
+      textParseElapsedMs: Number(elapsedMs.toFixed(2)), correctionTimeMs: 'N/A', byCase,
+    }
+    console.log('OCR_TEXT_EVALUATION ' + JSON.stringify(report))
+    expect(exactFields).toBe(expectedFields)
+    expect(missingFields + wrongFields + extraFields).toBe(0)
+    expect(silentlyAcceptedAmbiguousFields).toBe(0)
+  })
+})

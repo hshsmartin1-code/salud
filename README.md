@@ -1,46 +1,60 @@
-# Salud — Personal Health OS
+# Salud
 
-Aplicación web progresiva (PWA), instalable y **offline-first**, para registrar nutrición, entrenamiento, composición corporal, actividad, sueño y hábitos de **dos perfiles completamente independientes** en el mismo dispositivo. También se puede empaquetar como app Android (Capacitor).
+Aplicación para registrar nutrición, entrenamiento, composición corporal, actividad, sueño y hábitos, con perfiles independientes en el mismo dispositivo. Funciona sin conexión: es una PWA instalable y también una app Android (Capacitor).
 
-- **Privacidad:** todos los datos personales viven solo en el almacenamiento local (IndexedDB) del dispositivo. No hay servidor, cuentas ni sincronización. Este repositorio contiene únicamente el código y catálogos públicos.
-- **Respaldo:** exportación/importación JSON versionada por perfil o completa (Más → Respaldo e importación).
-- **Etiquetas nutricionales:** se escriben a mano, se pegan como texto o se fotografían; la foto se lee con OCR **en el propio dispositivo** (Tesseract.js, modelo en español incluido) y nada se guarda sin que revises y confirmes los valores.
-- **Adaptación energética (opcional, por perfil):** estima el gasto a partir de tus registros de comida y peso y puede sugerir (o, si lo activas, aplicar) ajustes graduales de la meta. Es una estimación, no una medición del metabolismo.
-- **Tabla ICBF (TCAC):** no se incluye ni se redistribuye; cada usuario puede importar su propio archivo privado.
+- **Privacidad:** los datos viven en el almacenamiento local del dispositivo (IndexedDB) y la app funciona sin servidor. Este repositorio contiene solo código y catálogos públicos; ninguna credencial ni dato personal.
+- **Sincronización opcional:** cada perfil puede vincularse a su propia cuenta de Google y sincronizarse con Cloud Firestore del proyecto de Firebase que tú configures. Sin esa configuración no hay cuentas ni nube. Ver [configurar Firebase](docs/V22_FIREBASE_SETUP.md) y [seguridad, privacidad y costos](docs/V22_SYNC_SECURITY.md).
+- **Respaldo:** exportación e importación JSON versionada, por perfil o completa.
+- **Comida:** búsqueda en catálogos públicos, medidas caseras, recetas, plantillas, etiquetas escritas o pegadas como texto, código de barras, tiempos de comida configurables y copia de comidas anteriores.
+- **Entreno:** rutinas, sesión en vivo con descanso, récords, historial, planificación semanal con recordatorios opcionales y estado muscular ([método y fuentes](docs/V3_MUSCLE_RECOVERY.md)).
+- **Salud y progreso:** peso, medidas, signos vitales, hidratación, sueño, actividad y gráficas. En Android, lectura opcional de Health Connect.
+- **Adaptación energética (opcional):** estima el gasto a partir de los registros de comida y peso. Es una estimación, no una medición del metabolismo.
+- **Tabla ICBF (TCAC):** no se incluye ni se redistribuye; cada persona puede importar su propio archivo.
+
+Historial de versiones: [CHANGELOG.md](CHANGELOG.md).
 
 ## Fuentes y atribuciones
 
 - USDA FoodData Central (CC0) · instantánea de Open Food Facts Colombia (ODbL 1.0 / DbCL 1.0).
-- Ejercicios: open-exercise-db (MIT, © 2026 cwlumm) basada en free-exercise-db (Unlicense).
-- Ilustraciones de ejercicios: **Exercise data by [RepDB (repdb.co)](https://repdb.co)** — RepDB Free Tier License v1.0 (uso dentro de la app, atribución visible, sin redistribución como conjunto de datos). Solo se incluyen las imágenes de los ejercicios con correspondencia verificada; ver `data-pipeline/repdb/REPORT.md`.
-- OCR: Tesseract.js / tesseract.js-core y modelo `spa` de tessdata (Apache 2.0).
+- Ejercicios: datos de open-exercise-db (CC0 1.0; código MIT, © 2026 cwlumm), basados en free-exercise-db (Unlicense).
+- Ilustraciones de ejercicios: **Exercise data by [RepDB (repdb.co)](https://repdb.co)** — RepDB Free Tier License v1.0 (uso dentro de la app, atribución visible, sin redistribución como conjunto de datos). Solo se incluyen las imágenes con correspondencia verificada; ver `data-pipeline/repdb/REPORT.md`.
+- Figura anatómica: BodyParts3D (CC BY 4.0).
 - Tipografía: Archivo (SIL Open Font License 1.1).
 
-Atribuciones completas dentro de la app: Más → Ajustes y fuentes.
+Atribuciones completas dentro de la app (Ajustes → Licencias y avisos de terceros) y en [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Desarrollo
 
 ```bash
 npm install
-npm run dev        # servidor local (copia antes los archivos de OCR a public/ocr)
-npm test           # pruebas unitarias (Vitest)
-npm run test:e2e   # pruebas end-to-end (Playwright, Edge)
-npm run build      # build de producción en dist/ (GitHub Pages, base /salud/)
+npm run dev               # servidor local
+npm test                  # pruebas unitarias (Vitest)
+npm run lint              # oxlint
+npx tsc -b --pretty false # comprobación de tipos
+npm run test:e2e          # pruebas de extremo a extremo (Playwright, Edge)
+npm run test:emulator     # reglas y sincronización contra los emuladores de Firebase
+npm run build             # compilación de producción en dist/
 ```
 
-Los scripts de `data-pipeline/` (Python 3.12) regeneran los catálogos de `public/data/` y las ilustraciones de `public/exercise-media/` (`python data-pipeline/repdb/build_repdb.py`).
+Los scripts de `data-pipeline/` (Python 3.12) regeneran los catálogos de `public/data/` y las ilustraciones de `public/exercise-media/`.
 
-## Android (APK de depuración)
+## Android
 
-Requisitos: JDK 21 y Android SDK (Android Studio o command-line tools). Gradle descarga lo que falte (plataforma 36, build-tools) la primera vez.
+Requisitos: JDK 21 y Android SDK (Platform 36 y Build-Tools 35, con sus licencias aceptadas). Compatible desde Android 8 (API 26).
 
 ```bash
-npm run build:android   # web con rutas relativas y sin service worker + cap sync
-npm run android:apk     # gradlew assembleDebug → android/app/build/outputs/apk/debug/app-debug.apk
+npm run build:android                # web con rutas relativas + cap sync
+npm run android:apk                  # gradlew assembleDebug
+python scripts/verify-android-apk.py # versión, firma y contenido del APK
 ```
 
-El script detecta `ANDROID_HOME`/`JAVA_HOME` o los busca en las rutas habituales. Para instalar: copia el APK al teléfono y ábrelo (permite «instalar apps desconocidas»), o `adb install -r app-debug.apk`. La app pide permiso de cámara solo al fotografiar una etiqueta.
+Para actualizar una instalación conserva el mismo paquete y la misma firma, y exporta antes un respaldo. Los datos de la app Android y los de la PWA del navegador están separados; se pasan de una a otra con Respaldo. La copia de seguridad automática de Android en la nube está desactivada para no subir datos de salud.
 
-**Los datos de la app Android y los de la PWA del navegador están separados** (cada una tiene su propio almacenamiento). Para pasar datos de una a otra usa Respaldo → exportar en una e importar en la otra. La copia de seguridad automática de Android en la nube está desactivada para no subir datos de salud.
+## Actualizaciones dentro de la app
 
-Instalación, respaldo, fuentes, pruebas y limitaciones: ver [INFORME.md](INFORME.md).
+La app Android puede recibir versiones nuevas de la interfaz sin reinstalar. Cada paquete va firmado (ECDSA P-256) y la app comprueba firma, tamaño, hash y compatibilidad antes de aplicarlo; si la interfaz nueva no arranca, vuelve sola a la anterior. La configuración pública (claves públicas, canal y dirección del manifiesto) está en `.env.android`; las claves privadas nunca están en el repositorio.
+
+```bash
+node scripts/ota-sign.mjs keygen <id> --out-dir <carpeta absoluta fuera del repositorio>
+node scripts/ota-build.mjs --channel stable --out <carpeta externa> --key-file <clave privada> --key-id <id> --notes "<novedades>"
+```

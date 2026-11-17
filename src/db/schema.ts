@@ -7,17 +7,26 @@ import type {
   CustomFood,
   DayMark,
   EnergyAdjustment,
+  ExerciseFavorite,
   ExerciseSet,
   Favorite,
   FoodLog,
+  FoodPortion,
+  SyncConflict,
+  SyncLink,
+  SyncShadow,
   Goal,
   Habit,
   HabitLog,
+  HealthRecord,
+  HydrationLog,
   ImportedDaily,
+  IntegrationState,
   LabelImage,
   MealTemplate,
   MetaRow,
   Profile,
+  ProgressPhoto,
   Recent,
   Recipe,
   RecoveryLog,
@@ -25,9 +34,10 @@ import type {
   Routine,
   SleepLog,
   TrainingSession,
+  VitalSign,
 } from './types'
 
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 5
 export const DB_NAME = 'salud-pho'
 
 export type SaludDB = Dexie & {
@@ -54,6 +64,16 @@ export type SaludDB = Dexie & {
   labelImages: EntityTable<LabelImage, 'id'>
   dayMarks: EntityTable<DayMark, 'id'>
   energyAdjustments: EntityTable<EnergyAdjustment, 'id'>
+  healthRecords: EntityTable<HealthRecord, 'id'>
+  integrations: EntityTable<IntegrationState, 'id'>
+  vitals: EntityTable<VitalSign, 'id'>
+  hydrationLogs: EntityTable<HydrationLog, 'id'>
+  progressPhotos: EntityTable<ProgressPhoto, 'id'>
+  exerciseFavorites: EntityTable<ExerciseFavorite, 'id'>
+  foodPortions: EntityTable<FoodPortion, 'id'>
+  syncLinks: EntityTable<SyncLink, 'profileId'>
+  syncShadow: EntityTable<SyncShadow, 'k'>
+  syncConflicts: EntityTable<SyncConflict, 'id'>
   meta: EntityTable<MetaRow, 'key'>
 }
 
@@ -89,8 +109,33 @@ export const STORES_V2: Record<string, string> = {
   energyAdjustments: 'id, profileId, [profileId+date]',
 }
 
+/**
+ * v3 (V2): additive only — Health Connect imports and connection state, vital signs, hydration,
+ * progress photos and favourite exercises. Existing rows are untouched (no upgrade function).
+ */
+export const STORES_V3: Record<string, string> = {
+  ...STORES_V2,
+  healthRecords: 'id, profileId, [profileId+date], [profileId+metric], externalId',
+  integrations: 'id, profileId',
+  vitals: 'id, profileId, [profileId+date], [profileId+kind]',
+  hydrationLogs: 'id, profileId, [profileId+date]',
+  progressPhotos: 'id, profileId, [profileId+date]',
+  exerciseFavorites: 'id, profileId, [profileId+exerciseId]',
+}
+
 /** Latest store definitions. */
-export const STORES = STORES_V2
+export const STORES_V4: Record<string, string> = {
+  ...STORES_V3,
+  foodPortions: 'id, profileId, [profileId+foodRef]',
+}
+/** V2.2: device-only sync bookkeeping (additive; no existing table changes). */
+export const STORES_V5: Record<string, string> = {
+  ...STORES_V4,
+  syncLinks: 'profileId, uid',
+  syncShadow: 'k, profileId, [profileId+table]',
+  syncConflicts: 'id, profileId, [profileId+key]',
+}
+export const STORES = STORES_V5
 
 export class IsolationError extends Error {
   constructor(message: string) {
@@ -105,7 +150,12 @@ export function createDB(name = DB_NAME): SaludDB {
   db.version(1).stores(STORES_V1)
   // v2 only adds tables; existing rows need no upgrade function.
   db.version(2).stores(STORES_V2)
-  // Future migrations: db.version(3).stores({...}).upgrade(tx => ...)
+  // v3 only adds tables as well.
+  db.version(3).stores(STORES_V3)
+  // V2.1 is additive: existing foods, snapshots and media are not rewritten.
+  db.version(4).stores(STORES_V4)
+  // V2.2 adds sync bookkeeping tables only; personal rows are not rewritten.
+  db.version(5).stores(STORES_V5)
 
   for (const t of PERSONAL_TABLES) {
     const table = db.table(t)

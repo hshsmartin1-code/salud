@@ -31,6 +31,51 @@ __pycache__/
 
 # generated OCR assets (copied from node_modules at build time)
 public/ocr/
+public/THIRD_PARTY_NOTICES.txt
 
-# local tooling
+# local tooling and assistant folders
 .claude/
+.codex/
+.cursor/
+.aider*
+.gemini/
+.privacy-terms
+.publish/
+
+# captures, QA output, logs, temporary files and built packages never enter Git
+screenshots/
+capturas/
+evidence/
+Screenshot*
+Captura*
+*.screenshot.png
+*.tmp
+*.bak
+*.orig
+*.har
+*.apk
+*.aab
+*.zip
+*.jwk
+*.p12
+.env
+.env.local
+
+# Firebase / signing: per-developer configuration and keys never go to Git
+android/app/google-services.json
+# Browser re-downloads ("google-services (1).json", "google-services-2.json"…) anywhere in the repo
+google-services*.json
+GoogleService-Info*.plist
+.env.*.local
+GoogleService-Info.plist
+.firebaserc
+firebase-debug*.log
+firestore-debug*.log
+ui-debug*.log
+ota-keys/
+*.pem
+*.p8
+*.jks
+*.keystore
+ota-manifest.json
+dist-emulator

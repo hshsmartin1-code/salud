@@ -10,7 +10,7 @@ const MACROS: { code: NutrientCode; es: string; color: string }[] = [
 /** Compact kcal + macro line. Unknown values render as "—", never 0. */
 export function MacroLine({ n, partial = [], hideKcal = false }: { n: NutrientMap; partial?: readonly NutrientCode[]; hideKcal?: boolean }) {
   return (
-    <span className="num inline-flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted">
+    <span className="num inline-flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-label text-muted">
       {hideKcal ? null : (
         <span className="font-semibold text-ink">
           {formatNutrient('kcal', n.kcal, false)} kcal{partial.includes('kcal') ? '*' : ''}
@@ -42,10 +42,10 @@ export function NutrientTable({ n, partial = [], hideEmptyGroups = true }: { n: 
         if (hideEmptyGroups && known.length === 0 && g.title !== GROUPS[0].title) return null
         return (
           <div key={g.title}>
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-faint">{g.title}</div>
+            <div className="mb-1 text-label font-semibold text-muted">{g.title}</div>
             <dl className="divide-y divide-line/60 rounded-xl border border-line">
               {g.codes.map((c) => (
-                <div key={c} className="flex items-center justify-between px-3 py-1.5 text-sm">
+                <div key={c} className="flex items-center justify-between px-3 py-1.5 text-body">
                   <dt className={['satFat', 'monoFat', 'polyFat', 'transFat', 'sugars', 'addedSugars', 'fiber', 'carbsAvail'].includes(c) ? 'pl-3 text-muted' : ''}>{ES[c]}</dt>
                   <dd className={`num ${n[c] === undefined ? 'text-faint' : 'font-medium'}`}>
                     {formatNutrient(c, n[c])}
@@ -57,7 +57,7 @@ export function NutrientTable({ n, partial = [], hideEmptyGroups = true }: { n: 
           </div>
         )
       })}
-      <p className="text-[11px] text-faint">«—» = dato desconocido (no se asume cero). «*» = total parcial.</p>
+      <p className="text-label text-muted">«—» = dato desconocido (no se asume cero). «*» = total parcial.</p>
     </div>
   )
 }

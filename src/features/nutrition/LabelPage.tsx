@@ -2,27 +2,31 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useProfiles, useRepo } from '../../app/profile'
+import { useDateParam } from '../../app/useDate'
+import { SAVE_FAILED_RESULT, useSafeWrite } from '../../app/safeSave'
 import { NUTRIENTS, type NutrientCode, type NutrientMap } from '../../db/catalogTypes'
 import { repo } from '../../db/repo'
 import type { CustomFood } from '../../db/types'
-import { todayLocal } from '../../domain/dates'
 import { checkLabelDraft, convertLabel, type LabelBasis, type LabelDraft } from '../../domain/labelConvert'
 import { parseLabelText, type LabelColumnBasis, type ParsedLabel } from '../../domain/labelText'
 import { formatNutrient } from '../../domain/nutrients'
-import { formatNumber } from '../../domain/units'
+import { textRangeError } from '../../domain/units'
+import { labelBaseAmount, labelValueError } from './labelRanges'
 import { NumField, TextArea, TextField, numStr, toNum } from '../../ui/fields'
+import { useConfirm } from '../../ui/Confirm'
 import { Icon } from '../../ui/Icon'
 import { Card, PageHeader, Segmented, Sheet, Toggle } from '../../ui/kit'
 import { fromCustomFood, type Food } from './food'
-import { LabelCapture, toStoredPhoto } from './LabelCapture'
+import { dateQuery, diaryPath } from './paths'
 import { QuantitySheet } from './QuantitySheet'
+import { createLabelSaver } from './labelSave'
 
 const MAIN: NutrientCode[] = ['kcal', 'protein', 'carbs', 'fat', 'satFat', 'transFat', 'fiber', 'sugars', 'addedSugars', 'sodium']
 const MORE: NutrientCode[] = ['kj', 'carbsAvail', 'monoFat', 'polyFat', 'cholesterol', 'potassium', 'calcium', 'iron', 'magnesium', 'phosphorus', 'zinc', 'vitA', 'vitC', 'vitD', 'vitE', 'vitB12', 'folate']
 const META = Object.fromEntries(NUTRIENTS.map((n) => [n.code, n])) as Record<NutrientCode, (typeof NUTRIENTS)[number]>
 const BASIS_ES: Record<LabelColumnBasis, string> = { '100g': 'Por 100 g', '100ml': 'Por 100 ml', serving: 'Por porción', package: 'Por envase' }
 
-type Entry = 'manual' | 'text' | 'photo'
+type Entry = 'manual' | 'text'
 type Vals = Partial<Record<NutrientCode, string>>
 
 /** Preferred column when a label prints several: per 100 is the most precise. */
@@ -32,8 +36,8 @@ function defaultColumn(p: ParsedLabel): LabelColumnBasis | null {
 }
 
 /**
- * Create or edit a food from a nutrition label: typed by hand, pasted text, or a photo read with
- * local OCR. Parsed values only pre-fill this form — the user reviews and confirms before saving.
+ * Create or edit a food from a nutrition label: typed by hand or pasted text.
+ * Parsed values only pre-fill this form — the user reviews and confirms before saving.
  * Blank = not stated (never 0).
  */
 export function LabelPage() {
@@ -41,6 +45,8 @@ export function LabelPage() {
   const editId = params.get('edit')
   const r = useRepo()
   const nav = useNavigate()
+  const confirm = useConfirm()
+  const [date] = useDateParam()
   const { profiles, active } = useProfiles()
   const existing = useLiveQuery(() => (editId ? r.get('customFoods', editId) : undefined), [r, editId])
   const existingPhoto = useLiveQuery(() => (existing?.labelImageId ? r.get('labelImages', existing.labelImageId) : undefined), [r, existing?.labelImageId])
@@ -62,15 +68,17 @@ export function LabelPage() {
   const [text, setText] = useState('')
   const [parsed, setParsed] = useState<ParsedLabel | null>(null)
   const [column, setColumn] = useState<LabelColumnBasis | null>(null)
+  const [reviewConfirmed, setReviewConfirmed] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
-  const [ocrConfidence, setOcrConfidence] = useState<number | null>(null)
-  const [keepPhoto, setKeepPhoto] = useState(true)
-  const photo = useRef<HTMLCanvasElement | null>(null)
-  const [hasPhoto, setHasPhoto] = useState(false)
   const [saved, setSaved] = useState<Food | null>(null)
   const [logOpen, setLogOpen] = useState(false)
   const [copyOpen, setCopyOpen] = useState(false)
   const formRef = useRef<HTMLDivElement>(null)
+  // In-flight guard: a double tap, or a tap during the pending write, must not save the food twice.
+  const savingRef = useRef(false)
+  const [saving, setSaving] = useState(false)
+  const [labelSaver] = useState(createLabelSaver)
+  const safeWrite = useSafeWrite()
 
   // Editing: restore the label exactly as printed when we have it; older foods show stored values.
   useEffect(() => {
@@ -115,8 +123,16 @@ export function LabelPage() {
   }
   const check = checkLabelDraft(draft)
   const conv = convertLabel(draft)
-  const invalidField = Object.values(vals).some((s) => s && s.trim() !== '' && toNum(s) === null)
-  const canSave = name.trim().length > 0 && check.errors.length === 0 && !invalidField
+  // Serving and package sizes: "1.200" is 1200 (see parseDecimal), so impossible values are rejected.
+  const sizeErr = textRangeError(size, 0.1, 5000, unit)
+  const perPackErr = textRangeError(perPack, 0.1, 1000)
+  const packErr = textRangeError(packSize, 0.1, 50000, packUnit)
+  const base = labelBaseAmount(basis, toNum(size), toNum(packSize))
+  const baseUnit = basis === '100ml' ? 'ml' : basis === '100g' ? 'g' : basis === 'package' ? (toNum(packSize) ? packUnit : null) : (toNum(size) ? unit : null)
+  const valueErr = (c: NutrientCode) => labelValueError(vals[c], META[c]?.unit ?? 'g', base, baseUnit)
+  const invalidField = (Object.keys(vals) as NutrientCode[]).some((c) => !!valueErr(c)) || !!sizeErr || !!perPackErr || !!packErr
+  const hasUncertainParsedField = !!parsed && !!column && parsed.nutrients.some((n) => n.basis === column && n.uncertain)
+  const canSave = name.trim().length > 0 && check.errors.length === 0 && !invalidField && (!hasUncertainParsedField || reviewConfirmed)
 
   /** Flags for fields the parser was unsure about (only for the column in use). */
   const flags = useMemo(() => {
@@ -148,6 +164,7 @@ export function LabelPage() {
 
   function interpret() {
     setParseError(null)
+    setReviewConfirmed(false)
     const p = parseLabelText(text)
     const col = defaultColumn(p)
     if (!col) {
@@ -162,7 +179,18 @@ export function LabelPage() {
   }
 
   async function save() {
-    if (!canSave) return
+    if (!canSave || savingRef.current) return
+    savingRef.current = true
+    setSaving(true)
+    try {
+      await write()
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
+  }
+
+  async function write() {
     const data = {
       source: 'label' as const,
       name: name.trim(),
@@ -181,24 +209,24 @@ export function LabelPage() {
       servingsPerPackage: draft.servingsPerPackage,
       packageSize: draft.packageSize,
       packageUnit: draft.packageUnit,
-      entryMethod: parsed ? (entry === 'photo' ? ('ocr' as const) : ('text' as const)) : (existing?.entryMethod ?? ('manual' as const)),
+      entryMethod: parsed ? ('text' as const) : (existing?.entryMethod ?? ('manual' as const)),
       sourceText: parsed || existing?.sourceText ? text || null : null,
       validation: 'confirmed' as const,
       labelImageId: existing?.labelImageId ?? null,
     }
-    let row: CustomFood = existing ? await r.put('customFoods', { ...existing, ...data }) : await r.add('customFoods', data)
-    if (photo.current && keepPhoto && entry === 'photo') {
-      const ph = toStoredPhoto(photo.current)
-      if (existing?.labelImageId) await r.remove('labelImages', existing.labelImageId).catch(() => undefined)
-      const img = await r.add('labelImages', { foodId: row.id, ...ph })
-      await r.update('customFoods', row.id, { labelImageId: img.id })
-      row = { ...row, labelImageId: img.id }
-    }
+    const row = await safeWrite(() => labelSaver.save(r, data, editId ?? undefined))
+    if (row === SAVE_FAILED_RESULT) return
     setSaved(fromCustomFood(row))
+    // From now on this page edits the new row: saving again (e.g. after fixing a typo) updates it.
+    if (!existing) {
+      const dq = dateQuery(date)
+      nav(`/comida/etiqueta?edit=${encodeURIComponent(row.id)}${dq ? `&${dq.slice(1)}` : ''}`, { replace: true })
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   function reset() {
+    labelSaver.reset()
     setSaved(null)
     setName('')
     setBrand('')
@@ -212,8 +240,8 @@ export function LabelPage() {
     setText('')
     setParsed(null)
     setColumn(null)
-    setOcrConfidence(null)
-    nav('/comida/etiqueta', { replace: true })
+    setReviewConfirmed(false)
+    nav(`/comida/etiqueta${dateQuery(date)}`, { replace: true })
   }
 
   const others = (profiles ?? []).filter((p) => p.id !== active?.id)
@@ -222,7 +250,7 @@ export function LabelPage() {
 
   return (
     <>
-      <PageHeader title={existing ? 'Editar alimento' : 'Crear desde etiqueta'} subtitle="Tabla nutricional del empaque" back="/comida" />
+      <PageHeader title={existing ? 'Editar alimento' : 'Crear desde etiqueta'} subtitle="Tabla nutricional del empaque" back={diaryPath(date)} />
       {saved ? (
         <Card className="mb-4 border-accent/50">
           <div className="flex items-center gap-2 font-semibold">
@@ -256,33 +284,21 @@ export function LabelPage() {
               options={[
                 { value: 'manual', label: 'Escribir' },
                 { value: 'text', label: 'Pegar texto' },
-                { value: 'photo', label: 'Foto' },
               ]}
             />
-            {entry === 'photo' ? (
-              <LabelCapture
-                onPhoto={(c) => {
-                  photo.current = c
-                  setHasPhoto(!!c)
-                }}
-                onText={(t, conf) => {
-                  setText(t)
-                  setOcrConfidence(conf)
-                  setParsed(null)
-                }}
-              />
-            ) : null}
-            {entry === 'text' || (entry === 'photo' && text) ? (
+            <p className="text-xs text-muted" data-testid="photo-ocr-unavailable">
+              La lectura automática de fotos está temporalmente desactivada porque aún no alcanza una precisión verificada. Puedes escribir los valores o pegar el texto de la etiqueta.
+            </p>
+            {entry === 'text' ? (
               <div className="space-y-2">
                 <TextArea
-                  label={entry === 'photo' ? 'Texto reconocido (corrige lo que haga falta)' : 'Texto de la etiqueta'}
+                  label="Texto de la etiqueta"
                   value={text}
                   onChange={setText}
-                  rows={entry === 'photo' ? 9 : 7}
+                  rows={7}
                   resize
                   testId="label-text"
                   placeholder={'Información nutricional\nTamaño de porción: 30 g\nCalorías: 120 kcal\nProteína: 8 g\n…'}
-                  hint={entry === 'photo' && ocrConfidence !== null ? `Confianza del reconocimiento: ${formatNumber(ocrConfidence, 0)} %. Revisa sobre todo los números y las unidades.` : undefined}
                 />
                 <button type="button" className="btn-primary w-full" disabled={!text.trim()} onClick={interpret} data-testid="parse-label">
                   <Icon name="clipboard" size={18} /> Interpretar texto
@@ -312,6 +328,7 @@ export function LabelPage() {
                   value={column ?? parsed.columns[0]!}
                   onChange={(c) => {
                     setColumn(c)
+                    setReviewConfirmed(false)
                     fillFromParsed(parsed, c)
                   }}
                   size="sm"
@@ -327,6 +344,16 @@ export function LabelPage() {
                   </li>
                 ))}
               </ul>
+            ) : null}
+            {hasUncertainParsedField ? (
+              <div className="mt-3" data-testid="label-uncertain-confirmation">
+                <Toggle
+                  checked={reviewConfirmed}
+                  onChange={setReviewConfirmed}
+                  label="Revisé los valores marcados como inciertos"
+                  description="Confirma los números, las unidades y la columna con la etiqueta original antes de guardar."
+                />
+              </div>
             ) : null}
             {parsed.unrecognizedLines.length ? (
               <details className="mt-2 text-sm text-muted">
@@ -370,6 +397,7 @@ export function LabelPage() {
                   label="Tamaño de la porción"
                   value={size}
                   onChange={setSize}
+                  error={sizeErr ?? undefined}
                   hint={basis === 'serving' ? 'Si la etiqueta indica el peso o volumen' : 'Opcional: agrega la porción como medida rápida'}
                 />
                 <div className="pb-[22px]">
@@ -386,9 +414,9 @@ export function LabelPage() {
               <div className="mt-3 space-y-3">
                 <TextField label="Descripción de la porción" value={servingLabel} onChange={setServingLabel} placeholder="p. ej. 2 galletas, 1 vaso" />
                 <div className="grid grid-cols-2 gap-3">
-                  <NumField label="Porciones por envase" value={perPack} onChange={setPerPack} />
+                  <NumField label="Porciones por envase" value={perPack} onChange={setPerPack} error={perPackErr ?? undefined} />
                   <div className="grid grid-cols-[1fr_auto] items-end gap-2">
-                    <NumField label="Contenido del envase" value={packSize} onChange={setPackSize} />
+                    <NumField label="Contenido del envase" value={packSize} onChange={setPackSize} error={packErr ?? undefined} />
                     <div className="pb-0.5">
                       <Segmented<'g' | 'ml'> value={packUnit} onChange={setPackUnit} size="sm" options={[{ value: 'g', label: 'g' }, { value: 'ml', label: 'ml' }]} />
                     </div>
@@ -421,6 +449,7 @@ export function LabelPage() {
                   onChange={(v) => setVals((s) => ({ ...s, [c]: v }))}
                   name={`n-${c}`}
                   flag={flags[c]}
+                  error={valueErr(c) ?? undefined}
                 />
               ))}
             </div>
@@ -463,9 +492,6 @@ export function LabelPage() {
             </p>
           ) : null}
 
-          {entry === 'photo' && hasPhoto && !existing ? (
-            <Toggle checked={keepPhoto} onChange={setKeepPhoto} label="Guardar la foto con el alimento" description="Se guarda reducida, solo en este dispositivo y en tus respaldos." />
-          ) : null}
           {existingPhoto ? (
             <details className="card p-3 text-sm">
               <summary className="cursor-pointer font-medium">Foto de la etiqueta</summary>
@@ -479,18 +505,18 @@ export function LabelPage() {
                 <Icon name="copy" size={16} /> Copiar a otro perfil
               </button>
             ) : null}
-            <button className="btn-primary flex-1" disabled={!canSave} onClick={() => void save()} data-testid="save-label">
-              {existing ? 'Guardar cambios' : 'Guardar alimento'}
+            <button className="btn-primary flex-1" disabled={!canSave || saving} aria-busy={saving} onClick={() => void save()} data-testid="save-label">
+              {saving ? 'Guardando…' : existing ? 'Guardar cambios' : 'Guardar alimento'}
             </button>
           </div>
           {existing ? (
             <button
               className="btn-danger w-full"
               onClick={async () => {
-                if (!confirm('¿Eliminar este alimento? Los registros ya hechos conservan sus valores.')) return
+                if (!(await confirm({ title: '¿Eliminar este alimento?', body: 'Los registros ya hechos conservan sus valores.', confirmLabel: 'Eliminar alimento', tone: 'danger' }))) return
                 if (existing.labelImageId) await r.remove('labelImages', existing.labelImageId).catch(() => undefined)
                 await r.remove('customFoods', existing.id)
-                nav('/comida')
+                nav(diaryPath(date))
               }}
             >
               <Icon name="trash" size={16} /> Eliminar alimento
@@ -499,7 +525,7 @@ export function LabelPage() {
         </div>
       </div>
 
-      <QuantitySheet open={logOpen && !!saved} food={saved} onClose={() => setLogOpen(false)} date={todayLocal()} onSaved={() => nav('/comida')} />
+      <QuantitySheet open={logOpen && !!saved} food={saved} onClose={() => setLogOpen(false)} date={date} onSaved={(_, same) => same && nav(diaryPath(date))} />
       <CopySheet open={copyOpen} onClose={() => setCopyOpen(false)} food={existing ?? null} targets={others.map((p) => ({ id: p.id, name: p.name }))} />
     </>
   )

@@ -1,6 +1,7 @@
 import type { ProtocolId, SkinfoldSite } from '../domain/bodycomp'
 import type { ActivityKey, GoalType, Sex } from '../domain/energy'
 import type { QtyUnit } from '../domain/units'
+import type { HouseholdPortion, PortionVerification } from '../domain/portions'
 import type { FoodBasis, FoodKind, FoodSource, NutrientCode, NutrientMap, TrackingType } from './catalogTypes'
 
 export type ID = string
@@ -31,7 +32,50 @@ export interface ProfileSettings {
   weekStartsMonday?: boolean
   /** Adaptive energy settings for this profile (absent = adaptation off). */
   adaptive?: StoredAdaptiveSettings
+  /** Daily step goal for the movement indicator (null/absent = no goal shown). */
+  stepGoal?: number | null
+  /** Daily water goal in ml (null/absent = no goal). */
+  waterGoalMl?: number | null
+  /** Water quick-add containers of this profile (max 6; default 250 and 500 ml). */
+  hydration?: { containers?: { label: string; ml: number }[] }
+  dashboard?: { order?: DashboardIndicator[]; hidden?: DashboardIndicator[]; hideEmpty?: boolean }
+  /** V3 training preferences (absent = defaults). Travels with the profile row. */
+  training?: TrainingSettings
+  /** V3.2 meal slots of this profile, in display order (absent = defaults, see nutrition/mealSlots.ts). */
+  meals?: MealSlotPref[]
 }
+/** V3.2: one configurable meal slot. `key` is the stored MealKey and never changes; only presentation does. */
+export interface MealSlotPref {
+  key: MealKey
+  on: boolean
+  /** Custom name (absent = the default Spanish name of the key). */
+  name?: string
+  /** Usual local time 'HH:MM' (absent = none). */
+  time?: string
+}
+/** V3.2: weekly training plan. A plan never creates or changes sessions; "done" comes only from real sessions. */
+export interface TrainingPlan {
+  /** ISO weekday '1' (Monday) … '7' (Sunday) → a training day, optionally with a routine. Absent weekday = rest. */
+  days?: Record<string, { routineId?: ID | null }>
+  /** One-off changes by local date (YYYY-MM-DD): rest that date, or train that date (optionally another routine). */
+  overrides?: Record<string, { rest: true } | { routineId?: ID | null }>
+  /** Optional reminder on training days at a local time 'HH:MM'. Scheduling is per device and needs its permission. */
+  reminder?: { on: boolean; time: string }
+}
+/** V3: optional training preferences. Every field is optional; absent keeps the 2.2.1 behaviour. */
+export interface TrainingSettings {
+  /** Start the rest timer when a work set is completed (default true). */
+  autoRest?: boolean
+  /** Effort column shown in the live session (default 'none'). */
+  effort?: 'none' | 'rpe' | 'rir'
+  /** End-of-rest alert: notification, vibration and tone (default true; web notifications need permission). */
+  restAlert?: boolean
+  /** Keep the screen on during a live session (Screen Wake Lock, where available; default false). */
+  keepAwake?: boolean
+  /** V3.2 weekly plan (absent = no plan). */
+  plan?: TrainingPlan
+}
+export type DashboardIndicator = 'weight' | 'steps' | 'sleep' | 'training' | 'water' | 'recovery' | 'habits' | 'pressure'
 export interface StoredAdaptiveSettings {
   /** 'off' (default), 'suggest' (proposals need review) or 'auto' (opt-in automatic adjustments). */
   mode: 'off' | 'suggest' | 'auto'
@@ -100,6 +144,11 @@ export interface FoodSnapshot {
   qty: number
   unit: QtyUnit
   portionLabel?: string | null
+  portionId?: string
+  portionSource?: FoodSource
+  portionVerification?: PortionVerification
+  portionEquivalentAmount?: number
+  portionEquivalentUnit?: 'g' | 'ml'
   grams: number | null
   ml: number | null
   /** Absolute amounts for this quantity. Missing key = unknown. */
@@ -114,6 +163,9 @@ export interface FoodLog extends PersonalRow, FoodSnapshot, Provenance {
   meal: MealKey
   note?: string
 }
+
+/** Food- and profile-specific equivalence; never modifies catalog or historical snapshots. */
+export type FoodPortion = PersonalRow & HouseholdPortion
 
 /** Foods a person created (by hand or from a nutrition label). */
 export interface CustomFood extends PersonalRow {
@@ -207,6 +259,7 @@ export interface Recent extends PersonalRow {
   lastQty: number
   lastUnit: QtyUnit
   lastPortionLabel?: string | null
+  lastPortionId?: string | null
 }
 
 // ───────────── Training ─────────────
@@ -219,12 +272,29 @@ export interface RoutineExercise {
   targetReps: string
   restSec: number
   notes?: string
+  /** V3: warm-up sets created (as warm-up rows, never counted as work) when a session starts from the routine. */
+  warmupSets?: number
 }
 export interface Routine extends PersonalRow {
   name: string
   notes?: string
   exercises: RoutineExercise[]
   archived?: boolean
+  /** V3: manual position in the routine list (absent = sorted by name after the ordered ones). */
+  order?: number
+}
+/** One exercise of a session. V3 adds the optional targets and notes copied from the routine. */
+export interface SessionExercise {
+  exerciseId: string
+  name: string
+  trackingType: TrackingType
+  restSec: number
+  /** V3: target set count copied from the routine when the session started. */
+  targetSets?: number
+  /** V3: target reps text copied from the routine (e.g. "8-12"). */
+  targetReps?: string
+  /** V3: per-exercise note for this session (from the routine, or carried over from the last session). */
+  notes?: string
 }
 export interface TrainingSession extends PersonalRow, Provenance {
   date: LocalDate
@@ -233,10 +303,13 @@ export interface TrainingSession extends PersonalRow, Provenance {
   status: 'active' | 'done'
   startedAt: string | null
   endedAt: string | null
-  /** Rest timer end, epoch ms (survives reloads). */
+  /**
+   * 2.2.1 rest timer end (epoch ms). V3 keeps the rest timer on the device (restTimer.ts) and never
+   * writes a non-null value here; it is only cleared when an older client left one behind.
+   */
   restEndsAt: number | null
   /** Exercise order within the session. */
-  exerciseOrder: { exerciseId: string; name: string; trackingType: TrackingType; restSec: number }[]
+  exerciseOrder: SessionExercise[]
   notes?: string
   rpe?: number | null
   durationMin?: number | null
@@ -252,10 +325,20 @@ export interface ExerciseSet extends PersonalRow, Provenance {
   durationSec: number | null
   distanceM: number | null
   rpe: number | null
+  /**
+   * Warm-up flag. Still the compatibility source for 2.2.1 clients: `kind === 'warmup'` ⇔
+   * `isWarmup === true`. Read with `setKind()` and write with `setKindPatch()` (domain/setKind.ts).
+   */
   isWarmup: boolean
+  /** V3: set type. Absent = normal work set. Never written directly (see setKindPatch). */
+  kind?: StoredSetKind
+  /** V3: repetitions in reserve (null/absent = not recorded). */
+  rir?: number | null
   done: boolean
   notes?: string
 }
+/** Stored values of ExerciseSet.kind ('normal' is represented by the field being absent). */
+export type StoredSetKind = 'warmup' | 'drop' | 'failure'
 export interface CustomExercise extends PersonalRow {
   nameEs: string
   aliases: string[]
@@ -382,4 +465,171 @@ export interface ImportedDaily extends PersonalRow, Provenance {
 export interface MetaRow {
   key: string
   value: unknown
+}
+
+// ───────────── V2 (schema v3): integrations, vitals, hydration, progress photos, exercise favourites ─────────────
+/** Metrics imported from an external health platform (Health Connect). */
+export type HealthMetric =
+  | 'steps'
+  | 'activeKcal'
+  | 'totalKcal'
+  | 'distanceM'
+  | 'restingHr'
+  | 'heartRateAvg'
+  | 'exercise'
+  | 'sleep'
+  | 'weight'
+  | 'bodyFat'
+  | 'leanMassKg'
+
+/** Consent groups shown to the person (one switch each). */
+export type HealthCategory = 'activity' | 'heart' | 'exercise' | 'sleep' | 'body'
+
+/**
+ * One value imported from an external provider. `kind: 'daily'` rows are per-day aggregates computed by
+ * the provider (de-duplicated across source apps); `kind: 'record'` rows are individual records
+ * (an exercise session, a sleep session, a weigh-in). Never mixed with hand-entered data: shown with
+ * their source and can be excluded from statistics.
+ */
+export interface HealthRecord extends PersonalRow {
+  provider: 'health-connect'
+  kind: 'daily' | 'record'
+  metric: HealthMetric
+  date: LocalDate
+  start: string | null
+  end: string | null
+  value: number | null
+  unit: string
+  /** Package names of the apps that wrote the data (e.g. a band's companion app). */
+  sources: string[]
+  device?: string | null
+  /** Provider record id (raw records) — used for de-duplication on re-import. */
+  externalId: string | null
+  lastModified: string | null
+  title?: string | null
+  detail?: Record<string, number | string | null>
+  /** Excluded by the person from statistics (kept for traceability). */
+  excluded?: boolean
+  importedAt: string
+}
+
+export interface SyncLogEntry {
+  at: string
+  ok: boolean
+  message: string
+  counts?: Record<string, number>
+}
+
+/** Connection state of one provider for one profile. id = `${profileId}|${provider}`. */
+export interface IntegrationState extends PersonalRow {
+  provider: 'health-connect'
+  status: 'connected' | 'disconnected'
+  categories: Partial<Record<HealthCategory, boolean>>
+  grantedPermissions: string[]
+  linkedAt: string | null
+  lastSyncAt: string | null
+  lastSyncFrom: LocalDate | null
+  lastSyncTo: LocalDate | null
+  /** Health Connect Changes API tokens, one per record type (device-specific; never exported). */
+  changesTokens: Partial<Record<string, string>>
+  lastError: string | null
+  log: SyncLogEntry[]
+}
+
+export type VitalKind = 'bloodPressure' | 'restingHr' | 'spo2' | 'glucose' | 'temperature'
+export interface VitalSign extends PersonalRow, Provenance {
+  date: LocalDate
+  time: string | null
+  kind: VitalKind
+  /** Blood pressure only. */
+  systolic?: number | null
+  diastolic?: number | null
+  /** Single-value vitals (bpm, %, mg/dL, °C). */
+  value: number | null
+  unit: string
+  /** e.g. 'reposo', 'ayunas', 'posprandial'. */
+  context?: string | null
+  notes?: string
+}
+
+export interface HydrationLog extends PersonalRow {
+  date: LocalDate
+  time: string | null
+  ml: number
+  drink?: string | null
+}
+
+export type PhotoPose = 'front' | 'side' | 'back' | 'other'
+export interface ProgressPhoto extends PersonalRow {
+  date: LocalDate
+  pose: PhotoPose
+  /** Downscaled JPEG data URL (≤1280 px) — a string, so it survives JSON backups. */
+  dataUrl: string
+  /** Small preview (≤240 px). */
+  thumbUrl: string
+  width: number
+  height: number
+  bytes: number
+  /** Weight on that day, copied from the measurements if present (context only). */
+  weightKg?: number | null
+  notes?: string
+}
+
+/** Favourite exercise. id = `${profileId}|${exerciseId}`. */
+export interface ExerciseFavorite extends PersonalRow {
+  exerciseId: string
+  name: string
+}
+
+// ───────────── V2.2 (schema v5): device-only sync bookkeeping ─────────────
+
+export type SyncLinkState = 'linking' | 'linked'
+/** One local profile ↔ one account (Firebase uid) on this device. Never exported. */
+export interface SyncLink {
+  profileId: ID
+  uid: string
+  email: string | null
+  displayName: string | null
+  linkedAt: string
+  state: SyncLinkState
+  /** Server time (ms) of the newest remote change already applied. null = never pulled. */
+  cursor: number | null
+  /** Sync table list the cursor was built with; a new synced table forces one full pull. */
+  tablesVersion: string
+  lastSyncAt: string | null
+  lastError: string | null
+  lastErrorCode: string | null
+  /** Local changes not yet accepted by the server (computed at the end of each sync). */
+  pending: number
+  /** Deletions held back until the person confirms them (mass-delete guard). */
+  heldDeletes: number
+  /** Set once counts matched after the first upload/merge. */
+  verifiedAt: string | null
+  /**
+   * `createdAt` of the account's cloud metadata when the link was verified. If the cloud copy is
+   * erased and recreated (another device deleted it and linked again), the value changes and this
+   * device stops instead of mixing its old revisions with the new copy (`cloud-reset`).
+   */
+  cloudEpoch?: number | null
+}
+/** Last revision/hash agreed with the server for one row. hash null = deleted (tombstone). */
+export interface SyncShadow {
+  k: string
+  profileId: ID
+  table: string
+  rowId: string
+  rev: number
+  hash: string | null
+}
+/** Both versions of a row edited on two devices; nothing is overwritten until the person decides. */
+export interface SyncConflict {
+  id: ID
+  profileId: ID
+  key: string
+  table: string
+  rowId: string
+  local: Record<string, unknown> | null
+  remote: Record<string, unknown> | null
+  remoteRev: number
+  detectedAt: string
 }

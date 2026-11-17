@@ -1,0 +1,1 @@
+{ "_comment": "Maps an old exercise id to its current id after a dataset update, e.g. { \"fedb:Old_Name\": \"fedb:New_Name\" }. History keeps its own exerciseName snapshot and is never rewritten; lookups follow these links so a renamed id never orphans history, favourites or routines. Keys starting with _ are ignored." }

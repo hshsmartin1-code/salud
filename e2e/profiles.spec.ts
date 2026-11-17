@@ -4,6 +4,8 @@ test('creates two independent profiles with calculated, visible targets', async 
   await onboard(page, ANA, BETO)
   // The last created profile is active; its goal method is shown on the profile page.
   await page.goto('./#/perfil')
+  // The formula lives inside the closed "Cómo calculamos tus objetivos" disclosure (V3.1).
+  await page.getByTestId('goal-method-card').getByText('Cómo calculamos tus objetivos').click()
   await expect(page.getByText(/Mifflin/).filter({ visible: true }).first()).toBeVisible()
 
   await switchProfile(page, ANA.name)

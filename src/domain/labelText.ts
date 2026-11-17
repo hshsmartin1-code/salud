@@ -167,6 +167,7 @@ const VIT = 'vit(?:amina|\\.)?\\s*';
 // Order matters: specific labels before the generic ones they start with.
 const DEFS: LabelDef[] = [
   { key: 'energy', re: /^(?:valor\s*energetico|contenido\s*energetico|valor\s*calorico|energia(?:\s*total)?)(?![a-z])/ },
+  { key: 'energy', re: /^energy(?![a-z])/ },
   { key: 'energy', re: /^(?:calorias(?:\s*totales)?|kilocalorias|kcal|cal)(?![a-z])/, implied: 'kcal' },
   { key: 'energy', re: /^(?:kj|kilojulios)(?![a-z])/, implied: 'kJ' },
   { key: 'transFat', re: new RegExp(`^${FATTY}trans(?:\\s*totale?s?)?(?![a-z])`) },
@@ -174,14 +175,18 @@ const DEFS: LabelDef[] = [
   { key: 'monoFat', re: new RegExp(`^${FATTY}mono\\s*-?\\s*insaturad[oa]s?(?:\\s*totale?s?)?(?![a-z])`) },
   { key: 'polyFat', re: new RegExp(`^${FATTY}poli\\s*-?\\s*insaturad[oa]s?(?:\\s*totale?s?)?(?![a-z])`) },
   { key: 'fat', re: /^(?:grasas?(?:\s*totale?s?)?|total\s*de\s*grasas?|lipidos?(?:\s*totale?s?)?|materia\s*grasa)(?![a-z])/ },
+  { key: 'fat', re: /^(?:total\s*fat|fat)(?![a-z])/ },
   { key: 'carbsAvail', re: new RegExp(`^${CARB}\\s*(?:disponibles?|asimilables?)(?![a-z])`) },
   { key: 'carbs', re: new RegExp(`^(?:${CARB}\\s*totale?s?|total\\s*de\\s*${CARB})(?![a-z])`) },
   { key: 'carbs', re: new RegExp(`^${CARB}(?![a-z])`), plainCarbs: true },
+  { key: 'carbs', re: /^(?:total\s*carbohydrates?|carbohydrates?)(?![a-z])/ },
   { key: 'fiber', re: /^fibras?(?:\s*(?:dietari[ao]s?|dieteticas?|alimentari[ao]s?|totale?s?))*(?![a-z])/ },
   { key: 'addedSugars', re: /^azucar(?:es)?\s*(?:anadidos?|adicionados?|agregados?)(?![a-z])/ },
   { key: 'sugars', re: /^(?:azucar(?:es)?(?:\s*totale?s?)?|total\s*de\s*azucares)(?![a-z])/ },
   { key: 'protein', re: /^proteinas?(?:\s*totale?s?)?(?![a-z])/ },
+  { key: 'protein', re: /^protein(?![a-z])/ },
   { key: 'sodium', re: /^sodio(?![a-z])/ },
+  { key: 'sodium', re: /^sodium(?![a-z])/ },
   { key: 'salt', re: /^sal(?![a-z])/ },
   { key: 'cholesterol', re: /^colesterol(?:\s*total)?(?![a-z])/ },
   { key: 'potassium', re: /^potasio(?![a-z])/, needsUnit: true },
@@ -400,6 +405,10 @@ function readNumber(
   raw: string,
   unit: Unit,
 ): { value: number; ambiguousG: number | null; thousandsSep: ',' | '.' | null } | null {
+  // Printed labels have an explicit space-thousands token (unlike manual fields).
+  if (unit !== 'g' && /^\d{1,3}( \d{3})+$/.test(raw)) {
+    return { value: Number(raw.replace(/ /g, '')), ambiguousG: null, thousandsSep: null };
+  }
   const m = /^(\d{1,3})([.,])(\d{3})$/.exec(raw);
   if (m && Number(m[1]) !== 0) {
     const thousands = Number(m[1]) * 1000 + Number(m[3]);
@@ -504,7 +513,7 @@ interface HeaderInfo {
 }
 
 const DESC_RE =
-  /(?<![a-z0-9])(?:(?:por|x|cada|en)\s*|\/\s*)?(?:(100)\s*(g|gr|grs|gramos|ml|mililitros|cc)(?:\s*(?:o|\/|u|y)\s*(?:100\s*)?(g|gr|gramos|ml|mililitros))?(?![a-z0-9])|(porcion|racion|servicio)(?![a-z])|(envase|paquete|empaque|bolsa|caja|botella|lata|recipiente|contenedor)(?![a-z])|(unidad)(?![a-z]))/g;
+  /(?<![a-z0-9])(?:(?:por|per|x|cada|en)\s*|\/\s*)?(?:(100)\s*(g|gr|grs|gramos|ml|mililitros|cc)(?:\s*(?:o|\/|u|y)\s*(?:100\s*)?(g|gr|gramos|ml|mililitros))?(?![a-z0-9])|(porcion|racion|servicio|serving)(?![a-z])|(envase|paquete|empaque|bolsa|caja|botella|lata|recipiente|contenedor|package)(?![a-z])|(unidad)(?![a-z]))/g;
 const HEADER_WORDS = new Set([
   'informacion', 'nutricional', 'nutrimental', 'nutricion', 'datos', 'de', 'del', 'la', 'el', 'los', 'las',
   'valores', 'valor', 'medios', 'medio', 'promedio', 'promedios', 'cantidad', 'cantidades', 'contenido',
@@ -722,6 +731,12 @@ function makeValue(
     if (num.ambiguousG !== null) {
       uncertain = true;
       notes.push(`Separador ambiguo en «${a.raw} g»: se leyó ${fmt(value)} g y no ${fmt(num.ambiguousG)} g.`);
+    }
+    // "1,200" with a comma: the label (often an English-format import) means 1200, but in a manual field
+    // the app's rule reads a comma as decimal (1,2). The two readings differ, so the person confirms it.
+    if (num.thousandsSep === ',' && !ctx.commaDecimal) {
+      uncertain = true;
+      notes.push(`Se leyó «${a.raw}» como ${fmt(value)} (coma como separador de miles); en la app la coma es decimal (${a.raw} = ${fmt(Number(a.raw.replace(',', '.')))}). Confírmalo.`);
     }
     if ((num.thousandsSep === ',' && ctx.commaDecimal) || (num.thousandsSep === '.' && ctx.dotDecimal)) {
       uncertain = true;

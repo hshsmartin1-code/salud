@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createDB, IsolationError, STORES, STORES_V1, type SaludDB } from './schema'
-import { DATED_TABLES, PERSONAL_TABLES, SHARED_TABLES, type PersonalTable } from './tables'
+import { createDB, IsolationError, STORES, STORES_V1, STORES_V2, type SaludDB } from './schema'
+import { DATED_TABLES, PERSONAL_TABLES, SHARED_TABLES, SYNC_STATE_TABLES, type PersonalTable } from './tables'
 import { createProfile, deleteProfile } from './profiles'
 import { repo, type NewRow, type RowOf } from './repo'
 
@@ -33,7 +33,7 @@ async function twoProfiles() {
 describe('table registry', () => {
   it('classifies every schema table exactly once', () => {
     const schemaTables = Object.keys(STORES).sort()
-    const registry = [...PERSONAL_TABLES, ...SHARED_TABLES].sort()
+    const registry = [...PERSONAL_TABLES, ...SHARED_TABLES, ...SYNC_STATE_TABLES].sort()
     expect(registry).toEqual(schemaTables)
     expect(new Set(registry).size).toBe(registry.length)
   })
@@ -45,6 +45,9 @@ describe('table registry', () => {
   })
   it('v2 only adds tables: every v1 store keeps its exact index definition', () => {
     for (const [t, def] of Object.entries(STORES_V1)) expect(STORES[t]).toBe(def)
+  })
+  it('v3 only adds tables: every v2 store keeps its exact index definition', () => {
+    for (const [t, def] of Object.entries(STORES_V2)) expect(STORES[t]).toBe(def)
   })
 })
 

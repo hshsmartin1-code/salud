@@ -1,44 +1,93 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { DateNav, useDateParam } from '../../app/useDate'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { dayLabel, DateNav, useDateParam } from '../../app/useDate'
 import { useRepo } from '../../app/profile'
 import type { FoodLog, MealKey, MealTemplate } from '../../db/types'
 import { addDays } from '../../domain/dates'
+import { useToday } from '../../app/useToday'
 import { formatNutrient, sumNutrients } from '../../domain/nutrients'
 import { formatNumber } from '../../domain/units'
 import { TextField } from '../../ui/fields'
 import { Icon } from '../../ui/Icon'
-import { Badge, PageHeader, Sheet } from '../../ui/kit'
+import { PageHeader, Sheet } from '../../ui/kit'
+import { useSwipeNav } from '../../ui/useSwipeNav'
+import { Menu, type MenuItem } from '../../ui/Menu'
+import { useToast } from '../../ui/Toast'
 import { DaySummary } from './DaySummary'
-import { FoodSearch } from './FoodSearch'
-import { describeQty, MEAL_LABEL, MEALS, SOURCE_SHORT, type Food } from './food'
+import { describeQty, shortQty } from './food'
+import { PartialMark } from './PartialMark'
+import { useMealSlots } from './useMealSlots'
 import { MacroLine } from './NutrientView'
-import { QuantitySheet, touchRecent } from './QuantitySheet'
+import { searchPath } from './paths'
+import { QuantitySheet } from './QuantitySheet'
+import { logSnapshots, type LogEntry } from './quickAdd'
+import { CopyMealSheet } from './CopyMealSheet'
+import { habitsForSlot, type SlotHabit } from './slotHabits'
 import { useDayNutrition } from './useDayNutrition'
+import { useDesktop } from './useDesktop'
 import { useFoods } from './useFoods'
+import { useQuickLog, useRecentLogs } from './useQuickLog'
 
 export function NutritionPage() {
+  const slots = useMealSlots()
+  const lower = slots.lower
   const [date, setDate] = useDateParam()
   const day = useDayNutrition(date)
   const r = useRepo()
   const foods = useFoods()
   const nav = useNavigate()
+  const toast = useToast()
+  const recent = useRecentLogs(date)
+  const quickLog = useQuickLog()
   const [editing, setEditing] = useState<FoodLog | null>(null)
   const [saveTpl, setSaveTpl] = useState<MealKey | null>(null)
   const [applyTpl, setApplyTpl] = useState<MealKey | null>(null)
+  const [copyFor, setCopyFor] = useState<MealKey | null>(null)
+  const today = useToday()
+  // One day per swipe, same date rules as the arrows. The day slides in from the side it came from.
+  const swipe = useSwipeNav({ onPrev: () => setDate(addDays(date, -1)), onNext: () => setDate(addDays(date, 1)) })
+  const [seen, setSeen] = useState<{ date: string; dir: 'next' | 'prev' | null }>({ date, dir: null })
+  if (seen.date !== date) setSeen({ date, dir: date > seen.date ? 'next' : 'prev' })
+  const slide = seen.dir ? `day-in-${seen.dir}` : ''
+  const dq = date === today ? '' : `?d=${date}`
   const editFood = editing ? foods.resolve(editing.foodRef) ?? null : null
+  // Under the meals on the phone; from lg it joins the summary column (one element, so its DOM order never changes).
+  const desktop = useDesktop()
+  const dayMark = day && (day.logs.length > 0 || day.imported.length > 0) ? <DayCompleteMark date={date} className="lg:mt-4" /> : null
 
-  async function copyFromYesterday(meal: MealKey) {
-    const prev = (await r.onDate('foodLogs', addDays(date, -1))).filter((l) => l.meal === meal)
-    for (const l of prev) {
-      const { id: _id, createdAt: _c, updatedAt: _u, profileId: _p, ...rest } = l
-      void _id
-      void _c
-      void _u
-      void _p
-      await r.add('foodLogs', { ...rest, date, origin: 'app' })
-    }
+  // At most one discreet line under the slot of the hour, only on today's diary.
+  const habits = useMemo(
+    () => habitsForSlot(recent ?? [], { slot: slots.now.key, today, viewed: date }).filter((h) => !quickLog.done.has(`habit:${date}:${slots.now.key}:${h.foodRef}`)),
+    [recent, slots.now.key, today, date, quickLog.done],
+  )
+
+  function addHabit(h: SlotHabit, meal: MealKey) {
+    void quickLog.add(`habit:${date}:${meal}:${h.foodRef}`, [{ snapshot: h.snapshot }], date, meal, `Agregado a ${lower(meal)}: ${h.name} · ${shortQty(h.snapshot)}`)
+  }
+
+  /** One batch through the quick-log path: one undo for everything copied. */
+  function copyPrevious(entries: LogEntry[], from: string, meal: MealKey) {
+    void quickLog.run(
+      `copy:${date}:${meal}:${from}:${Date.now()}`,
+      () => logSnapshots(r, entries, date, meal),
+      (b) => `${b.ids.length} ${b.ids.length === 1 ? 'alimento copiado' : 'alimentos copiados'} de ${dayLabel(from).toLowerCase()} a ${lower(meal)}`,
+    )
+  }
+
+  /** One more of the same entry, in the same meal and date (the snapshot is copied as stored). */
+  function repeatRow(l: FoodLog) {
+    void quickLog.add(`row:${l.id}:${Date.now()}`, [{ snapshot: l }], l.date, l.meal, `Repetido en ${lower(l.meal)}: ${l.name} · ${shortQty(l)}`)
+  }
+
+  async function removeLog(l: FoodLog) {
+    await r.remove('foodLogs', l.id)
+    setEditing(null)
+    toast.show({
+      message: `Eliminado: ${l.name}`,
+      actionLabel: 'Deshacer',
+      onAction: () => void r.put('foodLogs', l),
+    })
   }
 
   return (
@@ -46,18 +95,37 @@ export function NutritionPage() {
       <PageHeader
         title="Comida"
         actions={
-          <Link to={`/comida/buscar?d=${date}`} className="btn-primary px-3" data-testid="add-food">
-            <Icon name="plus" size={18} /> Agregar
-          </Link>
+          <>
+            {/* Desktop only: the shortcuts live next to "Agregar" (on the phone they sit below the meals). */}
+            <Link to={`/comida/recetas${dq}`} className="btn-secondary hidden px-3 lg:inline-flex">
+              <Icon name="book" size={18} /> Recetas
+            </Link>
+            <Link to={`/comida/plantillas${dq}`} className="btn-secondary hidden px-3 lg:inline-flex">
+              <Icon name="layers" size={18} /> Plantillas
+            </Link>
+            <Link to={`/comida/etiqueta${dq}`} className="btn-secondary hidden px-3 lg:inline-flex" aria-label="Registrar desde etiqueta">
+              <Icon name="tag" size={18} /> Etiqueta
+            </Link>
+            <Link to={searchPath(date)} className="btn-primary px-3" data-testid="add-food">
+              <Icon name="plus" size={18} /> Agregar
+            </Link>
+          </>
         }
       />
-      <div className="mb-3 flex justify-center">
-        <DateNav date={date} onChange={setDate} />
-      </div>
-      {day ? <DaySummary day={day} /> : <div className="card h-48 animate-pulse" />}
+      {/* Phone: one column in DOM order. From lg: summary column (sticky) on the left, meals on the right. */}
+      <div {...swipe} data-testid="diary-surface" className="min-h-[70vh]">
+      <div className="flex flex-col lg:grid lg:grid-cols-[minmax(280px,2fr)_minmax(0,3fr)] lg:items-start lg:gap-x-8">
+        <StickyColumn>
+          <div className="mb-3 flex justify-center lg:justify-start">
+            <DateNav date={date} onChange={setDate} />
+          </div>
+          {day ? <div key={date} className={slide}><DaySummary day={day} /></div> : <div className="h-48 rounded-2xl bg-surface2/40" aria-hidden />}
+          {desktop ? dayMark : null}
+        </StickyColumn>
 
+        <div className="contents lg:block lg:min-w-0">
       {day?.imported.length ? (
-        <div className="card mt-3 p-4 text-sm">
+        <div className="mt-4 border-b border-line pb-4 text-body lg:mb-3 lg:mt-0">
           <div className="mb-1 flex items-center gap-2 font-semibold">
             <Icon name="database" size={16} /> Historial importado (Fase 0)
           </div>
@@ -69,163 +137,267 @@ export function NutritionPage() {
               </li>
             ))}
           </ul>
-          <p className="mt-1 text-[11px] text-faint">Totales diarios sin detalle por alimento; no se suman a los registros de arriba.</p>
+          <p className="mt-1 text-label text-muted">Totales diarios sin detalle por alimento; no se suman a los registros de abajo.</p>
         </div>
       ) : null}
 
-      <div className="card mt-4 overflow-hidden divide-rows">
-        {MEALS.map((m) => {
+      <div key={date} className={`divide-rows lg:space-y-3 lg:[&>*+*]:border-t-0 ${slide}`} data-testid="meals">
+        {slots.visible(day?.logs ?? []).map((m) => {
           const entries = (day?.logs ?? []).filter((l) => l.meal === m.key)
-          const { totals, partial } = sumNutrients(entries)
+          const items: MenuItem[] = [
+            { label: 'Copiar comida anterior', icon: 'copy', onSelect: () => setCopyFor(m.key) },
+            { label: 'Aplicar plantilla', icon: 'layers', onSelect: () => setApplyTpl(m.key) },
+            ...(entries.length ? [{ label: 'Guardar como plantilla', icon: 'star' as const, onSelect: () => setSaveTpl(m.key) }] : []),
+          ]
           return (
-            <section key={m.key} data-testid={`meal-${m.key}`}>
-              <div className="flex min-h-[52px] items-center gap-2 py-1.5 pl-4 pr-2">
-                <div className="min-w-0 flex-1">
-                  <h2 className={`font-semibold ${entries.length ? '' : 'text-muted'}`}>{m.es}</h2>
-                  {entries.length ? (
-                    <div className="mt-0.5">
-                      <MacroLine n={totals} partial={partial} hideKcal />
-                    </div>
-                  ) : null}
-                </div>
-                {entries.length ? (
-                  <span className="readout mr-1 text-[20px]">
-                    {formatNutrient('kcal', totals.kcal, false)}
-                    {partial.includes('kcal') ? '*' : ''}
-                  </span>
-                ) : null}
-                <MealMenu
-                  hasEntries={entries.length > 0}
-                  onCopy={() => void copyFromYesterday(m.key)}
-                  onSaveTpl={() => setSaveTpl(m.key)}
-                  onApplyTpl={() => setApplyTpl(m.key)}
-                />
-                <Link
-                  to={`/comida/buscar?d=${date}&meal=${m.key}`}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-accent transition-colors hover:bg-accent/10"
-                  aria-label={`Agregar a ${m.es.toLowerCase()}`}
-                  title={`Agregar a ${m.es.toLowerCase()}`}
-                >
-                  <Icon name="plus" size={20} />
-                </Link>
-              </div>
-              {entries.length ? (
-                <ul className="pb-1.5">
-                  {entries.map((l) => (
-                    <li key={l.id}>
-                      <button type="button" onClick={() => setEditing(l)} className="flex w-full items-center gap-3 py-2 pl-4 pr-4 text-left transition-colors hover:bg-surface2/50">
-                        <span className="h-8 w-[3px] shrink-0 rounded-full bg-line" aria-hidden />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[15px] font-medium">{l.name}</span>
-                          <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
-                            <span className="num">{describeQty(l)}</span>
-                            <Badge>{SOURCE_SHORT[l.source]}</Badge>
-                            {l.missing.length ? <span className="text-warn" title={`Sin dato: ${l.missing.join(', ')}`}>datos incompletos</span> : null}
-                          </span>
-                        </span>
-                        <span className="num shrink-0 text-sm font-semibold">{formatNutrient('kcal', l.nutrients.kcal, false)}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </section>
+            <MealSection
+              key={m.key}
+              meal={m.key}
+              name={m.label}
+              date={date}
+              entries={entries}
+              habits={m.key === slots.now.key ? habits : []}
+              items={items}
+              onEdit={setEditing}
+              onRepeatRow={repeatRow}
+              onRemoveRow={(l) => void removeLog(l)}
+              onHabit={(h) => addHabit(h, m.key)}
+            />
           )
         })}
       </div>
 
-      {day && (day.logs.length > 0 || day.imported.length > 0) ? <DayCompleteMark date={date} /> : null}
+        {desktop ? null : dayMark}
+        </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <Link to="/comida/recetas" className="btn-secondary flex-col gap-1 py-3 text-[13px]">
+      <div className="mt-5 grid grid-cols-3 gap-2 lg:hidden">
+        <Link to={`/comida/recetas${dq}`} className="btn-secondary flex-col gap-1 px-2 py-3 text-center text-label">
           <Icon name="book" /> Recetas
         </Link>
-        <Link to="/comida/plantillas" className="btn-secondary flex-col gap-1 py-3 text-[13px]">
+        <Link to={`/comida/plantillas${dq}`} className="btn-secondary flex-col gap-1 px-2 py-3 text-center text-label">
           <Icon name="layers" /> Plantillas
         </Link>
-        <Link to="/comida/etiqueta" className="btn-secondary flex-col gap-1 py-3 text-[13px]">
-          <Icon name="tag" /> Desde etiqueta
+        <Link to={`/comida/etiqueta${dq}`} className="btn-secondary flex-col gap-1 px-2 py-3 text-center text-label" aria-label="Registrar desde etiqueta">
+          <Icon name="tag" /> Etiqueta
         </Link>
       </div>
+      </div>
+      </div>
 
-      {editing && editFood ? (
+      {editing ? (
         <QuantitySheet
           open
           food={editFood}
           existing={editing}
           date={date}
           onClose={() => setEditing(null)}
-          onDelete={async () => {
-            await r.remove('foodLogs', editing.id)
-            setEditing(null)
-          }}
+          onDelete={() => void removeLog(editing)}
         />
-      ) : null}
-      {editing && !editFood ? (
-        <Sheet open onClose={() => setEditing(null)} title={editing.name}>
-          <p className="text-sm text-muted">
-            {describeQty(editing)} · {MEAL_LABEL[editing.meal]}. El alimento original ya no está disponible; el registro conserva su copia de valores.
-          </p>
-          <div className="mt-3">
-            <MacroLine n={editing.nutrients} />
-          </div>
-          <button
-            className="btn-danger mt-4 w-full"
-            onClick={async () => {
-              await r.remove('foodLogs', editing.id)
-              setEditing(null)
-            }}
-          >
-            <Icon name="trash" size={16} /> Eliminar registro
-          </button>
-        </Sheet>
       ) : null}
 
       <SaveTemplateSheet meal={saveTpl} date={date} onClose={() => setSaveTpl(null)} />
-      <ApplyTemplateSheet meal={applyTpl} date={date} onClose={() => setApplyTpl(null)} onManage={() => nav('/comida/plantillas')} />
+      <CopyMealSheet meal={copyFor} date={date} onClose={() => setCopyFor(null)} onCopy={copyPrevious} />
+      <ApplyTemplateSheet
+        meal={applyTpl}
+        onClose={() => setApplyTpl(null)}
+        onManage={() => nav(`/comida/plantillas${dq}`)}
+        onApply={(t, meal) => {
+          setApplyTpl(null)
+          void quickLog.run(
+            `tpl:${date}:${meal}:${t.id}`,
+            () => logSnapshots(r, t.items.map((snapshot) => ({ snapshot, time: null })), date, meal),
+            (b) => `Plantilla «${t.name}» aplicada a ${lower(meal)}: ${b.ids.length} ${b.ids.length === 1 ? 'alimento' : 'alimentos'}`,
+          )
+        }}
+      />
     </>
   )
 }
 
-function MealMenu({ hasEntries, onCopy, onSaveTpl, onApplyTpl }: { hasEntries: boolean; onCopy: () => void; onSaveTpl: () => void; onApplyTpl: () => void }) {
-  const [open, setOpen] = useState(false)
+
+function MealSection({
+  meal,
+  name,
+  date,
+  entries,
+  habits,
+  items,
+  onEdit,
+  onRepeatRow,
+  onRemoveRow,
+  onHabit,
+}: {
+  meal: MealKey
+  name: string
+  date: string
+  entries: FoodLog[]
+  habits: SlotHabit[]
+  items: MenuItem[]
+  onEdit: (l: FoodLog) => void
+  onRepeatRow: (l: FoodLog) => void
+  onRemoveRow: (l: FoodLog) => void
+  onHabit: (h: SlotHabit) => void
+}) {
+  const { totals, partial } = sumNutrients(entries)
+  const [macros, setMacros] = useState(false)
+  const macrosId = `meal-macros-${meal}`
   return (
-    <div className="relative">
-      <button type="button" className="btn-ghost p-1.5" aria-label="Opciones de la comida" onClick={() => setOpen((v) => !v)}>
-        <Icon name="dots" />
-      </button>
-      {open ? (
+    <section data-testid={`meal-${meal}`} className="py-3 lg:rounded-2xl lg:border lg:border-line lg:px-4 lg:py-2" aria-label={name}>
+      <div className="flex min-h-11 flex-wrap items-center gap-x-1 gap-y-0">
+        <h2 className={`min-w-0 flex-1 text-heading ${entries.length ? 'text-ink' : 'text-muted'}`}>
+          {entries.length ? (
+            <span className="flex min-h-11 w-full items-center">
+              <button
+                type="button"
+                aria-expanded={macros}
+                aria-controls={macrosId}
+                data-testid={`meal-toggle-${meal}`}
+                onClick={() => setMacros((v) => !v)}
+                className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left"
+              >
+                <span className="min-w-0 flex-1 truncate">{name}</span>
+                <span className="readout mr-1 text-title">{formatNutrient('kcal', totals.kcal, false)}</span>
+              </button>
+              {partial.includes('kcal') ? (
+                <span className="readout -ml-1 mr-1 text-title text-muted">
+                  <PartialMark code="kcal" logs={entries} />
+                </span>
+              ) : null}
+              <button type="button" tabIndex={-1} aria-hidden onClick={() => setMacros((v) => !v)} className="flex h-11 w-7 shrink-0 items-center justify-center text-muted">
+                <Icon name={macros ? 'chevronUp' : 'chevronDown'} size={16} />
+              </button>
+            </span>
+          ) : (
+            name
+          )}
+        </h2>
+        <div className="flex items-center gap-1 lg:order-1" data-no-swipe>
+          <Menu label={`Opciones de ${name.toLowerCase()}`} items={items} />
+          <Link
+            to={searchPath(date, meal)}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-accent transition-colors duration-state hover:bg-accent/10 active:scale-95"
+            aria-label={`Agregar a ${name.toLowerCase()}`}
+            title={`Agregar a ${name.toLowerCase()}`}
+          >
+            <Icon name="plus" size={22} />
+          </Link>
+        </div>
+      </div>
+      {entries.length && macros ? (
+        <div id={macrosId} className="pb-1" data-testid={`meal-macros-${meal}`}>
+          <MacroLine n={totals} partial={partial} hideKcal />
+        </div>
+      ) : null}
+
+      {entries.length ? (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-xl border border-line bg-surface shadow-pop">
-            {[
-              { l: 'Copiar de ayer', i: 'copy' as const, f: onCopy, show: true },
-              { l: 'Aplicar plantilla', i: 'layers' as const, f: onApplyTpl, show: true },
-              { l: 'Guardar como plantilla', i: 'star' as const, f: onSaveTpl, show: hasEntries },
-            ]
-              .filter((x) => x.show)
-              .map((x) => (
-                <button
-                  key={x.l}
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-surface2"
-                  onClick={() => {
-                    setOpen(false)
-                    x.f()
-                  }}
-                >
-                  <Icon name={x.i} size={16} className="text-muted" /> {x.l}
-                </button>
-              ))}
+          {/* Desktop column heads (decorative: each row is one button whose name already says it all). */}
+          <div className={`${ENTRY_GRID} mb-0.5 hidden border-b border-line pb-1 text-micro text-muted lg:grid`} aria-hidden>
+            <span className="col-start-2 text-right">Cantidad</span>
+            {MACRO_COLS.map((m, i) => (
+              <span key={m.code} className={`hidden items-center justify-end gap-1 xl:flex ${MACRO_COL_START[i]}`}>
+                <span className="h-1.5 w-1.5 rounded-[2px]" style={{ background: `rgb(var(--${m.color}))` }} />
+                {m.l}
+              </span>
+            ))}
+            <span className="col-start-3 text-right xl:col-start-6">kcal</span>
           </div>
+          <ul>
+            {entries.map((l) => (
+              <li key={l.id} className="flex items-center">
+                <button
+                  type="button"
+                  onClick={() => onEdit(l)}
+                  className={`${ENTRY_GRID} -mx-2 flex min-h-[56px] min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors duration-state hover:bg-surface2/50 active:bg-surface2 lg:grid lg:min-h-11 lg:content-center lg:py-1`}
+                >
+                  <span className="min-w-0 flex-1 lg:contents">
+                    <span className="block truncate text-body font-medium lg:col-start-1">{l.name}</span>
+                    <span className="num block truncate text-label text-muted lg:col-start-2 lg:text-right" title={describeQty(l)}>{describeQty(l)}</span>
+                  </span>
+                  {MACRO_COLS.map((m, i) => (
+                    <span key={m.code} aria-hidden className={`num hidden text-right text-label text-muted xl:block ${MACRO_COL_START[i]}`}>
+                      {formatNutrient(m.code, l.nutrients[m.code], false)}
+                    </span>
+                  ))}
+                  <span className="num shrink-0 text-body font-semibold lg:col-start-3 lg:text-right xl:col-start-6">{formatNutrient('kcal', l.nutrients.kcal, false)}</span>
+                </button>
+                <span data-no-swipe className="inline-flex">
+                  <Menu
+                    label={`Acciones de ${l.name}`}
+                    items={[
+                      { label: 'Repetir', icon: 'copy', onSelect: () => onRepeatRow(l) },
+                      { label: 'Eliminar', icon: 'trash', tone: 'danger', onSelect: () => onRemoveRow(l) },
+                    ]}
+                  />
+                </span>
+              </li>
+            ))}
+          </ul>
         </>
       ) : null}
+
+      {habits.length ? (
+        <div role="group" aria-label={`Lo que sueles tomar en ${name.toLowerCase()}`} className="mt-1 flex flex-wrap gap-x-2" data-testid="slot-habits">
+          {habits.map((h) => (
+            <button
+              key={h.foodRef}
+              type="button"
+              data-testid="slot-habit"
+              aria-label={`Agregar ${describeQty(h.snapshot)} de ${h.name} a ${name.toLowerCase()}`}
+              onClick={() => onHabit(h)}
+              className="inline-flex min-h-11 max-w-full items-center gap-1 rounded-full px-1 text-label text-muted transition-colors duration-state hover:text-ink active:scale-95"
+            >
+              <Icon name="plus" size={14} className="shrink-0 text-accent" />
+              <span className="min-w-0 truncate" title={h.name}>{h.name}</span>
+              <span className="num shrink-0">· {shortQty(h.snapshot)}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+/** Column template shared by the desktop entry rows and their heads: name, quantity, [P C G from xl], kcal. */
+const ENTRY_GRID = 'lg:grid-cols-[minmax(0,1fr)_5.5rem_3.5rem] lg:gap-x-3 xl:grid-cols-[minmax(0,1fr)_5.5rem_repeat(3,2.5rem)_3.25rem]'
+const MACRO_COLS = [
+  { code: 'protein', l: 'P', color: 'protein' },
+  { code: 'carbs', l: 'C', color: 'carbs' },
+  { code: 'fat', l: 'G', color: 'fat' },
+] as const
+const MACRO_COL_START = ['xl:col-start-3', 'xl:col-start-4', 'xl:col-start-5'] as const
+
+/**
+ * Keeps the desktop summary column in view while the meals scroll. Taller than the window, it scrolls with
+ * the page until its bottom edge shows, then holds there (top is negative). On the phone it is not a box at all.
+ */
+function StickyColumn({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const fit = () => {
+      el.style.top = `${Math.min(24, window.innerHeight - el.offsetHeight - 24)}px`
+    }
+    fit()
+    const ro = new ResizeObserver(fit)
+    ro.observe(el)
+    window.addEventListener('resize', fit)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', fit)
+    }
+  }, [])
+  return (
+    <div ref={ref} className="contents lg:sticky lg:block lg:min-w-0">
+      {children}
     </div>
   )
 }
 
 function SaveTemplateSheet({ meal, date, onClose }: { meal: MealKey | null; date: string; onClose: () => void }) {
   const r = useRepo()
+  const slots = useMealSlots()
   const [name, setName] = useState('')
   return (
     <Sheet
@@ -266,34 +438,27 @@ function SaveTemplateSheet({ meal, date, onClose }: { meal: MealKey | null; date
         </button>
       }
     >
-      <TextField label="Nombre de la plantilla" value={name} onChange={setName} autoFocus placeholder={meal ? `Mi ${MEAL_LABEL[meal].toLowerCase()}` : ''} />
-      <p className="mt-2 text-xs text-muted">Guarda los alimentos y cantidades de esta comida con sus valores nutricionales.</p>
+      <TextField label="Nombre de la plantilla" value={name} onChange={setName} autoFocus placeholder={meal ? `Mi ${slots.lower(meal)}` : ''} />
+      <p className="mt-2 text-label text-muted">Guarda los alimentos y cantidades de esta comida con sus valores nutricionales.</p>
     </Sheet>
   )
 }
 
-function ApplyTemplateSheet({ meal, date, onClose, onManage }: { meal: MealKey | null; date: string; onClose: () => void; onManage: () => void }) {
+function ApplyTemplateSheet({ meal, onClose, onManage, onApply }: { meal: MealKey | null; onClose: () => void; onManage: () => void; onApply: (t: MealTemplate, meal: MealKey) => void }) {
   const r = useRepo()
+  const slots = useMealSlots()
   const templates = useLiveQuery(() => r.all('mealTemplates'), [r])
-  async function apply(t: MealTemplate) {
-    if (!meal) return
-    for (const it of t.items) {
-      await r.add('foodLogs', { ...it, date, meal, time: null, origin: 'app' })
-      await touchRecent(r, it)
-    }
-    onClose()
-  }
   return (
-    <Sheet open={!!meal} onClose={onClose} title={`Aplicar plantilla${meal ? ` a ${MEAL_LABEL[meal].toLowerCase()}` : ''}`}>
+    <Sheet open={!!meal} onClose={onClose} title={`Aplicar plantilla${meal ? ` a ${slots.lower(meal)}` : ''}`}>
       {templates && templates.length ? (
         <ul className="space-y-2 pb-2">
           {templates.map((t) => {
             const { totals, partial } = sumNutrients(t.items)
             return (
               <li key={t.id}>
-                <button type="button" className="w-full rounded-2xl border border-line p-3 text-left hover:bg-surface2" onClick={() => void apply(t)}>
+                <button type="button" className="w-full rounded-2xl border border-line p-3 text-left hover:bg-surface2" onClick={() => meal && onApply(t, meal)}>
                   <div className="font-semibold">{t.name}</div>
-                  <div className="mt-0.5 text-xs text-muted">{t.items.length} alimentos</div>
+                  <div className="mt-0.5 text-label text-muted">{t.items.length} alimentos</div>
                   <div className="mt-1">
                     <MacroLine n={totals} partial={partial} />
                   </div>
@@ -303,7 +468,7 @@ function ApplyTemplateSheet({ meal, date, onClose, onManage }: { meal: MealKey |
           })}
         </ul>
       ) : (
-        <p className="py-4 text-sm text-muted">No hay plantillas. Usa «Guardar como plantilla» en una comida registrada.</p>
+        <p className="py-4 text-body text-muted">No hay plantillas. Usa «Guardar como plantilla» en una comida registrada.</p>
       )}
       <button className="btn-ghost w-full" onClick={onManage}>
         Gestionar plantillas
@@ -312,27 +477,11 @@ function ApplyTemplateSheet({ meal, date, onClose, onManage }: { meal: MealKey |
   )
 }
 
-/** /comida/buscar — search, then quantity sheet. */
-export function FoodSearchPage() {
-  const [params] = useSearchParams()
-  const nav = useNavigate()
-  const [date] = useDateParam()
-  const meal = (params.get('meal') as MealKey | null) ?? undefined
-  const [food, setFood] = useState<Food | null>(null)
-  return (
-    <>
-      <PageHeader title="Agregar alimento" subtitle={meal ? MEAL_LABEL[meal] : undefined} back={`/comida${date ? `?d=${date}` : ''}`} />
-      <FoodSearch onSelect={setFood} autoScan={params.get('scan') === '1'} />
-      <QuantitySheet open={!!food} food={food} date={date} meal={meal} onClose={() => setFood(null)} onSaved={() => nav(`/comida?d=${date}`)} />
-    </>
-  )
-}
-
 /**
  * Lets the person say whether the day's log is complete. Adaptive energy only trusts confirmed or
  * plausible days; "incompleto" removes the day from that estimate. Not marking is fine.
  */
-function DayCompleteMark({ date }: { date: string }) {
+function DayCompleteMark({ date, className = '' }: { date: string; className?: string }) {
   const r = useRepo()
   const mark = useLiveQuery(async () => (await r.onDate('dayMarks', date))[0] ?? null, [r, date])
   if (mark === undefined) return null
@@ -351,8 +500,8 @@ function DayCompleteMark({ date }: { date: string }) {
     { v: 'incomplete', l: 'Incompleto' },
   ] as const
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 px-1" data-testid="day-complete">
-      <span className="text-sm text-muted" id={`day-mark-${date}`}>
+    <div className={`mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 ${className}`} data-testid="day-complete">
+      <span className="text-body text-muted" id={`day-mark-${date}`}>
         ¿Registraste todo lo de este día?
       </span>
       <div className="flex gap-2" role="radiogroup" aria-labelledby={`day-mark-${date}`}>

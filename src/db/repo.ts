@@ -8,21 +8,28 @@ import type {
   CustomFood,
   DayMark,
   EnergyAdjustment,
+  ExerciseFavorite,
   ExerciseSet,
   Favorite,
   FoodLog,
+  FoodPortion,
   Goal,
   Habit,
   HabitLog,
+  HealthRecord,
+  HydrationLog,
   ImportedDaily,
+  IntegrationState,
   LabelImage,
   MealTemplate,
+  ProgressPhoto,
   Recent,
   Recipe,
   RecoveryLog,
   Routine,
   SleepLog,
   TrainingSession,
+  VitalSign,
 } from './types'
 
 export interface PersonalRows {
@@ -47,6 +54,13 @@ export interface PersonalRows {
   labelImages: LabelImage
   dayMarks: DayMark
   energyAdjustments: EnergyAdjustment
+  healthRecords: HealthRecord
+  integrations: IntegrationState
+  vitals: VitalSign
+  hydrationLogs: HydrationLog
+  progressPhotos: ProgressPhoto
+  exerciseFavorites: ExerciseFavorite
+  foodPortions: FoodPortion
 }
 type AssertAllCovered = { [K in PersonalTable]: PersonalRows[K] }
 export type RowOf<T extends PersonalTable> = AssertAllCovered[T]

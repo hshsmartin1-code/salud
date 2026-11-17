@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Salud Dev</string>
+    <string name="title_activity_main">Salud Dev</string>
+    <string name="package_name">app.salud.personal.dev</string>
+    <string name="custom_url_scheme">app.salud.personal.dev</string>
+</resources>

@@ -21,7 +21,7 @@ from pho_common import (HTTP_HEADERS, IDX, NUTRIENT_CODES, OUT_DIR, RAW_DIR, ded
                         round_grams, round_nutrient, write_catalog)
 
 OFF_RAW = os.path.join(RAW_DIR, 'off')
-FIELDS = ('code,product_name,product_name_es,brands,quantity,serving_size,serving_quantity,nutriments,'
+FIELDS = ('code,product_name,product_name_es,brands,quantity,serving_size,serving_quantity,serving_quantity_unit,nutriments,'
           'categories_tags,nutrition_data_per,product_quantity,product_quantity_unit')
 SEARCH_URL = ('https://world.openfoodfacts.org/api/v2/search?countries_tags_en=colombia&page_size=100'
               '&page={page}&fields=' + FIELDS)
@@ -167,22 +167,66 @@ def is_liquid(prod: dict) -> bool:
 
 
 def product_quantity(prod: dict):
-    """Total pack quantity in g or ml (same unit family as basis), or None."""
+    """(normalized amount, explicit g/ml), or None; never infer a density."""
     pq = num(prod.get('product_quantity'))
-    if pq is not None and pq > 0:
-        return pq
-    q = str(prod.get('quantity') or '')
-    m = _QTY_RE.search(q)
-    if not m:
+    unit = normalized_unit(prod.get('product_quantity_unit'))
+    raw = text_measure(prod.get('quantity'))
+    if pq is not None and pq <= 0:
         return None
-    v = float(m.group(1).replace(',', '.'))
-    unit = re.sub(r'\s+', ' ', m.group(2).lower())
-    factor = {'kg': 1000, 'g': 1, 'gr': 1, 'grs': 1, 'gramos': 1, 'mg': 0.001, 'ml': 1, 'cl': 10, 'dl': 100,
-              'l': 1000, 'lt': 1000, 'lts': 1000, 'litro': 1000, 'litros': 1000, 'cc': 1}.get(unit)
-    if factor is None:
-        return None  # oz / fl oz: ambiguous on Colombian labels -> skip
-    v *= factor
-    return v if v > 0 else None
+    if prod.get('product_quantity_unit') is not None and (unit is None or (raw and raw[1] != unit)):
+        return None
+    if pq is not None and unit:
+        normalized = pq, unit
+        return None if raw and not measures_agree(raw, normalized) else normalized
+    if pq is not None:
+        return raw if raw and abs(raw[0] - pq) <= 0.02 else None
+    return raw
+
+
+def normalized_unit(value):
+    unit = str(value or '').strip().lower()
+    return unit if unit in {'g', 'ml'} else None
+
+
+def text_measure(value):
+    text = str(value or '')
+    if re.search(r'\d\s*[x×]\s*\d', text, re.IGNORECASE):
+        return None
+    matches = list(_QTY_RE.finditer(text))
+    if len(matches) != 1:
+        return None
+    m = matches[0]
+    u = re.sub(r'\s+', ' ', m.group(2).lower())
+    factors = {'kg': 1000, 'mg': 0.001, 'g': 1, 'gr': 1, 'grs': 1, 'gramos': 1,
+               'ml': 1, 'cl': 10, 'dl': 100, 'l': 1000, 'lt': 1000,
+               'lts': 1000, 'litro': 1000, 'litros': 1000, 'cc': 1}
+    if u not in factors:
+        return None
+    amount = float(m.group(1).replace(',', '.')) * factors[u]
+    unit = 'g' if u in {'kg', 'mg', 'g', 'gr', 'grs', 'gramos'} else 'ml'
+    return (amount, unit) if amount > 0 and amount != float('inf') else None
+
+
+def measures_agree(a, b):
+    return a[1] == b[1] and abs(a[0] - b[0]) <= 0.02
+
+
+def serving_quantity(prod: dict):
+    if re.search(r'\d\s*[x×]\s*\d', str(prod.get('serving_size') or ''), re.IGNORECASE):
+        return None
+    sq = num(prod.get('serving_quantity'))
+    unit = normalized_unit(prod.get('serving_quantity_unit'))
+    raw = text_measure(prod.get('serving_size'))
+    if sq is not None and sq <= 0:
+        return None
+    if prod.get('serving_quantity_unit') is not None and (unit is None or (raw and raw[1] != unit)):
+        return None
+    if sq is not None and unit:
+        normalized = sq, unit
+        return None if raw and not measures_agree(raw, normalized) else normalized
+    if not raw:
+        return None
+    return raw if sq is None or abs(sq - raw[0]) <= 0.02 else None
 
 
 def clean_category(tags):
@@ -299,14 +343,18 @@ def build_row(prod: dict, drops: dict):
     basis = '100ml' if is_liquid(prod) else '100g'
 
     portions = []
-    sq = num(prod.get('serving_quantity'))
-    if sq is not None and sq > 0:
+    serving = serving_quantity(prod)
+    expected_unit = 'ml' if basis == '100ml' else 'g'
+    pq = product_quantity(prod)
+    if (serving is not None and serving[1] == expected_unit and round_grams(serving[0]) > 0
+            and not (pq is not None and pq[1] == expected_unit and serving[0] > pq[0] + 0.02)):
         ss = str(prod.get('serving_size') or '').strip()
         label = f'1 porción ({ss})' if ss else '1 porción'
-        portions.append([label[:80], round_grams(sq)])
-    pq = product_quantity(prod)
-    if pq is not None and pq > 0:
-        portions.append(['Envase completo', round_grams(pq)])
+        portions.append([label[:80], round_grams(serving[0])])
+    if pq is not None and pq[1] == expected_unit and round_grams(pq[0]) > 0:
+        portions.append(['Envase completo', round_grams(pq[0])])
+    if portions:
+        flags.append('portion_units_checked')
 
     brands = prod.get('brands') or ''
     if isinstance(brands, list):

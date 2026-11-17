@@ -1,140 +1,34 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useProfile, useRepo } from '../../app/profile'
-import type { BodyMeasurement, CircumferenceKey, DerivedBodyComp } from '../../db/types'
-import { bmi, computeBodyComp, PROTOCOLS, SKINFOLD_SITES, whtr, type ProtocolId, type SkinfoldSite } from '../../domain/bodycomp'
-import { formatDateEs, nowLocalTime, todayLocal } from '../../domain/dates'
-import { ageFromBirthDate } from '../../domain/energy'
-import { movingAverage } from '../../domain/stats'
+import type { BodyMeasurement } from '../../db/types'
+import { bmi, whtr } from '../../domain/bodycomp'
+import { formatDateEs } from '../../domain/dates'
 import { formatNumber } from '../../domain/units'
-import { NumField, SelectField, TextArea, TextField, numStr, toNum } from '../../ui/fields'
 import { Icon } from '../../ui/Icon'
-import { Badge, Card, EmptyState, PageHeader } from '../../ui/kit'
+import { Segmented } from '../../ui/kit'
+import { Row } from '../../ui/Row'
+import { SectionHeader } from '../../ui/SectionHeader'
+import { useHealthInput, usePeriod, useQueryChoice } from '../health/hooks'
+import { hcRowsFor, HealthRows, originLabel, useLimit } from '../health/HealthRows'
+import { MetricBlock, MetricDetail } from '../health/MetricDetail'
+import { QuickLogHost, type QuickTarget } from '../health/QuickLog'
+import { splitByMethod, weightHistory, type HealthInput } from '../health/series'
+import type { MetricId } from '../health/metrics'
 
-export const CIRCUMFERENCES: { key: CircumferenceKey; es: string }[] = [
-  { key: 'waist', es: 'Cintura' },
-  { key: 'hip', es: 'Cadera' },
-  { key: 'neck', es: 'Cuello' },
-  { key: 'chest', es: 'Pecho' },
-  { key: 'armRelaxed', es: 'Brazo relajado' },
-  { key: 'armContracted', es: 'Brazo contraído' },
-  { key: 'forearm', es: 'Antebrazo' },
-  { key: 'thigh', es: 'Muslo' },
-  { key: 'calf', es: 'Pantorrilla' },
+export { MeasurementEditor } from './MeasurementEditor'
+
+type Tab = 'weight' | 'waist' | 'bodyFat' | 'lean'
+type LeanId = 'leanMass' | 'fatMass' | 'ffmi'
+const TABS: readonly Tab[] = ['weight', 'waist', 'bodyFat', 'lean']
+/** `?m=` values that point inside a tab (the overview links with the metric id). */
+const TAB_OF: Record<string, Tab> = { weight: 'weight', waist: 'waist', bodyFat: 'bodyFat', leanMass: 'lean', fatMass: 'lean', ffmi: 'lean' }
+const LEAN: readonly { value: LeanId; label: string }[] = [
+  { value: 'leanMass', label: 'Masa magra' },
+  { value: 'fatMass', label: 'Masa grasa' },
+  { value: 'ffmi', label: 'FFMI' },
 ]
-
-export function BodyPage() {
-  const r = useRepo()
-  const profile = useProfile()
-  const rows = useLiveQuery(() => r.all('bodyMeasurements'), [r])
-  const sorted = useMemo(() => (rows ?? []).slice().sort((a, b) => (b.date + (b.time ?? '')).localeCompare(a.date + (a.time ?? ''))), [rows])
-  const weights = sorted.filter((m) => m.weightKg !== null && !m.excludeFromStats)
-  const latestW = weights.find((m) => !m.approx) ?? weights[0]
-  const latestWaist = sorted.find((m) => m.circumferences.waist !== undefined)
-  const latestFat = sorted.find((m) => m.derived?.bodyFatPct !== undefined)
-  const latestSum = sorted.find((m) => m.derived?.sum !== null && m.derived?.sum !== undefined)
-
-  // 7-day moving average of daily weights (one value per day: the last of the day).
-  const avg7 = useMemo(() => {
-    const byDay = new Map<string, number>()
-    for (const m of weights.slice().reverse()) if (!m.approx) byDay.set(m.date, m.weightKg as number)
-    const points = [...byDay.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([date, value]) => ({ date, value }))
-    if (!points.length) return null
-    const ma = movingAverage(points, 7)
-    const last = ma[ma.length - 1]
-    return last ? { value: last.avg, n: last.n } : null
-  }, [weights])
-
-  return (
-    <>
-      <PageHeader
-        title="Cuerpo"
-        actions={
-          <Link to="/cuerpo/nueva" className="btn-primary px-3" data-testid="new-measurement">
-            <Icon name="plus" size={18} /> Medición
-          </Link>
-        }
-      />
-      <div className="space-y-5">
-        <div className="metric-strip grid-cols-2 sm:grid-cols-4">
-          <div>
-            <div className="text-[13px] text-muted">Peso</div>
-            <div className="readout mt-2 text-[30px]" data-testid="latest-weight">
-              {latestW ? formatNumber(latestW.weightKg as number, 1) : '—'}
-              <span className="ml-1 text-sm font-medium text-muted">kg</span>
-            </div>
-            <div className="mt-1 text-xs text-faint">
-              {latestW ? formatDateEs(latestW.date) : 'Sin registros'}
-              {latestW?.approx ? ' · aprox.' : ''}
-            </div>
-          </div>
-          <div>
-            <div className="text-[13px] text-muted">Media 7 días</div>
-            <div className="readout mt-2 text-[30px]">
-              {avg7 ? formatNumber(avg7.value, 1) : '—'}
-              <span className="ml-1 text-sm font-medium text-muted">kg</span>
-            </div>
-            <div className="mt-1 text-xs text-faint">{avg7 ? `${avg7.n} ${avg7.n === 1 ? 'día' : 'días'} con peso` : '—'}</div>
-          </div>
-          <div>
-            <div className="text-[13px] text-muted">Cintura</div>
-            <div className="readout mt-2 text-[30px]">
-              {latestWaist ? formatNumber(latestWaist.circumferences.waist as number, 1) : '—'}
-              <span className="ml-1 text-sm font-medium text-muted">cm</span>
-            </div>
-            <div className="mt-1 text-xs text-faint">
-              {latestWaist && profile.heightCm ? `Cintura/talla ${formatNumber(whtr(latestWaist.circumferences.waist as number, profile.heightCm), 2)}` : latestWaist ? formatDateEs(latestWaist.date) : '—'}
-            </div>
-          </div>
-          <div>
-            <div className="text-[13px] text-muted">Grasa estimada</div>
-            <div className="readout mt-2 text-[30px]">
-              {latestFat ? formatNumber(latestFat.derived!.bodyFatPct as number, 1) : '—'}
-              <span className="ml-1 text-sm font-medium text-muted">%</span>
-            </div>
-            <div className="mt-1 text-xs text-faint">
-              {latestFat ? PROTOCOLS.find((p) => p.id === latestFat.derived!.protocol)?.es : latestSum ? `Suma ${formatNumber(latestSum.derived!.sum as number, 1)} mm` : 'Sin pliegues'}
-            </div>
-          </div>
-        </div>
-        {latestW && profile.heightCm ? (
-          <p className="text-xs text-muted">
-            IMC {formatNumber(bmi(latestW.weightKg as number, profile.heightCm), 1)} (calculado con {formatNumber(latestW.weightKg as number, 1)} kg y {formatNumber(profile.heightCm, 0)} cm; es una referencia poblacional, no mide composición corporal).
-          </p>
-        ) : null}
-
-        <section>
-          <h2 className="section-title mb-2">Historial</h2>
-          {sorted.length ? (
-            <ul className="card divide-y divide-line overflow-hidden" data-testid="measurement-list">
-              {sorted.map((m) => (
-                <li key={m.id}>
-                  <Link to={`/cuerpo/${m.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-surface2/60">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium">
-                        {formatDateEs(m.date, 'weekday')}
-                        {m.time ? <span className="text-muted"> · {m.time}</span> : null}
-                      </div>
-                      <div className="truncate text-xs text-muted">{summary(m)}</div>
-                    </div>
-                    {m.origin === 'phase0' ? <Badge>Importado</Badge> : null}
-                    {m.approx ? <Badge tone="warn">Aprox.</Badge> : null}
-                    <Icon name="chevronRight" size={18} className="text-faint" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState icon="ruler" title="Sin mediciones" action={<Link className="btn-primary" to="/cuerpo/nueva">Registrar medición</Link>}>
-              Registra peso, perímetros y pliegues. Los valores calculados se guardan aparte y se marcan como estimados.
-            </EmptyState>
-          )}
-        </section>
-      </div>
-    </>
-  )
-}
 
 function summary(m: BodyMeasurement): string {
   const parts: string[] = []
@@ -149,211 +43,166 @@ function summary(m: BodyMeasurement): string {
   return parts.join(' · ') || 'Sin datos'
 }
 
-type Strs<K extends string> = Partial<Record<K, string>>
+/** Methods with an estimate of the metric anywhere in the loaded window, most recent first. */
+function methodsIn(input: HealthInput | undefined, id: 'bodyFat' | 'fatMass' | 'leanMass' | 'ffmi', from: string, to: string): string[] {
+  return input ? splitByMethod(id, input, from, to).filter((s) => s.points.some((p) => p.value !== null)).map((s) => s.method) : []
+}
 
-export function MeasurementEditor() {
-  const { id } = useParams()
-  const isNew = !id || id === 'nueva'
+export function BodyPage() {
   const r = useRepo()
-  const nav = useNavigate()
   const profile = useProfile()
-  const existing = useLiveQuery(() => (isNew ? undefined : r.get('bodyMeasurements', id as string)), [r, id])
-  const [date, setDate] = useState(todayLocal())
-  const [time, setTime] = useState(nowLocalTime())
-  const [weight, setWeight] = useState('')
-  const [circ, setCirc] = useState<Strs<CircumferenceKey>>({})
-  const [sf, setSf] = useState<Strs<SkinfoldSite>>({})
-  const [protocol, setProtocol] = useState<ProtocolId | ''>(profile.settings.skinfoldProtocol ?? '')
-  const [notes, setNotes] = useState('')
-  const [showCirc, setShowCirc] = useState(true)
-  const [showSf, setShowSf] = useState(false)
+  const { period, setPeriod, today } = usePeriod()
+  const input = useHealthInput(period, today)
+  const [params, setParams] = useSearchParams()
+  const [m, setM] = useQueryChoice<string>('m', [...TABS, 'leanMass', 'fatMass', 'ffmi'], 'weight')
+  const tab: Tab = TAB_OF[m] ?? 'weight'
+  const leanId: LeanId = m === 'fatMass' || m === 'ffmi' ? m : 'leanMass'
+  const [methodChoice, setMethodChoice] = useState<string | null>(null)
+  const [target, setTarget] = useState<QuickTarget | null>(() => (params.get('tipo') === 'peso' ? { kind: 'weight' } : null))
+  const rows = useLiveQuery(() => r.all('bodyMeasurements'), [r])
+  const sorted = useMemo(() => (rows ?? []).slice().sort((a, b) => (b.date + (b.time ?? '')).localeCompare(a.date + (a.time ?? ''))), [rows])
+  const weights = sorted.filter((m) => m.weightKg !== null && !m.excludeFromStats)
+  const latestW = weights.find((m) => !m.approx) ?? weights[0]
+  const latestWeight = latestW ? { kg: latestW.weightKg as number, date: latestW.date } : input ? (() => { const h = weightHistory(input).at(-1); return h && h.value !== null ? { kg: h.value, date: h.date } : null })() : null
+  const inPeriod = sorted.filter((m) => m.date >= period.range.from && m.date <= period.range.to)
 
-  useEffect(() => {
-    if (!existing) return
-    setDate(existing.date)
-    setTime(existing.time ?? '')
-    setWeight(numStr(existing.weightKg, 2))
-    setCirc(Object.fromEntries(Object.entries(existing.circumferences).map(([k, v]) => [k, numStr(v, 1)])))
-    setSf(Object.fromEntries(Object.entries(existing.skinfolds).map(([k, v]) => [k, numStr(v, 1)])))
-    setProtocol(existing.protocol ?? '')
-    setNotes(existing.notes ?? '')
-    setShowSf(Object.keys(existing.skinfolds).length > 0)
-  }, [existing])
-
-  const nums = <K extends string>(o: Strs<K>) => {
-    const out: Partial<Record<K, number>> = {}
-    for (const [k, s] of Object.entries(o) as [K, string | undefined][]) {
-      const n = toNum(s ?? '')
-      if (n !== null && n > 0) out[k] = n
+  const lim = useLimit(inPeriod.length)
+  const closeTarget = (t: QuickTarget | null) => {
+    setTarget(t)
+    if (!t && params.get('tipo')) {
+      const p = new URLSearchParams(params)
+      p.delete('tipo')
+      setParams(p, { replace: true })
     }
-    return out
-  }
-  const circN = nums(circ)
-  const sfN = nums(sf)
-  const weightN = toNum(weight)
-  const proto = PROTOCOLS.find((p) => p.id === protocol)
-  const age = profile.birthDate ? ageFromBirthDate(profile.birthDate, date) : null
-
-  const result = useMemo(() => {
-    if (!protocol || Object.keys(sfN).length === 0 || age === null) return null
-    try {
-      return computeBodyComp({ protocol, sex: profile.sex, ageYears: age, skinfolds: sfN, weightKg: weightN, heightCm: profile.heightCm })
-    } catch {
-      return null
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [protocol, JSON.stringify(sfN), age, profile.sex, weightN, profile.heightCm])
-
-  const invalid =
-    (weight.trim() && (weightN === null || weightN <= 0 || weightN > 400)) ||
-    [...Object.values(circ), ...Object.values(sf)].some((s) => s && s.trim() && (toNum(s) === null || (toNum(s) as number) <= 0))
-  const hasData = weightN !== null || Object.keys(circN).length > 0 || Object.keys(sfN).length > 0
-  const canSave = !invalid && hasData && /^\d{4}-\d{2}-\d{2}$/.test(date)
-
-  async function save() {
-    if (!canSave) return
-    const derived: DerivedBodyComp | null =
-      result && protocol && result.sum !== null && age !== null
-        ? {
-            estimated: true,
-            protocol,
-            equation: result.equation,
-            method: result.method,
-            sum: result.sum,
-            ...(result.density !== undefined ? { density: result.density } : {}),
-            ...(result.bodyFatPct !== undefined ? { bodyFatPct: result.bodyFatPct } : {}),
-            ...(result.fatMassKg !== undefined ? { fatMassKg: result.fatMassKg } : {}),
-            ...(result.leanMassKg !== undefined ? { leanMassKg: result.leanMassKg } : {}),
-            inputs: { sex: profile.sex, ageYears: age, weightKg: weightN, heightCm: profile.heightCm },
-            computedAt: new Date().toISOString(),
-          }
-        : null
-    const data = {
-      date,
-      time: time || null,
-      weightKg: weightN,
-      circumferences: circN,
-      skinfolds: sfN,
-      protocol: Object.keys(sfN).length ? (protocol || null) : null,
-      derived,
-      notes: notes.trim() || undefined,
-    }
-    if (existing) await r.put('bodyMeasurements', { ...existing, ...data })
-    else await r.add('bodyMeasurements', { ...data, origin: 'app' })
-    nav('/cuerpo')
   }
 
-  const protoSites = proto?.sites ?? []
-  const otherSites = SKINFOLD_SITES.filter((s) => !protoSites.includes(s.key))
+  const compId: 'bodyFat' | LeanId | null = tab === 'bodyFat' ? 'bodyFat' : tab === 'lean' ? leanId : null
+  const methods = compId ? methodsIn(input, compId, period.range.from, period.range.to) : []
+  const method = methodChoice && methods.includes(methodChoice) ? methodChoice : methods[0]
+  const hasLean = input ? methodsIn(input, 'leanMass', period.range.from, period.range.to).length > 0 || methodsIn(input, 'ffmi', period.range.from, period.range.to).length > 0 || methodsIn(input, 'fatMass', period.range.from, period.range.to).length > 0 : false
+  const tabs = [
+    { value: 'weight' as Tab, label: 'Peso' },
+    { value: 'waist' as Tab, label: 'Cintura' },
+    { value: 'bodyFat' as Tab, label: 'Grasa estimada' },
+    ...(hasLean || tab === 'lean' ? [{ value: 'lean' as Tab, label: 'Masa magra · FFMI' }] : []),
+  ]
+  const id: MetricId = tab === 'lean' ? leanId : tab
+  const seriesOptions = useMemo(() => (compId && method ? { method } : undefined), [compId, method])
+  const lastFat = sorted.find((m) => m.derived?.bodyFatPct !== undefined)
 
   return (
     <>
-      <PageHeader title={isNew ? 'Nueva medición' : 'Medición'} back="/cuerpo" />
-      <div className="space-y-4">
-        {existing?.origin === 'phase0' ? (
-          <p className="rounded-xl bg-surface2 px-3 py-2 text-xs text-muted">
-            Importada del historial (fase 0){existing.approx ? ', valor aproximado' : ''}. Puedes corregirla.
-          </p>
-        ) : null}
-        <Card className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <TextField label="Fecha" type="date" value={date} onChange={setDate} />
-            <TextField label="Hora" type="time" value={time} onChange={setTime} />
+      <MetricDetail
+        testId="body-page"
+        title="Cuerpo"
+        period={period}
+        onPeriod={setPeriod}
+        tabs={tabs}
+        tab={tab}
+        tabsLabel="Medidas corporales"
+        onTab={(t) => setM(t === 'lean' ? leanId : t)}
+        action={
+          <button type="button" className="btn-primary px-3" onClick={() => setTarget({ kind: 'weight' })} data-testid="new-weight">
+            <Icon name="plus" size={18} /> Registrar
+          </button>
+        }
+      >
+        {tab === 'lean' ? <Segmented ariaLabel="Composición" value={leanId} onChange={(v) => setM(v)} options={LEAN} size="sm" /> : null}
+        {compId && methods.length > 1 ? (
+          <div>
+            <span className="label">Método de estimación</span>
+            <Segmented ariaLabel="Método de estimación" value={method ?? ''} onChange={setMethodChoice} options={methods.map((m) => ({ value: m, label: m }))} size="sm" />
           </div>
-          <NumField label="Peso" unit="kg" value={weight} onChange={setWeight} autoFocus={isNew} name="weight" hint="En ayunas, después de ir al baño, para comparar mejor" />
-        </Card>
-
-        <Card>
-          <button className="flex w-full items-center justify-between" onClick={() => setShowCirc((v) => !v)}>
-            <span className="font-semibold">Perímetros (cm)</span>
-            <Icon name={showCirc ? 'chevronUp' : 'chevronDown'} size={18} className="text-muted" />
-          </button>
-          {showCirc ? (
-            <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">
-              {CIRCUMFERENCES.map((c) => (
-                <NumField key={c.key} label={c.es} unit="cm" value={circ[c.key] ?? ''} onChange={(v) => setCirc((s) => ({ ...s, [c.key]: v }))} name={`c-${c.key}`} />
-              ))}
-            </div>
-          ) : null}
-        </Card>
-
-        <Card>
-          <button className="flex w-full items-center justify-between" onClick={() => setShowSf((v) => !v)} data-testid="toggle-skinfolds">
-            <span className="font-semibold">Pliegues cutáneos (mm)</span>
-            <Icon name={showSf ? 'chevronUp' : 'chevronDown'} size={18} className="text-muted" />
-          </button>
-          {showSf ? (
-            <div className="mt-3 space-y-3">
-              <SelectField<ProtocolId>
-                label="Protocolo"
-                value={protocol}
-                onChange={setProtocol}
-                options={PROTOCOLS.filter((p) => !p.sex || p.sex === profile.sex).map((p) => ({ value: p.id, label: p.es }))}
-                placeholder="Elige un protocolo"
-              />
-              {proto ? <p className="text-xs text-muted">{proto.note}</p> : null}
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">
-                {(proto && proto.id !== 'sum_custom' ? SKINFOLD_SITES.filter((s) => protoSites.includes(s.key)) : SKINFOLD_SITES).map((s) => (
-                  <NumField key={s.key} label={s.es} unit="mm" hint={s.hint} value={sf[s.key] ?? ''} onChange={(v) => setSf((o) => ({ ...o, [s.key]: v }))} name={`sf-${s.key}`} />
-                ))}
-              </div>
-              {proto && proto.id !== 'sum_custom' && otherSites.length ? (
-                <details>
-                  <summary className="cursor-pointer text-xs font-medium text-muted">Otros pliegues (opcional)</summary>
-                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">
-                    {otherSites.map((s) => (
-                      <NumField key={s.key} label={s.es} unit="mm" value={sf[s.key] ?? ''} onChange={(v) => setSf((o) => ({ ...o, [s.key]: v }))} name={`sf-${s.key}`} />
-                    ))}
-                  </div>
-                </details>
-              ) : null}
-              {result ? (
-                <div className="rounded-xl border border-line bg-surface2/60 p-3 text-sm" data-testid="bodycomp-result">
-                  <div className="mb-1 flex items-center gap-2">
-                    <span className="font-semibold">Resultado</span>
-                    <Badge tone="warn">Estimado</Badge>
-                  </div>
-                  {result.sum !== null ? (
-                    <div className="num grid grid-cols-2 gap-1 sm:grid-cols-4">
-                      <span>Suma: {formatNumber(result.sum, 1)} mm</span>
-                      {result.density !== undefined ? <span>Densidad: {formatNumber(result.density, 4)}</span> : null}
-                      {result.bodyFatPct !== undefined ? <span className="font-semibold">Grasa: {formatNumber(result.bodyFatPct, 1)} %</span> : null}
-                      {result.fatMassKg !== undefined ? <span>Masa grasa: {formatNumber(result.fatMassKg, 1)} kg</span> : null}
-                      {result.leanMassKg !== undefined ? <span>Masa magra: {formatNumber(result.leanMassKg, 1)} kg</span> : null}
-                    </div>
-                  ) : null}
-                  <p className="mt-2 text-xs text-muted">{result.method}</p>
-                  {result.warnings.map((w) => (
-                    <p key={w} className="mt-1 text-xs text-warn">
-                      {w}
-                    </p>
-                  ))}
-                </div>
-              ) : protocol && Object.keys(sfN).length && age === null ? (
-                <p className="text-xs text-warn">Falta la fecha de nacimiento en el perfil para calcular.</p>
-              ) : null}
-            </div>
-          ) : null}
-        </Card>
-
-        <TextArea label="Notas" value={notes} onChange={setNotes} />
-        {invalid ? <p className="text-sm text-bad">Revisa los valores: deben ser números positivos.</p> : null}
-        <button className="btn-primary w-full" disabled={!canSave} onClick={() => void save()} data-testid="save-measurement">
-          Guardar medición
-        </button>
-        {existing ? (
-          <button
-            className="btn-danger w-full"
-            onClick={async () => {
-              if (!confirm('¿Eliminar esta medición?')) return
-              await r.remove('bodyMeasurements', existing.id)
-              nav('/cuerpo')
-            }}
-          >
-            <Icon name="trash" size={16} /> Eliminar medición
-          </button>
         ) : null}
-      </div>
+        <MetricBlock
+          id={id}
+          input={input}
+          period={period}
+          today={today}
+          seriesOptions={seriesOptions}
+          label={tab === 'weight' ? 'Peso registrado' : compId && method ? `${LEAN.find((l) => l.value === id)?.label ?? 'Grasa corporal'} · ${method}` : undefined}
+          title={compId ? `${compId === 'bodyFat' ? 'Grasa corporal' : (LEAN.find((l) => l.value === id)?.label ?? '')} (estimada)` : undefined}
+          emptyAction={
+            compId ? (
+              <Link to="/cuerpo/nueva" className="btn-secondary">
+                Medición con pliegues
+              </Link>
+            ) : (
+              <button type="button" className="btn-secondary" onClick={() => setTarget({ kind: 'weight' })}>
+                Registrar peso
+              </button>
+            )
+          }
+          footnote={
+            compId || tab === 'weight' || (tab === 'waist' && profile.heightCm && sorted.some((m) => m.circumferences.waist !== undefined)) ? (
+              <div className="space-y-2">
+                {compId ? (
+                  <p className="text-label text-muted" data-testid="estimate-note">
+                    Estimación calculada{method ? ` con ${method}` : ''}: no es una medición directa y cambia según el método. Los métodos distintos no se mezclan en una misma línea.
+                    {id === 'ffmi' ? ' FFMI = masa magra (kg) ÷ estatura (m)².' : ''}
+                    {compId === 'bodyFat' && lastFat ? ` Última con pliegues: ${formatDateEs(lastFat.date)}.` : ''}
+                  </p>
+                ) : null}
+                {tab === 'weight' ? (
+                  <p className="text-label text-muted">
+                    {latestW ? (
+                      <>
+                        Peso actual: <span className="num font-medium text-ink" data-testid="latest-weight">{formatNumber(latestW.weightKg as number, 1)} kg</span> · {formatDateEs(latestW.date)}
+                        {latestW.approx ? ' · aprox.' : ''}.{' '}
+                        {profile.heightCm ? `IMC ${formatNumber(bmi(latestW.weightKg as number, profile.heightCm), 1)} (referencia poblacional, no mide composición corporal).` : ''}
+                      </>
+                    ) : (
+                      <span data-testid="latest-weight">Sin registros de peso.</span>
+                    )}
+                  </p>
+                ) : null}
+                {tab === 'waist' && profile.heightCm ? <WaistNote rows={sorted} heightCm={profile.heightCm} /> : null}
+              </div>
+            ) : null
+          }
+        />
+
+        <section aria-label="Historial">
+          <SectionHeader
+            title="Mediciones"
+            hint={`${inPeriod.length} en el periodo`}
+            action={
+              <Link to="/cuerpo/nueva" className="btn-secondary px-3" data-testid="new-measurement">
+                Medición completa
+              </Link>
+            }
+          />
+          {inPeriod.length ? (
+            <div className="divide-rows mt-1" data-testid="measurement-list">
+              {inPeriod.slice(0, lim.shown).map((m) => (
+                <Row
+                  key={m.id}
+                  to={`/cuerpo/${m.id}`}
+                  title={`${formatDateEs(m.date, 'weekday')}${m.time ? ` · ${m.time}` : ''}`}
+                  subtitle={`${summary(m)} · ${originLabel(m.origin)}${m.approx ? ' · aprox.' : ''}`}
+                />
+              ))}
+              {lim.more}
+            </div>
+          ) : (
+            <p className="mt-2 text-body text-muted" data-testid="measurement-list">
+              {sorted.length ? 'No hay mediciones en este periodo.' : 'Aún no hay mediciones. Registra tu peso o una medición completa con perímetros y pliegues.'}
+            </p>
+          )}
+        </section>
+        {input ? <HealthRows rows={hcRowsFor(input.health, ['weight', 'bodyFat', 'leanMassKg'], period.range)} /> : null}
+      </MetricDetail>
+      <QuickLogHost target={target} onTarget={closeTarget} latestWeight={latestWeight} />
     </>
+  )
+}
+
+function WaistNote({ rows, heightCm }: { rows: BodyMeasurement[]; heightCm: number }) {
+  const w = rows.find((m) => m.circumferences.waist !== undefined)
+  if (!w) return null
+  return (
+    <p className="text-label text-muted">
+      Cintura/talla {formatNumber(whtr(w.circumferences.waist as number, heightCm), 2)} con {formatNumber(w.circumferences.waist as number, 1)} cm el {formatDateEs(w.date)}.
+    </p>
   )
 }

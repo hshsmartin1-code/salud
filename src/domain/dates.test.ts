@@ -7,6 +7,7 @@ import {
   daysBetween,
   formatDateEs,
   isoWeekStart,
+  isoWeekday,
   nowLocalTime,
   todayLocal,
 } from './dates';
@@ -49,5 +50,34 @@ describe('dates', () => {
     expect(formatDateEs('2026-11-14')).toBe('14 nov 2026');
     expect(formatDateEs('2026-11-14', 'long')).toBe('sábado, 14 de noviembre de 2026');
     expect(formatDateEs('2026-11-14', 'weekday')).toBe('sáb 14 nov');
+  });
+});
+
+describe('isoWeekday', () => {
+  it('Monday is 1 and Sunday is 7, across week, month, year and leap boundaries', () => {
+    expect(isoWeekday('2026-11-16')).toBe(1); // Monday
+    expect(isoWeekday('2026-11-18')).toBe(3);
+    expect(isoWeekday('2026-11-22')).toBe(7); // Sunday
+    expect(isoWeekday('2026-11-23')).toBe(1);
+    expect(isoWeekday('2026-12-31')).toBe(4);
+    expect(isoWeekday('2027-01-01')).toBe(5);
+    expect(isoWeekday('2028-02-29')).toBe(2); // leap day
+  });
+  it('does not depend on the process time zone (no date-only Date parsing)', () => {
+    const env = (globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process.env;
+    const tz = env.TZ;
+    try {
+      for (const z of ['America/Bogota', 'Pacific/Honolulu', 'Asia/Tokyo']) {
+        env.TZ = z;
+        expect(isoWeekday('2026-11-22')).toBe(7);
+        expect(isoWeekday('2026-11-23')).toBe(1);
+      }
+    } finally {
+      if (tz === undefined) delete env.TZ;
+      else env.TZ = tz;
+    }
+  });
+  it('rejects a malformed date instead of guessing', () => {
+    expect(() => isoWeekday('hoy')).toThrow();
   });
 });

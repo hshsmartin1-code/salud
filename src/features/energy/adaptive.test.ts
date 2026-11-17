@@ -199,3 +199,31 @@ describe('loadAdaptiveState + applyProposal', () => {
     expect(s.observed?.validIntakeDays).toBe(23)
   })
 })
+
+describe('V2: weekly evolution and activity context', () => {
+  it('recomputes the estimate weekly; early weeks without enough history stay empty', async () => {
+    const [p, r] = await mkProfile('Perfil Semanal', { mode: 'suggest', phase: 'deficit', targetRatePctPerWeek: -0.5 })
+    await seedSteadyLoss(r)
+    await r.add('goals', goalRow(2300))
+    const s = await loadAdaptiveState(r, p, TODAY)
+    expect(s.weekly).toHaveLength(8)
+    expect(s.weekly[7]!.to).toBe(addDays(TODAY, -1))
+    const ok = s.weekly.filter((w) => w.status === 'ok')
+    expect(ok.length).toBeGreaterThanOrEqual(3)
+    for (const w of ok) expect(w.observed!).toBeGreaterThan(2650)
+    for (const w of ok) expect(w.observed!).toBeLessThan(2950)
+    // The oldest window ends 49 days before yesterday: only ~7 days of data exist before it.
+    expect(s.weekly[0]!.status).not.toBe('ok')
+  })
+
+  it('reports recorded activity as context and never adds it to the estimate', async () => {
+    const [p, r] = await mkProfile('Perfil Actividad', { mode: 'suggest', phase: 'deficit', targetRatePctPerWeek: -0.5 })
+    await seedSteadyLoss(r)
+    await r.add('goals', goalRow(2300))
+    const before = (await loadAdaptiveState(r, p, TODAY)).observed!.observedTdee
+    for (let i = 1; i <= 10; i++) await r.add('activityLogs', { date: addDays(TODAY, -i), type: 'caminata', steps: 9000, activeKcal: 400, minutes: 60, distanceKm: 6 })
+    const s = await loadAdaptiveState(r, p, TODAY)
+    expect(s.activity).toEqual({ meanKcal: 400, days: 10, sources: 'Registro propio' })
+    expect(s.observed!.observedTdee).toBe(before)
+  })
+})

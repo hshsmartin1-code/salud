@@ -4,6 +4,13 @@ import { es } from 'date-fns/locale';
 /** Zona horaria de la app (Colombia, sin DST). */
 export const APP_TZ = 'America/Bogota';
 
+/** Exact calendar date, including month lengths and leap years. */
+export function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T12:00:00Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 /** YYYY-MM-DD en la zona dada. */
 export function todayLocal(now: Date = new Date(), tz: string = APP_TZ): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -62,6 +69,16 @@ export function isoWeekStart(date: string): string {
   const [y, m, d] = parseParts(date);
   const dow = new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay(); // 0 = Sunday
   return addDays(date, -((dow + 6) % 7));
+}
+
+/**
+ * ISO weekday of a local YYYY-MM-DD: 1 = Monday … 7 = Sunday. Pure calendar arithmetic (UTC noon of that
+ * calendar day), never the date-only Date constructor read in local time, which lands on the previous day west of UTC.
+ */
+export function isoWeekday(date: string): number {
+  const [y, m, d] = parseParts(date);
+  const dow = new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay(); // 0 = Sunday
+  return dow === 0 ? 7 : dow;
 }
 
 export function compareDates(a: string, b: string): number {

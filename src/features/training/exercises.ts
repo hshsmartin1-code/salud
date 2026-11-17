@@ -1,9 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useState } from 'react'
-import { useRepo } from '../../app/profile'
+import { useProfile, useRepo } from '../../app/profile'
 import type { CatalogExercise, CatalogExerciseFile, TrackingType } from '../../db/catalogTypes'
 import type { CustomExercise } from '../../db/types'
 import { normalize } from '../../domain/search'
+import { EMPTY_FILTER, filterLibrary, loadExerciseAliases, resolveExerciseId, setFavorite, type ExerciseAliases, type LibraryFilter } from './exerciseKnowledge'
 
 export interface Exercise extends CatalogExercise {
   custom: boolean
@@ -79,56 +80,52 @@ export function customToExercise(c: CustomExercise): Exercise {
   return { ...base, custom: true, search: searchText(base) }
 }
 
-/** Shared exercise catalog + this profile's custom exercises. */
+/** Shared exercise catalog + this profile's custom exercises (+ stable-id aliases and favourites). */
 export function useExercises() {
   const r = useRepo()
+  const profileId = useProfile().id
   const [catalog, setCatalog] = useState<ExerciseCatalog | null>(null)
+  const [aliases, setAliases] = useState<ExerciseAliases>({})
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     let alive = true
     loadExerciseCatalog()
       .then((c) => alive && setCatalog(c))
       .catch((e: unknown) => alive && setError(e instanceof Error ? e.message : String(e)))
+    loadExerciseAliases(import.meta.env.BASE_URL).then((a) => alive && setAliases(a))
     return () => {
       alive = false
     }
   }, [])
   const customs = useLiveQuery(() => r.all('customExercises'), [r])
+  const favRows = useLiveQuery(() => r.all('exerciseFavorites'), [r])
   return useMemo(() => {
     const list = [...(customs ?? []).map(customToExercise), ...(catalog?.list ?? [])]
     const byId = new Map(list.map((e) => [e.id, e]))
-    return { ready: !!catalog, error, list, byId, labels: catalog?.labels ?? EMPTY_LABELS, catalog }
-  }, [catalog, customs, error])
+    // Renamed ids keep resolving to the current exercise.
+    for (const old of Object.keys(aliases)) {
+      const cur = byId.get(resolveExerciseId(old, aliases))
+      if (cur && !byId.has(old)) byId.set(old, cur)
+    }
+    const favorites = new Set((favRows ?? []).map((f) => resolveExerciseId(f.exerciseId, aliases)))
+    const toggleFavorite = (e: Pick<Exercise, 'id' | 'nameEs'>) => setFavorite(r, profileId, e.id, e.nameEs, !favorites.has(e.id))
+    return {
+      ready: !!catalog,
+      error,
+      list,
+      byId,
+      labels: catalog?.labels ?? EMPTY_LABELS,
+      catalog,
+      aliases,
+      favorites,
+      toggleFavorite,
+      resolve: (id: string) => resolveExerciseId(id, aliases),
+    }
+  }, [catalog, customs, error, aliases, favRows, r, profileId])
 }
 
-export interface ExerciseFilter {
-  q: string
-  muscle: string
-  equipment: string
-  category: string
-}
-
-export function filterExercises(list: Exercise[], f: ExerciseFilter, limit = 80): Exercise[] {
-  const tokens = normalize(f.q).split(' ').filter(Boolean)
-  const out: { e: Exercise; score: number }[] = []
-  for (const e of list) {
-    if (f.muscle && !e.primaryMuscles.includes(f.muscle) && !e.secondaryMuscles.includes(f.muscle)) continue
-    if (f.equipment && (e.equipment ?? '') !== f.equipment) continue
-    if (f.category && e.category !== f.category) continue
-    if (tokens.length && !tokens.every((t) => e.search.includes(t))) continue
-    let score = 0
-    if (e.custom) score -= 50
-    if (f.muscle && e.primaryMuscles.includes(f.muscle)) score -= 10
-    const name = normalize(e.nameEs)
-    if (tokens.length && name.startsWith(tokens[0]!)) score -= 20
-    if (tokens.length && tokens.every((t) => name.includes(t))) score -= 10
-    if (e.level === 'beginner') score -= 2
-    score += name.length / 100
-    out.push({ e, score })
-  }
-  out.sort((a, b) => a.score - b.score)
-  return out.slice(0, limit).map((x) => x.e)
-}
+export type ExerciseFilter = LibraryFilter
+export { EMPTY_FILTER, filterLibrary as filterExercises }
 
 export function muscleList(e: Pick<CatalogExercise, 'primaryMuscles'>, labels: ExerciseLabels): string {
   return e.primaryMuscles.map((m) => labels.muscles[m] ?? m).join(', ')

@@ -1,49 +1,24 @@
-import { useEffect } from 'react'
-import { useRegisterSW } from 'virtual:pwa-register/react'
-import { Icon } from '../ui/Icon'
+import { lazy, Suspense, useEffect, useState } from 'react'
 
-/** Service-worker lifecycle: "offline ready" note and "new version" prompt. */
+// The service-worker registration (workbox-window, ~6 KB) is not needed to paint the first screen: it is
+// loaded once the browser is idle (at most 2 s after mount).
+const Inner = lazy(() => import('./UpdatePromptInner'))
+
+/** Service-worker lifecycle: "offline ready" note and "new version" prompt, registered when idle. */
 export function UpdatePrompt() {
-  const {
-    offlineReady: [offlineReady, setOfflineReady],
-    needRefresh: [needRefresh, setNeedRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
-    onRegisteredSW(_url, reg) {
-      // Check for updates every hour while the app is open.
-      if (reg) window.setInterval(() => void reg.update(), 60 * 60 * 1000)
-    },
-  })
-  // The "ready offline" note is informational: hide it on its own after a few seconds.
+  const [ready, setReady] = useState(false)
   useEffect(() => {
-    if (!offlineReady || needRefresh) return
-    const t = window.setTimeout(() => setOfflineReady(false), 5000)
+    const go = () => setReady(true)
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(go, { timeout: 2000 })
+      return () => window.cancelIdleCallback(id)
+    }
+    const t = window.setTimeout(go, 1200)
     return () => window.clearTimeout(t)
-  }, [offlineReady, needRefresh, setOfflineReady])
-  if (!offlineReady && !needRefresh) return null
-  return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4 lg:bottom-6" role="status">
-      <div className="card pointer-events-auto flex max-w-md items-center gap-3 px-4 py-3 shadow-pop">
-        <Icon name={needRefresh ? 'refresh' : 'check'} className="text-accent" />
-        <div className="flex-1 text-sm">
-          {needRefresh ? 'Hay una versión nueva de la aplicación.' : 'Lista para usarse sin conexión.'}
-        </div>
-        {needRefresh ? (
-          <button className="btn-primary px-3 py-1.5" onClick={() => void updateServiceWorker(true)}>
-            Actualizar
-          </button>
-        ) : null}
-        <button
-          className="btn-ghost p-1.5"
-          aria-label="Cerrar"
-          onClick={() => {
-            setOfflineReady(false)
-            setNeedRefresh(false)
-          }}
-        >
-          <Icon name="x" size={18} />
-        </button>
-      </div>
-    </div>
-  )
+  }, [])
+  return ready ? (
+    <Suspense fallback={null}>
+      <Inner />
+    </Suspense>
+  ) : null
 }

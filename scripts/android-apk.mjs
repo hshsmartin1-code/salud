@@ -7,6 +7,7 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+const dev = process.argv.includes('--dev') // side-by-side "Salud Dev" test app (app.salud.personal.dev)
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const androidDir = join(root, 'android')
 const win = process.platform === 'win32'
@@ -51,8 +52,8 @@ writeFileSync(join(androidDir, 'local.properties'), `sdk.dir=${sdk.split(String.
 console.log(`[apk] SDK: ${sdk}`)
 console.log(`[apk] JDK: ${env.JAVA_HOME ?? '(PATH)'}`)
 const gradlew = join(androidDir, win ? 'gradlew.bat' : 'gradlew')
-const r = spawnSync(gradlew, ['assembleDebug', '--no-daemon'], { cwd: androidDir, env, stdio: 'inherit', shell: win })
-const apk = join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk')
+const r = spawnSync(gradlew, ['assembleDebug', '--no-daemon', ...(dev ? ['-PsaludDev=true'] : [])], { cwd: androidDir, env, stdio: 'inherit', shell: win })
+const apk = join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug', dev ? 'app-dev-debug.apk' : 'app-debug.apk')
 if (r.status !== 0 || !existsSync(apk)) {
   console.error('[apk] Gradle terminó con error; no se generó el APK.')
   process.exit(r.status || 1)

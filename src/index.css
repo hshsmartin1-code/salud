@@ -12,38 +12,53 @@
   --surface: 255 255 255;
   --surface2: 232 235 237;
   --line: 216 221 225;
-  --line-strong: 186 193 199;
+  --line-strong: 136 141 145;
   --ink: 18 26 33;
   --ink-contrast: 255 255 255;
   --muted: 86 97 107;
-  --faint: 138 148 156;
+  --faint: 94 105 115;
   /* Set per active profile by ProfileProvider (see src/app/accent.ts). */
-  --accent: var(--accent-light, 15 122 85);
+  --accent: var(--accent-light, 15 121 84);
   --accent-ink: 255 255 255;
-  --good: 22 128 80;
-  --warn: 176 104 0;
-  --bad: 194 44 52;
+  --good: 20 119 74;
+  --warn: 151 89 0;
+  --bad: 192 44 51;
   --protein: 79 102 230;
-  --carbs: 214 136 16;
+  --carbs: 188 120 14;
   --fat: 212 72 118;
   --fiber: 56 146 88;
   --kcal: 18 26 33;
+  /* Domain colours (V2): identity of each health area. Always paired with an icon + label (never colour alone). */
+  --energy: 217 84 26;
+  --move: 79 143 18;
+  --train: 12 116 139;
+  --sleep: 87 87 214;
+  --body: 162 61 176;
+  --heart: 204 41 54;
+  --water: 31 111 209;
   --shadow-pop: 0 18px 40px -12px rgb(18 26 33 / 0.28), 0 2px 6px rgb(18 26 33 / 0.08);
+  /* Plate behind exercise stills: the illustrations are drawn for a light blue ground, so the plate stays light in both themes. */
+  --media-plate: 219 233 245;
+  --dur-state: 120ms;
+  --dur-enter: 200ms;
+  --dur-progress: 320ms;
   color-scheme: light;
 }
 
 :root[data-theme='dark'] {
-  --bg: 14 19 23;
-  --surface: 21 27 32;
-  --surface2: 28 36 42;
-  --line: 40 49 57;
-  --line-strong: 62 73 83;
-  --ink: 230 235 238;
-  --ink-contrast: 14 19 23;
-  --muted: 152 163 172;
-  --faint: 106 117 126;
+  /* V2: near-black canvas with lifted panels (OLED friendly); data colours carry the energy. */
+  --bg: 4 5 6;
+  --surface: 20 21 24;
+  --surface2: 31 33 37;
+  --line: 39 41 46;
+  /* Control outlines (.field, .chip, .btn-secondary): >= 3:1 on surface and bg (WCAG 1.4.11). Hairlines use --line. */
+  --line-strong: 98 101 107;
+  --ink: 240 241 243;
+  --ink-contrast: 8 9 11;
+  --muted: 158 162 170;
+  --faint: 142 147 156;
   --accent: var(--accent-dark, 78 211 160);
-  --accent-ink: 14 19 23;
+  --accent-ink: 8 9 11;
   --good: 74 222 128;
   --warn: 245 185 66;
   --bad: 248 113 113;
@@ -51,8 +66,16 @@
   --carbs: 184 134 30;
   --fat: 210 88 143;
   --fiber: 90 220 130;
-  --kcal: 230 235 238;
+  --kcal: 240 241 243;
+  --energy: 242 106 46;
+  --move: 125 194 30;
+  --train: 20 184 212;
+  --sleep: 124 124 248;
+  --body: 216 101 216;
+  --heart: 240 72 78;
+  --water: 59 143 240;
   --shadow-pop: 0 18px 44px -10px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.04);
+  --media-plate: 219 233 245;
   color-scheme: dark;
 }
 
@@ -133,17 +156,44 @@
   .card {
     @apply rounded-2xl border border-line bg-surface;
   }
+  /* V2 dashboard tile: a lifted surface; hairline in light mode, borderless depth in dark mode. */
+  .tile {
+    @apply rounded-[18px] border border-line bg-surface p-4 transition-colors;
+  }
+  a.tile:hover,
+  button.tile:hover {
+    @apply border-line-strong;
+  }
+  :root[data-theme='dark'] .tile {
+    border-color: rgb(var(--line) / 0.55);
+  }
   .panel-quiet {
     @apply rounded-2xl bg-surface2/70;
   }
   .field {
-    @apply w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-[15px] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-faint hover:border-line-strong focus:border-ink/50 focus:ring-[3px] focus:ring-accent/20;
+    @apply w-full rounded-xl border border-line-strong bg-surface px-3 py-2.5 text-body outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-faint hover:border-line-strong focus:border-ink/50 focus:ring-[3px] focus:ring-accent/20;
   }
   .label {
-    @apply mb-1.5 block text-[13px] font-medium text-muted;
+    @apply mb-1.5 block text-label font-medium text-muted;
+  }
+  /*
+    Touch target: the drawn shape may be smaller, but the hit area is at least 44 x 44 px.
+    An invisible ::before is centred on the control and grows to 44 px where the control is smaller.
+  */
+  .hit-44 {
+    position: relative;
+  }
+  .hit-44::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
   }
   .btn {
-    @apply inline-flex min-h-[42px] select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-[background-color,border-color,color,transform,filter] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
+    @apply relative inline-flex min-h-[44px] select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-[background-color,border-color,color,transform,filter] duration-state active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
   }
   .btn-primary {
     @apply btn bg-ink text-ink-contrast hover:bg-ink/90;
@@ -152,22 +202,22 @@
     @apply btn bg-accent text-accent-ink hover:brightness-110;
   }
   .btn-secondary {
-    @apply btn border border-line bg-surface text-ink hover:border-line-strong hover:bg-surface2/60;
+    @apply btn border border-line-strong bg-surface text-ink hover:border-line-strong hover:bg-surface2/60;
   }
   .btn-ghost {
-    @apply btn min-h-0 text-muted hover:bg-surface2 hover:text-ink;
+    @apply btn hit-44 min-h-0 text-muted hover:bg-surface2 hover:text-ink;
   }
   .btn-danger {
     @apply btn bg-bad/10 text-bad hover:bg-bad/15;
   }
   .chip {
-    @apply inline-flex min-h-[32px] items-center gap-1 rounded-full border border-line bg-surface px-3 py-1 text-[13px] font-medium text-muted transition-colors hover:border-line-strong hover:text-ink;
+    @apply hit-44 inline-flex min-h-[32px] items-center gap-1 rounded-full border border-line-strong bg-surface px-3 py-1 text-label font-medium text-muted transition-colors hover:border-line-strong hover:text-ink;
   }
   .chip-on {
     @apply border-ink bg-ink text-ink-contrast hover:border-ink hover:text-ink-contrast;
   }
   .section-title {
-    @apply text-[15px] font-semibold text-ink;
+    @apply text-body font-semibold text-ink;
   }
   .divide-rows > * + * {
     @apply border-t border-line;
@@ -230,10 +280,52 @@
 .anim-pop {
   animation: pop 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+/* Skeleton: a slow brightness pulse, only for people who have not asked for less motion. */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+.skeleton {
+  background: rgb(var(--surface2));
+  border-radius: 8px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton {
+    animation: skeleton-pulse 1400ms ease-in-out infinite;
+  }
+}
+/* Toast host: above the mobile bottom navigation (62 px) and the safe area; beside the sidebar on desktop. */
+.toast-host {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(62px + env(safe-area-inset-bottom) + var(--dock-inset, 0px) + 12px);
+  z-index: 40; /* above the bottom navigation (30), below sheets (50) */
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  pointer-events: none;
+}
+@media (min-width: 1024px) {
+  .toast-host {
+    left: 16rem;
+    bottom: calc(env(safe-area-inset-bottom) + var(--dock-inset, 0px) + 16px);
+  }
+}
+.anim-toast {
+  animation: sheet-in var(--dur-enter) cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 @media (prefers-reduced-motion: reduce) {
   .anim-sheet,
   .anim-fade,
-  .anim-pop {
+  .anim-pop,
+  .anim-toast,
+  .skeleton {
     animation: none;
   }
   * {
@@ -244,6 +336,40 @@
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }
+.sheet-scroll {
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-block: 1rem;
+}
 .pt-safe {
   padding-top: env(safe-area-inset-top);
+}
+
+/* Day change by swipe or arrows: the day slides in from the side it came from (skipped for reduced motion). */
+@keyframes day-in-next {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes day-in-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .day-in-next {
+    animation: day-in-next 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .day-in-prev {
+    animation: day-in-prev 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
 }

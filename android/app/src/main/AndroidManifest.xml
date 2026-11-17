@@ -25,6 +25,25 @@
 
         </activity>
 
+        <!-- Health Connect: rationale screen (Android 9-13) and its Android 14+ alias. -->
+        <activity
+            android:name=".healthconnect.PermissionsRationaleActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".healthconnect.PermissionsRationaleActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -42,4 +61,36 @@
     <!-- Camera: only for photographing nutrition labels (processed on the device, never uploaded). -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- Backup export to Documents/Salud (Filesystem plugin). Only Android 10 and older still need these;
+         Android 11+ lets an app write its own files in Documents without any permission. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+
+    <!-- Rest-timer notification (Local Notifications plugin). Android 13+ asks at runtime, only when the person taps
+         "Activar avisos". The plugin library also merges RECEIVE_BOOT_COMPLETED, WAKE_LOCK and SCHEDULE_EXACT_ALARM;
+         the app schedules inexact alarms only (isExactNotification: false), so the exact-alarm one is never used. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Health Connect: READ-ONLY, one block per consent category in the app. No history, no background,
+         no total calories, no writes. Declaring a permission does not grant it; the person grants each one. -->
+    <!-- activity -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" />
+    <!-- heart -->
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
+    <!-- exercise -->
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <!-- sleep -->
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+    <!-- body -->
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <uses-permission android:name="android.permission.health.READ_BODY_FAT" />
+    <uses-permission android:name="android.permission.health.READ_LEAN_BODY_MASS" />
+
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
 </manifest>

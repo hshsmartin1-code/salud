@@ -1,0 +1,72 @@
+import { ANA, BETO, chooseUnit, expect, kcalToday, mealMenu, onboard, saveFood, setKeepAdding, switchProfile, test } from './helpers'
+
+test('search can keep adding foods and still reach the diary', async ({ page }) => {
+  await onboard(page)
+  await page.goto('./#/comida/buscar?meal=desayuno')
+  await setKeepAdding(page, true)
+  for (let count = 1; count <= 2; count++) {
+    // The query is cleared after each log (and the field refocused), so the next food is typed again.
+    await page.getByTestId('food-search').fill('arroz cocido')
+    await page.getByTestId('food-results').locator('button').first().click()
+    await chooseUnit(page, 'g')
+    await page.getByRole('textbox', { name: 'Cantidad' }).fill('100')
+    await page.getByTestId('save-food').click()
+    await expect(page.getByTestId('food-added-count')).toContainText(count === 1 ? '1 alimento registrado' : `${count} alimentos registrados`)
+    await expect(page).toHaveURL(/#\/comida\/buscar/)
+    await expect(page.getByTestId('food-search')).toHaveValue('')
+    await expect(page.getByTestId('food-search')).toBeFocused()
+  }
+  await page.getByTestId('food-added-count').getByRole('link', { name: 'Ver diario' }).click()
+  expect(await kcalToday(page)).toBe('260')
+})
+
+test('a meal can be copied from a chosen date (Copiar comida anterior)', async ({ page }) => {
+  await onboard(page)
+  await page.goto('./#/comida/buscar?d=2026-01-05&meal=desayuno')
+  await page.getByTestId('food-search').fill('arroz cocido')
+  await page.getByTestId('food-results').locator('button').first().click()
+  await chooseUnit(page, 'g')
+  await page.getByRole('textbox', { name: 'Cantidad' }).fill('100')
+  await saveFood(page)
+
+  await page.goto('./#/comida?d=2026-01-06')
+  await mealMenu(page, 'desayuno', 'Copiar comida anterior')
+  const dialog = page.getByRole('dialog', { name: 'Copiar comida anterior' })
+  await dialog.getByLabel('Fecha de origen').fill('2026-01-05')
+  await expect(dialog.getByTestId('copy-meal-list')).toContainText('Arroz blanco cocido')
+  await expect(dialog.getByTestId('copy-meal-save')).toContainText('Copiar 1 alimento')
+  await dialog.getByTestId('copy-meal-save').click()
+  await expect(page.getByTestId('meal-desayuno')).toContainText('Arroz blanco cocido')
+  await expect(page.getByTestId('kcal-total')).toHaveText('130')
+})
+
+test('dashboard indicator choices persist per profile and after reload', async ({ page }) => {
+  await onboard(page, ANA, BETO)
+  await switchProfile(page, ANA.name)
+  await page.getByTestId('dashboard-customize').click()
+  const dialog = page.getByRole('dialog', { name: 'Personalizar indicadores' })
+  await dialog.getByTestId('dashboard-hide-empty').click()
+  await expect(dialog.getByTestId('dashboard-hide-empty')).not.toBeChecked()
+  await expect(page.locator('[data-indicator]')).toHaveCount(8)
+  await dialog.getByRole('checkbox', { name: 'Sueño' }).click()
+  await expect(dialog.getByRole('checkbox', { name: 'Sueño' })).not.toBeChecked()
+  await expect(page.locator('[data-indicator]')).toHaveCount(7)
+  await dialog.getByRole('button', { name: 'Bajar Peso' }).click()
+  await expect.poll(() => page.locator('[data-indicator]').first().getAttribute('data-indicator')).toBe('steps')
+  await dialog.getByRole('button', { name: 'Cerrar' }).click()
+
+  await switchProfile(page, BETO.name)
+  await page.getByTestId('dashboard-customize').click()
+  const other = page.getByRole('dialog', { name: 'Personalizar indicadores' })
+  await expect(other.getByTestId('dashboard-hide-empty')).toBeChecked()
+  await expect(other.getByRole('checkbox', { name: 'Sueño' })).toBeChecked()
+  await other.getByRole('button', { name: 'Cerrar' }).click()
+
+  await switchProfile(page, ANA.name)
+  await page.reload()
+  await expect.poll(() => page.locator('[data-indicator]').first().getAttribute('data-indicator')).toBe('steps')
+  await expect(page.locator('[data-indicator]')).toHaveCount(7)
+  await page.getByTestId('dashboard-customize').click()
+  await expect(page.getByRole('dialog', { name: 'Personalizar indicadores' }).getByTestId('dashboard-hide-empty')).not.toBeChecked()
+  await expect(page.getByRole('dialog', { name: 'Personalizar indicadores' }).getByRole('checkbox', { name: 'Sueño' })).not.toBeChecked()
+})

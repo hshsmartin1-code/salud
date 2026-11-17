@@ -1,7 +1,7 @@
 {
   "name": "app",
   "private": true,
-  "version": "0.0.0",
+  "version": "3.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,25 +13,35 @@
     "predev": "node scripts/copy-ocr-assets.mjs",
     "prebuild": "node scripts/copy-ocr-assets.mjs",
     "build:android": "tsc -b && node scripts/copy-ocr-assets.mjs && vite build --mode android && cap sync android",
-    "android:apk": "node scripts/android-apk.mjs"
+    "android:apk": "node scripts/check-distributable.mjs && node scripts/android-apk.mjs",
+    "test:emulator": "npx --yes firebase-tools@15.34.2 emulators:exec --only auth,firestore --project demo-salud \"vitest run --config vitest.emulator.config.ts\"",
+    "dev:emulator": "npx --yes firebase-tools@15.34.2 emulators:exec --only auth,firestore --project demo-salud \"vite --mode emulator --port 4190 --strictPort\"",
+    "test:e2e:emulator": "npx --yes firebase-tools@15.34.2 emulators:exec --only auth,firestore --project demo-salud \"playwright test -c playwright.emulator.config.ts\""
   },
   "dependencies": {
+    "@capacitor-firebase/authentication": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.6.2",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/share": "^8.0.3",
+    "@capgo/capacitor-updater": "^8.54.2",
     "@fontsource-variable/archivo": "^5.3.0",
     "date-fns": "^4.4.0",
     "dexie": "^4.4.7",
     "dexie-react-hooks": "^4.4.0",
+    "firebase": "^12.19.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-hook-form": "^7.92.0",
     "react-router-dom": "^7.18.5",
-    "recharts": "^3.10.1",
     "tesseract.js": "^7.0.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@capacitor/android": "^8.6.2",
     "@capacitor/cli": "^8.6.2",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@playwright/test": "^1.65.1",
     "@tesseract.js-data/spa": "^1.0.0",
     "@types/node": "^24.19.2",

@@ -14,7 +14,7 @@ export function ProfileSwitcher() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex max-w-full items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-3 text-sm font-semibold shadow-card transition hover:bg-surface2"
+        className="flex max-w-full items-center gap-2 min-h-[44px] rounded-full border border-line bg-surface py-1 pl-1.5 pr-3 text-sm font-semibold shadow-card transition hover:bg-surface2"
         aria-label={`Perfil activo: ${active.name}. Cambiar perfil`}
         data-testid="profile-switcher"
       >

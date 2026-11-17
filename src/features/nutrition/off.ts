@@ -6,7 +6,7 @@ import type { NutrientCode, NutrientMap } from '../../db/catalogTypes'
 import type { RefFood } from '../../db/types'
 
 const FIELDS =
-  'code,product_name,product_name_es,brands,quantity,serving_size,serving_quantity,nutriments,categories_tags,product_quantity,product_quantity_unit'
+  'code,product_name,product_name_es,brands,quantity,serving_size,serving_quantity,serving_quantity_unit,nutriments,categories_tags,product_quantity,product_quantity_unit'
 const OFF = 'https://world.openfoodfacts.org'
 
 type Nutriments = Record<string, unknown>
@@ -18,6 +18,7 @@ export interface OffProduct {
   quantity?: string
   serving_size?: string
   serving_quantity?: number | string
+  serving_quantity_unit?: string
   nutriments?: Nutriments
   categories_tags?: string[]
   product_quantity?: number | string
@@ -65,6 +66,62 @@ function isLiquid(p: OffProduct): boolean {
   return /\b\d+(?:[.,]\d+)?\s*(ml|cl|dl|l|lt|lts|litros?|cc)\b/i.test(String(p.quantity ?? ''))
 }
 
+function normalizedUnit(v: unknown): 'g' | 'ml' | null {
+  const u = String(v ?? '').trim().toLowerCase()
+  return u === 'g' || u === 'ml' ? u : null
+}
+
+type Measure = { amount: number; unit: 'g' | 'ml' }
+const MEASURE_RE = /\b(\d+(?:[.,]\d+)?)\s*(kg|mg|g|gr|grs|gramos|ml|cl|dl|l|lt|lts|litro|litros|cc)\b/gi
+const MEASURE_FACTOR: Record<string, number> = { kg: 1000, mg: 0.001, g: 1, gr: 1, grs: 1, gramos: 1, ml: 1, cl: 10, dl: 100, l: 1000, lt: 1000, lts: 1000, litro: 1000, litros: 1000, cc: 1 }
+
+function textMeasure(value: unknown): Measure | null {
+  const text = String(value ?? '')
+  if (/\d\s*[x×]\s*\d/i.test(text)) return null
+  const matches = [...text.matchAll(MEASURE_RE)]
+  if (matches.length !== 1) return null
+  const u = matches[0][2].toLowerCase()
+  const amount = Number(matches[0][1].replace(',', '.')) * MEASURE_FACTOR[u]
+  if (!Number.isFinite(amount) || amount <= 0) return null
+  return { amount, unit: ['kg', 'mg', 'g', 'gr', 'grs', 'gramos'].includes(u) ? 'g' : 'ml' }
+}
+
+function agrees(a: Measure, b: Measure): boolean {
+  return a.unit === b.unit && Math.abs(a.amount - b.amount) <= 0.02
+}
+
+function servingQuantity(p: OffProduct): Measure | null {
+  if (/\d\s*[x×]\s*\d/i.test(String(p.serving_size ?? ''))) return null
+  const text = textMeasure(p.serving_size)
+  const sq = num(p.serving_quantity)
+  const unit = normalizedUnit(p.serving_quantity_unit)
+  if (sq !== null && sq <= 0) return null
+  if (p.serving_quantity_unit != null && (!unit || (text && text.unit !== unit))) return null
+  if (sq !== null && sq > 0 && unit) {
+    const normalized = { amount: sq, unit }
+    return text && !agrees(text, normalized) ? null : normalized
+  }
+  if (!text) return null
+  return sq !== null && Math.abs(sq - text.amount) > 0.02 ? null : text
+}
+
+function packageQuantity(p: OffProduct): Measure | null {
+  const pq = num(p.product_quantity)
+  const text = textMeasure(p.quantity)
+  const unit = normalizedUnit(p.product_quantity_unit)
+  if (pq !== null && pq <= 0) return null
+  if (p.product_quantity_unit != null && (!unit || (text && text.unit !== unit))) return null
+  if (pq !== null) {
+    if (unit && pq > 0) {
+      const normalized = { amount: pq, unit }
+      return text && !agrees(text, normalized) ? null : normalized
+    }
+    if (!text || Math.abs(pq - text.amount) > 0.02) return null
+    return text
+  }
+  return text
+}
+
 export type OffResult = { food: RefFood } | { error: string }
 
 /** Convert an OFF product to a reference food; refuses products without name or energy. */
@@ -105,11 +162,17 @@ export function offToRefFood(p: OffProduct, fetchedAt = new Date().toISOString()
     const est = 4 * n.protein + 4 * n.carbs + 9 * n.fat
     if (Math.abs(kcal - est) > 0.25 * Math.max(est, kcal)) flags.push('atwater_mismatch')
   }
+  const basis = isLiquid(p) ? '100ml' : '100g'
+  const expectedUnit = basis === '100ml' ? 'ml' : 'g'
   const portions: [string, number][] = []
-  const sq = num(p.serving_quantity)
-  if (sq !== null && sq > 0) portions.push([p.serving_size ? `1 porción (${p.serving_size})`.slice(0, 80) : '1 porción', r2(sq)])
-  const pq = num(p.product_quantity)
-  if (pq !== null && pq > 0) portions.push(['Envase completo', r2(pq)])
+  const serving = servingQuantity(p)
+  const pq = packageQuantity(p)
+  if (serving && serving.unit === expectedUnit && r2(serving.amount) > 0 &&
+      !(pq && pq.unit === expectedUnit && serving.amount > pq.amount + 0.02))
+    portions.push([p.serving_size ? `1 porción (${p.serving_size})`.slice(0, 80) : '1 porción', r2(serving.amount)])
+  if (pq && pq.unit === expectedUnit && r2(pq.amount) > 0)
+    portions.push(['Envase completo', r2(pq.amount)])
+  if (portions.length) flags.push('portion_units_checked')
   const brands = Array.isArray(p.brands) ? p.brands.join(',') : (p.brands ?? '')
   const brand =
     brands
@@ -130,7 +193,7 @@ export function offToRefFood(p: OffProduct, fetchedAt = new Date().toISOString()
       barcode: code,
       category: cat ? cat.charAt(0).toUpperCase() + cat.slice(1) : null,
       kind: 'packaged',
-      basis: isLiquid(p) ? '100ml' : '100g',
+      basis,
       nutrients: n,
       portions,
       synonyms: null,

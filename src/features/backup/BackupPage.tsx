@@ -1,8 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useProfiles } from '../../app/profile'
-import { backupFileName, backupStats, downloadJson, exportBackup, importBackup, parseBackup, type Backup, type ImportResult } from '../../db/backup'
-import { createProfile, getMeta, setMeta } from '../../db/profiles'
+import { backupFileName, backupSize, backupStats, exportBackup, importBackup, parseBackup, previewImport, type Backup, type ImportResult } from '../../db/backup'
+import { checkIntegrity, repairIntegrity, type IntegrityReport } from '../../db/integrity'
+import { createProfile, getMeta, listProfiles, setMeta } from '../../db/profiles'
 import { repo } from '../../db/repo'
 import { requestPersistentStorage } from '../../db/schema'
 import { refFoods } from '../../db/shared'
@@ -10,12 +11,19 @@ import type { PersonalTable } from '../../db/tables'
 import type { Profile, ProfileColor } from '../../db/types'
 import { todayLocal } from '../../domain/dates'
 import { formatNumber } from '../../domain/units'
+import { Disclosure } from '../../ui/Disclosure'
 import { Icon } from '../../ui/Icon'
+import { useConfirm } from '../../ui/Confirm'
 import { Badge, Card, PageHeader, Segmented } from '../../ui/kit'
+import { IMPORT_MERGE_HELP, IMPORT_MERGE_LABEL, replaceConfirmText, replaceWithSafetyCopy } from './replaceFlow'
+import { savedMessage, saveJsonFile, shareSavedFile } from './saveFile'
 import { mapPhase0, parsePhase0, type P0File } from './phase0'
 import { importTcac, parseTcac } from './tcac'
+import { SYNC_CONFIG } from '../../sync/config'
+import { BACKUP_NOTE } from '../../sync/copy'
 
 export const TABLE_LABEL: Record<PersonalTable, string> = {
+  foodPortions: 'Porciones personalizadas',
   goals: 'Objetivos',
   foodLogs: 'Registros de comida',
   customFoods: 'Alimentos propios',
@@ -37,6 +45,12 @@ export const TABLE_LABEL: Record<PersonalTable, string> = {
   labelImages: 'Fotos de etiquetas',
   dayMarks: 'Días marcados como completos',
   energyAdjustments: 'Ajustes de energía',
+  healthRecords: 'Datos de Health Connect',
+  integrations: 'Conexiones (Health Connect)',
+  vitals: 'Signos vitales',
+  hydrationLogs: 'Hidratación',
+  progressPhotos: 'Fotos de progreso',
+  exerciseFavorites: 'Ejercicios favoritos',
 }
 
 const COLORS: ProfileColor[] = ['emerald', 'violet', 'amber', 'sky', 'rose']
@@ -74,20 +88,24 @@ export function BackupPage() {
   const { profiles, active, setActive } = useProfiles()
   return (
     <>
-      <PageHeader title="Respaldo e importación" subtitle="Los datos viven solo en este dispositivo" back={active ? '/mas' : '/'} />
+      <PageHeader title="Datos y respaldos" subtitle={SYNC_CONFIG ? 'Copias manuales de tus datos' : 'Tus datos viven en este dispositivo'} back={active ? '/mas' : '/'} />
       <div className="space-y-5">
-        <Card className="flex gap-3 border-warn/30 bg-warn/5">
-          <Icon name="shield" className="mt-0.5 shrink-0 text-warn" />
-          <p className="text-sm text-muted">
-            No hay sincronización ni nube: cada dispositivo guarda sus datos en el navegador. Exporta un respaldo con frecuencia y guárdalo en un lugar
-            seguro. Los archivos contienen datos de salud: no los compartas.
-          </p>
-        </Card>
         {profiles && profiles.length ? <ExportCard profiles={profiles} active={active} /> : null}
         <ImportCard profiles={profiles ?? []} onCreated={(id) => !active && setActive(id)} />
-        <Phase0Card profiles={profiles ?? []} onCreated={(id) => !active && setActive(id)} />
-        <TcacCard />
-        <StorageCard />
+        <p className="flex items-start gap-2 px-1 text-label text-muted" data-testid="backup-note">
+          <Icon name="shield" size={16} className="mt-0.5 shrink-0" />
+          <span>{BACKUP_NOTE}</span>
+        </p>
+        <div className="tile">
+          <Disclosure summary="Herramientas avanzadas" tone="section" testId="backup-advanced">
+            <div className="space-y-5 pt-2">
+              <Phase0Card profiles={profiles ?? []} onCreated={(id) => !active && setActive(id)} />
+              <TcacCard />
+              <StorageCard />
+              <IntegrityCard />
+            </div>
+          </Disclosure>
+        </div>
       </div>
     </>
   )
@@ -96,17 +114,33 @@ export function BackupPage() {
 function ExportCard({ profiles, active }: { profiles: Profile[]; active: Profile | null }) {
   const [last, setLast] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [media, setMedia] = useState(true)
+  const [size, setSize] = useState<number | null>(null)
+  const [msg, setMsg] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null)
+  const [shareable, setShareable] = useState<{ uri: string; fileName: string } | null>(null)
   useEffect(() => {
     void getMeta<string>('lastExport').then((v) => setLast(v ?? null))
   }, [])
   async function run(scope: { profileId: string } | 'all', label: string) {
     setBusy(true)
+    setMsg(null)
+    setShareable(null)
     try {
-      const b = await exportBackup(scope)
-      downloadJson(b, backupFileName(b, label))
+      const b = await exportBackup(scope, undefined, { includeMedia: media })
+      const out = await saveJsonFile(b, backupFileName(b, label))
+      // The date of the last backup is recorded only once a file was really handed to the platform.
+      if (!out.ok) {
+        setMsg({ tone: 'bad', text: out.message })
+        return
+      }
+      setSize(backupSize(b))
       const now = new Date().toISOString()
       await setMeta('lastExport', now)
       setLast(now)
+      setMsg({ tone: 'good', text: savedMessage(out) })
+      if (out.method === 'documents') setShareable({ uri: out.uri, fileName: out.fileName })
+    } catch (e) {
+      setMsg({ tone: 'bad', text: e instanceof Error && e.message ? `No se pudo exportar: ${e.message}` : 'No se pudo exportar. Inténtalo de nuevo.' })
     } finally {
       setBusy(false)
     }
@@ -115,8 +149,15 @@ function ExportCard({ profiles, active }: { profiles: Profile[]; active: Profile
     <Card className="space-y-3">
       <h2 className="font-semibold">Exportar</h2>
       <p className="text-sm text-muted">
-        Archivo JSON versionado con todos los registros. Último respaldo: {last ? new Date(last).toLocaleString('es-CO') : 'nunca'}.
+        Archivo JSON versionado con todos los registros. Último respaldo: <span data-testid="last-export">{last ? new Date(last).toLocaleString('es-CO') : 'nunca'}</span>.
       </p>
+      <label className="flex min-h-[44px] items-center gap-2.5 text-sm">
+        <input type="checkbox" className="h-4 w-4 accent-[rgb(var(--accent))]" checked={media} onChange={(e) => setMedia(e.target.checked)} data-testid="export-media" />
+        <span>
+          Incluir fotos (etiquetas y progreso)
+          <span className="block text-xs text-muted">Sin fotos el archivo es mucho más liviano. Al restaurarlo, las fotos que ya tengas se conservan.</span>
+        </span>
+      </label>
       <div className="grid gap-2 sm:grid-cols-2">
         {active ? (
           <button className="btn-primary" disabled={busy} onClick={() => void run({ profileId: active.id }, active.name)} data-testid="export-profile">
@@ -129,7 +170,68 @@ function ExportCard({ profiles, active }: { profiles: Profile[]; active: Profile
           </button>
         ) : null}
       </div>
+      {msg ? (
+        <p className={`text-sm ${msg.tone === 'bad' ? 'text-bad' : 'text-good'}`} role={msg.tone === 'bad' ? 'alert' : 'status'} data-testid="export-message">
+          {msg.text}
+        </p>
+      ) : null}
+      {shareable ? (
+        <button
+          type="button"
+          className="btn-secondary"
+          data-testid="share-backup"
+          onClick={() =>
+            void shareSavedFile(shareable.uri, shareable.fileName).then((r) => {
+              if (!r.ok && r.message) setMsg({ tone: 'bad', text: r.message })
+            })
+          }
+        >
+          Compartir
+        </button>
+      ) : null}
+      {size !== null ? (
+        <p className="text-xs text-faint" data-testid="export-size">
+          Último archivo: {formatNumber(size / 1024 / 1024, 2)} MB.
+        </p>
+      ) : null}
     </Card>
+  )
+}
+
+function PreviewTable({ res }: { res: ImportResult }) {
+  const rows = Object.entries(res.byTable) as [PersonalTable, NonNullable<ImportResult['byTable'][PersonalTable]>][]
+  if (!rows.length) return <p className="text-sm text-muted">No hay registros para importar con esta selección.</p>
+  return (
+    <div className="overflow-x-auto" data-testid="import-preview">
+      <table className="w-full text-left text-xs">
+        <caption className="sr-only">Vista previa de la importación por tabla</caption>
+        <thead className="text-faint">
+          <tr>
+            <th className="py-1 pr-2 font-medium">Tabla</th>
+            <th className="px-1 py-1 text-right font-medium">Nuevos</th>
+            <th className="px-1 py-1 text-right font-medium">Actualiza</th>
+            <th className="px-1 py-1 text-right font-medium">Se borran</th>
+            <th className="py-1 pl-1 text-right font-medium">Se conservan</th>
+          </tr>
+        </thead>
+        <tbody className="num">
+          {rows.map(([t, c]) => (
+            <tr key={t} className="border-t border-line">
+              <td className="py-1 pr-2 text-muted">{TABLE_LABEL[t]}</td>
+              <td className="px-1 py-1 text-right">{c.inserted || '·'}</td>
+              <td className="px-1 py-1 text-right">{c.updated || '·'}</td>
+              <td className={`px-1 py-1 text-right ${c.removed ? 'font-semibold text-bad' : ''}`}>{c.removed || '·'}</td>
+              <td className="py-1 pl-1 text-right">{c.skipped || '·'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {res.conflicts ? (
+        <p className="mt-2 text-xs text-muted">
+          {res.conflicts} registros locales son más recientes que los del archivo: se conserva la versión local.
+        </p>
+      ) : null}
+    </div>
   )
 }
 
@@ -139,7 +241,28 @@ function ImportCard({ profiles, onCreated }: { profiles: Profile[]; onCreated: (
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [mode, setMode] = useState<'merge' | 'replace'>('merge')
   const [result, setResult] = useState<ImportResult | null>(null)
+  const [preview, setPreview] = useState<ImportResult | null>(null)
   const [busy, setBusy] = useState(false)
+  const confirm = useConfirm()
+
+  useEffect(() => {
+    if (!b) {
+      setPreview(null)
+      return
+    }
+    let alive = true
+    const plan = Object.fromEntries(Object.entries(mapping).filter(([, v]) => v !== 'skip'))
+    previewImport(b, { mode, mapping: plan })
+      .then((p) => {
+        if (alive) setPreview(p)
+      })
+      .catch((e: unknown) => {
+        if (alive) setErr(e instanceof Error ? e.message : String(e))
+      })
+    return () => {
+      alive = false
+    }
+  }, [b, mapping, mode])
 
   function load(text: string) {
     setResult(null)
@@ -162,18 +285,34 @@ function ImportCard({ profiles, onCreated }: { profiles: Profile[]; onCreated: (
     setErr(null)
     try {
       const plan = Object.fromEntries(Object.entries(mapping).filter(([, v]) => v !== 'skip'))
+      let res: ImportResult
       if (mode === 'replace') {
-        // Safety net: export whatever is about to be replaced.
-        for (const target of Object.values(plan)) {
-          if (target === 'new') continue
-          const p = profiles.find((x) => x.id === target)
-          const cur = await exportBackup({ profileId: target })
-          downloadJson(cur, backupFileName(cur, `antes-de-reemplazar-${p?.name ?? 'perfil'}`))
+        const targets = [...new Set(Object.values(plan))].filter((t) => t !== 'new').map((id) => ({ id, name: profiles.find((x) => x.id === id)?.name ?? 'perfil' }))
+        const ok = await confirm({
+          title: 'Reemplazar datos',
+          body: replaceConfirmText(targets.map((t) => t.name), preview?.removed ?? null),
+          confirmLabel: 'Reemplazar',
+          tone: 'danger',
+        })
+        if (!ok) return
+        // Safety net: save whatever is about to be replaced, and abort if that copy cannot be saved.
+        const out = await replaceWithSafetyCopy(targets, {
+          saveSafetyCopy: async (t) => {
+            const cur = await exportBackup({ profileId: t.id })
+            return saveJsonFile(cur, backupFileName(cur, `antes-de-reemplazar-${t.name}`))
+          },
+          runImport: () => importBackup(b, { mode, mapping: plan }),
+        })
+        if (!out.ok) {
+          setErr(out.message)
+          return
         }
+        res = out.result
+      } else {
+        res = await importBackup(b, { mode, mapping: plan })
       }
-      const res = await importBackup(b, { mode, mapping: plan })
       setResult(res)
-      const created = await (await import('../../db/profiles')).listProfiles()
+      const created = await listProfiles()
       const firstNew = created.find((p) => !profiles.some((x) => x.id === p.id))
       if (firstNew) onCreated(firstNew.id)
       setB(null)
@@ -188,12 +327,15 @@ function ImportCard({ profiles, onCreated }: { profiles: Profile[]; onCreated: (
     <Card className="space-y-3">
       <h2 className="font-semibold">Importar respaldo</h2>
       <FilePick label="Elegir archivo de respaldo" onText={load} testId="import-backup-file" />
-      {err ? <p className="text-sm text-bad">{err}</p> : null}
+      {err ? <p className="text-sm text-bad" role="alert" data-testid="import-error">{err}</p> : null}
       {b ? (
         <div className="space-y-3 rounded-xl border border-line p-3">
           <div className="text-sm">
             Respaldo del {new Date(b.exportedAt).toLocaleString('es-CO')} · {b.scope === 'all' ? 'todos los perfiles' : 'un perfil'} · versión {b.schemaVersion}
           </div>
+          {!b.media ? (
+            <p className="text-xs text-muted">Este respaldo no incluye fotos: las fotos que ya tienes en este dispositivo se conservan.</p>
+          ) : null}
           <ul className="flex flex-wrap gap-1.5">
             {backupStats(b).map((s) => (
               <li key={s.table}>
@@ -222,15 +364,16 @@ function ImportCard({ profiles, onCreated }: { profiles: Profile[]; onCreated: (
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'merge', label: 'Combinar' },
+              { value: 'merge', label: IMPORT_MERGE_LABEL },
               { value: 'replace', label: 'Reemplazar' },
             ]}
           />
           <p className="text-xs text-muted">
             {mode === 'merge'
-              ? 'Combinar: agrega lo que falta y, si un registro existe en ambos, conserva la versión más reciente.'
-              : 'Reemplazar: borra los datos del perfil de destino y deja solo los del archivo. Antes se descarga automáticamente un respaldo de lo que se reemplaza.'}
+              ? IMPORT_MERGE_HELP
+              : 'Reemplazar: borra los datos del perfil de destino (solo de las tablas que trae el archivo) y deja los del archivo. Antes se guarda automáticamente una copia de lo que se reemplaza; si no se puede guardar, no se reemplaza nada.'}
           </p>
+          {preview ? <PreviewTable res={preview} /> : null}
           <button className="btn-primary w-full" disabled={busy || Object.values(mapping).every((v) => v === 'skip')} onClick={() => void apply()} data-testid="apply-import">
             Importar
           </button>
@@ -239,6 +382,7 @@ function ImportCard({ profiles, onCreated }: { profiles: Profile[]; onCreated: (
       {result ? (
         <p className="text-sm text-good" data-testid="import-result">
           Listo: {result.inserted} nuevos, {result.updated} actualizados, {result.skipped} sin cambios
+          {result.removed ? `, ${result.removed} reemplazados` : ''}
           {result.profilesCreated ? `, ${result.profilesCreated} perfil(es) creados` : ''}.
         </p>
       ) : null}
@@ -446,9 +590,24 @@ function StorageCard() {
         {info.persisted ? 'Almacenamiento persistente activado: el navegador no borrará los datos por falta de espacio.' : 'El navegador podría borrar datos si se queda sin espacio. Activa el almacenamiento persistente (instalar la app ayuda).'}
       </p>
       {info.usage !== null ? (
-        <p className="text-xs text-faint">
-          En uso: {mb(info.usage)} MB{info.quota ? ` de ${mb(info.quota)} MB disponibles` : ''}.
-        </p>
+        <div className="space-y-1.5" data-testid="storage-usage">
+          {info.quota ? (
+            <div
+              className="h-1.5 overflow-hidden rounded-full bg-surface2"
+              role="meter"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round((info.usage / info.quota) * 100)}
+              aria-label="Espacio usado"
+            >
+              <div className={`h-full rounded-full ${info.usage / info.quota > 0.8 ? 'bg-bad' : 'bg-accent'}`} style={{ width: `${Math.max(1, Math.min(100, (info.usage / info.quota) * 100))}%` }} />
+            </div>
+          ) : null}
+          <p className="text-xs text-faint">
+            En uso: {mb(info.usage)} MB{info.quota ? ` de ${mb(info.quota)} MB disponibles` : ''}.
+          </p>
+          {info.quota && info.usage / info.quota > 0.8 ? <p className="text-xs text-bad">Queda poco espacio. Exporta un respaldo y considera quitar fotos antiguas.</p> : null}
+        </div>
       ) : null}
       {!info.persisted ? (
         <button
@@ -461,6 +620,66 @@ function StorageCard() {
           Solicitar almacenamiento persistente
         </button>
       ) : null}
+    </Card>
+  )
+}
+
+function IntegrityCard() {
+  const [rep, setRep] = useState<IntegrityReport | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const fixable = rep?.issues.filter((i) => i.code !== 'invalid_date') ?? []
+  async function run() {
+    setBusy(true)
+    setMsg(null)
+    try {
+      setRep(await checkIntegrity())
+    } finally {
+      setBusy(false)
+    }
+  }
+  async function repair() {
+    if (!window.confirm('Se aplicarán las reparaciones indicadas. Conviene exportar un respaldo antes. ¿Continuar?')) return
+    setBusy(true)
+    try {
+      const n = await repairIntegrity(fixable)
+      setMsg(`Reparación aplicada: ${n} registros corregidos.`)
+      setRep(await checkIntegrity())
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Card className="space-y-3" data-testid="integrity">
+      <h2 className="font-semibold">Verificar datos</h2>
+      <p className="text-sm text-muted">Revisa que no haya registros huérfanos, referencias rotas ni importaciones duplicadas. La verificación no cambia nada.</p>
+      <button className="btn-secondary w-full" disabled={busy} onClick={() => void run()} data-testid="integrity-run">
+        <Icon name="shield" size={18} /> Verificar ahora
+      </button>
+      {rep && rep.issues.length ? (
+        <div className="space-y-2">
+          <ul className="space-y-2 text-sm">
+            {rep.issues.map((i) => (
+              <li key={i.code + i.table} className="rounded-xl border border-line p-3">
+                <div className="font-medium">{TABLE_LABEL[i.table]}</div>
+                <div className="text-muted">{i.message}</div>
+                <div className="mt-1 text-xs text-faint">Reparación: {i.repair}</div>
+              </li>
+            ))}
+          </ul>
+          {fixable.length ? (
+            <button className="btn-danger w-full" disabled={busy} onClick={() => void repair()}>
+              Reparar
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {rep && !rep.issues.length ? (
+        <p className="text-sm text-good" data-testid="integrity-ok">
+          Todo en orden: {formatNumber(rep.rows, 0)} registros revisados.
+        </p>
+      ) : null}
+      {msg ? <p className="text-sm text-good">{msg}</p> : null}
     </Card>
   )
 }

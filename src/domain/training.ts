@@ -1,4 +1,5 @@
 import { isoWeekStart } from './dates';
+import { isWarmupSet } from './setKind';
 
 export type SetLike = {
   weight?: number | null;
@@ -6,6 +7,8 @@ export type SetLike = {
   durationSec?: number | null;
   distanceM?: number | null;
   isWarmup?: boolean;
+  /** V3 set type; read only through setKind()/isWarmupSet(). */
+  kind?: string | null;
   date: string;
   sessionId: string;
 };
@@ -28,9 +31,9 @@ export function e1rm(weight: number, reps: number, formula: 'epley' | 'brzycki' 
   return formula === 'epley' ? epley(weight, reps) : brzycki(weight, reps);
 }
 
-/** weight × reps; 0 if either is missing; warm-ups count 0. */
+/** weight × reps; 0 if either is missing; warm-ups count 0 (drop and failure sets count). */
 export function setVolume(s: SetLike): number {
-  if (s.isWarmup) return 0;
+  if (isWarmupSet(s)) return 0;
   if (!num(s.weight) || !num(s.reps)) return 0;
   return s.weight * s.reps;
 }
@@ -58,8 +61,8 @@ function setE1rm(s: SetLike): number | null {
  * max_reps_at_weight = more reps than any previous set done at >= the same weight.
  */
 export function detectPRs(history: SetLike[], candidate: SetLike): PRType[] {
-  if (candidate.isWarmup) return [];
-  const prior = history.filter((h) => h !== candidate && !h.isWarmup);
+  if (isWarmupSet(candidate)) return [];
+  const prior = history.filter((h) => h !== candidate && !isWarmupSet(h));
   if (prior.length === 0) return [];
   const prs: PRType[] = [];
 
@@ -100,7 +103,7 @@ export function detectPRs(history: SetLike[], candidate: SetLike): PRType[] {
 
 /** Highest e1RM among non-warm-up sets; fallback to most reps, then longest duration. */
 export function bestSet(sets: SetLike[]): SetLike | null {
-  const work = sets.filter((s) => !s.isWarmup);
+  const work = sets.filter((s) => !isWarmupSet(s));
   if (work.length === 0) return null;
   let best: SetLike | null = null;
   let bestE = -Infinity;

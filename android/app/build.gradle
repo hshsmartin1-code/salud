@@ -1,19 +1,46 @@
 apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+// "Salud Dev" test variant (side by side with the real app): ./gradlew assembleDebug -PsaludDev=true.
+// Only scripts/android-apk.mjs --dev passes the property; the normal build below is unchanged without it.
+def saludDev = project.hasProperty('saludDev') && project.property('saludDev') == 'true'
+if (saludDev) {
+    base { archivesName = 'app-dev' }
+}
+
+// Kotlin is only used by the local Health Connect plugin (app/healthconnect).
+kotlin {
+    jvmToolchain(21)
+}
 
 android {
     namespace = "app.salud.personal"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "app.salud.personal"
+        applicationId saludDev ? "app.salud.personal.dev" : "app.salud.personal"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.1.0"
+        versionCode 8
+        versionName "3.1.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    if (saludDev) {
+        // Above the normal build (8) and bumped per round so installing it OVER an older Dev APK exercises a real native upgrade
+        // (resetWhenUpdate: back to the built-in interface, data kept).
+        defaultConfig { versionCode ((project.findProperty('saludDevCode') ?: '9') as Integer) } // -PsaludDevCode=N or ORG_GRADLE_PROJECT_saludDevCode=N for another round
+    }
+    sourceSets {
+        debug {
+            if (saludDev) {
+                // Launcher name/tint, own scheme, and cleartext only for localhost (adb reverse OTA tests).
+                res.srcDirs += 'src/dev/res'
+                manifest.srcFile 'src/dev/AndroidManifest.xml'
+            }
         }
     }
     buildTypes {
@@ -36,6 +63,10 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    implementation "androidx.activity:activity:$androidxActivityVersion"
+    // Health Connect (read-only). Needs minSdk 26 and compileSdk 36.
+    implementation "androidx.health.connect:connect-client:1.1.0"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
@@ -46,7 +77,8 @@ apply from: 'capacitor.build.gradle'
 
 try {
     def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
+    // The Dev variant has no Firebase client for its package: never apply google-services to it.
+    if (!saludDev && servicesJSON.text) {
         apply plugin: 'com.google.gms.google-services'
     }
 } catch(Exception e) {

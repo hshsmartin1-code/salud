@@ -1,4 +1,4 @@
-import { expect, kcalToday, logFood, onboard, saveFood, test } from './helpers'
+import { chooseUnit, expect, kcalToday, logFood, mealMenu, onboard, saveFood, test, unitChoices, withFilters } from './helpers'
 
 test('logs a catalog food by weight with correct scaling', async ({ page }) => {
   await onboard(page)
@@ -26,9 +26,10 @@ test('label per 100 g converts and logs by grams; per serving without size logs 
   await page.locator('input[name="n-kcal"]').fill('150')
   await page.getByTestId('save-label').click()
   await page.getByTestId('log-label-food').click()
-  const unit = page.getByLabel('Unidad')
-  await expect(unit.locator('option')).toHaveCount(1)
-  await expect(unit).toContainText(/porci/i)
+  // a label food logged by serving offers that one measure, nothing else
+  const choices = await unitChoices(page)
+  expect(choices).toHaveLength(1)
+  expect(choices[0]).toMatch(/porci/i)
   await page.getByRole('textbox', { name: 'Cantidad' }).fill('2')
   await saveFood(page)
   expect(await kcalToday(page)).toBe('420')
@@ -42,6 +43,7 @@ test('creates a recipe from weighed ingredients and logs one serving', async ({ 
   await page.getByTestId('add-ingredient').click()
   await page.getByTestId('food-search').fill('arroz cocido')
   await page.getByTestId('food-results').locator('button').first().click()
+  await chooseUnit(page, 'g')
   await page.getByRole('textbox', { name: 'Cantidad' }).fill('300')
   await page.getByTestId('save-food').click()
   await page.getByTestId('save-recipe').click()
@@ -56,14 +58,12 @@ test('saves a meal as template and applies it on another day', async ({ page }) 
   await onboard(page)
   await logFood(page, 'arroz cocido', '100')
   await page.goto('./#/comida')
-  await page.getByTestId('meal-desayuno').getByRole('button', { name: 'Opciones de la comida' }).click()
-  await page.getByRole('button', { name: 'Guardar como plantilla' }).click()
+  await mealMenu(page, 'desayuno', 'Guardar como plantilla')
   await page.getByLabel('Nombre de la plantilla').fill('Desayuno base')
   await page.getByRole('button', { name: 'Guardar', exact: true }).click()
 
   await page.goto('./#/comida?d=2026-01-05')
-  await page.getByTestId('meal-almuerzo').getByRole('button', { name: 'Opciones de la comida' }).click()
-  await page.getByRole('button', { name: 'Aplicar plantilla' }).click()
+  await mealMenu(page, 'almuerzo', 'Aplicar plantilla')
   await page.getByRole('button', { name: /Desayuno base/ }).click()
   await expect(page.getByTestId('kcal-total')).toHaveText('130')
 })
@@ -71,7 +71,7 @@ test('saves a meal as template and applies it on another day', async ({ page }) 
 test('searches the bundled Open Food Facts snapshot offline-first', async ({ page }) => {
   await onboard(page)
   await page.goto('./#/comida/buscar')
-  await page.getByText('Empacados', { exact: true }).click()
+  await withFilters(page, (sheet) => sheet.getByRole('radio', { name: 'Empacados' }).click())
   await page.getByTestId('food-search').fill('yogurt')
   await expect(page.getByTestId('food-results').locator('button').first()).toBeVisible()
 })

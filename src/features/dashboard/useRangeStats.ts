@@ -4,6 +4,7 @@ import { pickGoalForDate } from '../../db/queries'
 import type { BodyMeasurement, FoodLog, Goal, ImportedDaily } from '../../db/types'
 import { addDays, dateRange } from '../../domain/dates'
 import { sumNutrients } from '../../domain/nutrients'
+import { byMoment } from './controlCenter'
 import { sessionVolume } from '../../domain/training'
 
 export interface DayIntake {
@@ -39,7 +40,7 @@ export function dailyIntake(logs: FoodLog[], imported: ImportedDaily[], goals: G
 
 export function weightSeries(rows: BodyMeasurement[]): { date: string; value: number }[] {
   const byDay = new Map<string, BodyMeasurement>()
-  for (const m of rows.filter((m) => m.weightKg !== null && !m.excludeFromStats && !m.approx).sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')))) byDay.set(m.date, m)
+  for (const m of rows.filter((m) => m.weightKg !== null && !m.excludeFromStats && !m.approx).sort(byMoment)) byDay.set(m.date, m)
   return [...byDay.values()].map((m) => ({ date: m.date, value: m.weightKg as number })).sort((a, b) => (a.date < b.date ? -1 : 1))
 }
 

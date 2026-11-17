@@ -1,7 +1,42 @@
-import { useState, type ReactNode } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { matchPath, NavLink, useLocation } from 'react-router-dom'
 import { Icon, type IconName } from './Icon'
-import { Sheet } from './kit'
+import { STORAGE_NOTE_TINY } from '../sync/copy'
+import { OngoingSessionBar } from '../features/training/session/OngoingSessionBar'
+import { useActiveSession } from '../features/training/useTraining'
+import type { TrainingSession } from '../db/types'
+import { observeDockInset } from './dockInset'
+import { QuickAdd } from '../features/quick/QuickAdd'
+
+/**
+ * Live session focus mode: on the route of the ACTIVE session the session owns the screen (no top
+ * bar, no bottom navigation). Anywhere else, while a session is active, a "Sesión en curso" bar sits
+ * above the bottom navigation (and in the desktop sidebar).
+ */
+function useSessionChrome() {
+  const { pathname } = useLocation()
+  const active = useActiveSession()
+  const route = matchPath('/entreno/sesion/:id', pathname)
+  // While the active session is still loading on its own route, keep the chrome hidden (no flash).
+  const focus = !!route && (active === undefined || active?.id === route.params.id)
+  const bar = !route || active?.id !== route.params.id ? (active ?? null) : null
+  return { focus, bar }
+}
+
+/** The mobile "Sesión en curso" bar: publishes its height (--dock-inset / --session-bar-inset). */
+function MobileSessionBar({ session }: { session: TrainingSession }) {
+  const el = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const node = el.current
+    if (!node) return
+    return observeDockInset('session', node)
+  }, [])
+  return (
+    <div ref={el} className="fixed inset-x-0 bottom-[calc(62px+env(safe-area-inset-bottom))] z-30 border-t border-line bg-surface/95 backdrop-blur-xl lg:hidden">
+      <OngoingSessionBar session={session} variant="bottom" />
+    </div>
+  )
+}
 
 type NavItem = { to: string; label: string; icon: IconName; end?: boolean }
 
@@ -9,60 +44,35 @@ export const MAIN_NAV: NavItem[] = [
   { to: '/', label: 'Hoy', icon: 'home', end: true },
   { to: '/comida', label: 'Comida', icon: 'utensils' },
   { to: '/entreno', label: 'Entreno', icon: 'dumbbell' },
-  { to: '/cuerpo', label: 'Cuerpo', icon: 'ruler' },
+  { to: '/salud', label: 'Salud', icon: 'heart' },
 ]
 
-export const MORE_NAV: NavItem[] = [
-  { to: '/progreso', label: 'Progreso', icon: 'chart' },
+/** Health modules, reachable from the Salud hub (mobile) and the sidebar (desktop). */
+export const HEALTH_NAV: NavItem[] = [
+  { to: '/cuerpo', label: 'Cuerpo y medidas', icon: 'ruler' },
   { to: '/actividad', label: 'Actividad', icon: 'activity' },
   { to: '/sueno', label: 'Sueño y recuperación', icon: 'bed' },
+  { to: '/signos', label: 'Signos vitales', icon: 'heart' },
+  { to: '/agua', label: 'Hidratación', icon: 'droplet' },
   { to: '/habitos', label: 'Hábitos y suplementos', icon: 'pill' },
-  { to: '/perfil', label: 'Perfil y objetivos', icon: 'target' },
-  { to: '/respaldo', label: 'Respaldo e importación', icon: 'database' },
-  { to: '/ajustes', label: 'Ajustes y fuentes', icon: 'sliders' },
+  { to: '/fotos', label: 'Fotos de progreso', icon: 'image' },
 ]
 
-export const QUICK_ADD: { to: string; label: string; icon: IconName; hint: string }[] = [
-  { to: '/comida/buscar', label: 'Alimento', icon: 'search', hint: 'Buscar y registrar por peso' },
-  { to: '/comida/etiqueta', label: 'Etiqueta', icon: 'tag', hint: 'Desde la tabla nutricional' },
-  { to: '/comida/buscar?scan=1', label: 'Código de barras', icon: 'barcode', hint: 'Open Food Facts' },
-  { to: '/comida/recetas', label: 'Receta', icon: 'book', hint: 'Registrar una receta' },
-  { to: '/entreno?iniciar=1', label: 'Entrenamiento', icon: 'dumbbell', hint: 'Iniciar sesión' },
-  { to: '/cuerpo/nueva?tipo=peso', label: 'Peso', icon: 'scale', hint: 'Peso corporal' },
-  { to: '/cuerpo/nueva', label: 'Medidas', icon: 'ruler', hint: 'Perímetros y pliegues' },
-  { to: '/actividad?nuevo=1', label: 'Actividad', icon: 'activity', hint: 'Pasos, cardio' },
-  { to: '/sueno?nuevo=1', label: 'Sueño', icon: 'bed', hint: 'Horas y calidad' },
-  { to: '/habitos', label: 'Hábitos', icon: 'check', hint: 'Marcar del día' },
+export const MORE_GROUPS: { title: string; items: NavItem[] }[] = [
+  { title: 'Análisis', items: [{ to: '/progreso', label: 'Gráficas de progreso', icon: 'chart' }] },
+  {
+    // Same order as /ajustes: everyday first (account, profile), then data; technical items live inside "Ajustes > Avanzado".
+    title: 'Cuenta y datos',
+    items: [
+      { to: '/cuenta', label: 'Cuenta y sincronización', icon: 'user' },
+      { to: '/perfil', label: 'Perfil y objetivos', icon: 'target' },
+      { to: '/ajustes', label: 'Ajustes', icon: 'sliders' },
+      { to: '/integraciones', label: 'Health Connect', icon: 'link' },
+      { to: '/respaldo', label: 'Datos y respaldos', icon: 'database' },
+    ],
+  },
 ]
-
-function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const nav = useNavigate()
-  return (
-    <Sheet open={open} onClose={onClose} title="Registrar">
-      <div className="grid grid-cols-2 gap-2 pb-2 sm:grid-cols-3">
-        {QUICK_ADD.map((q) => (
-          <button
-            key={q.to}
-            type="button"
-            onClick={() => {
-              onClose()
-              nav(q.to)
-            }}
-            className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3 text-left transition-colors hover:border-line-strong hover:bg-surface2/50 active:scale-[0.98]"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
-              <Icon name={q.icon} size={18} />
-            </span>
-            <span>
-              <span className="block text-sm font-semibold">{q.label}</span>
-              <span className="block text-xs text-muted">{q.hint}</span>
-            </span>
-          </button>
-        ))}
-      </div>
-    </Sheet>
-  )
-}
+export const MORE_NAV: NavItem[] = MORE_GROUPS.flatMap((g) => g.items)
 
 function SideLink({ item }: { item: NavItem }) {
   return (
@@ -83,6 +93,7 @@ function SideLink({ item }: { item: NavItem }) {
 
 export function AppShell({ header, children }: { header?: ReactNode; children: ReactNode }) {
   const [quick, setQuick] = useState(false)
+  const { focus, bar } = useSessionChrome()
   return (
     <div className="min-h-dvh lg:flex">
       {/* Desktop sidebar */}
@@ -95,25 +106,37 @@ export function AppShell({ header, children }: { header?: ReactNode; children: R
         <button type="button" className="btn-primary mb-3 w-full" onClick={() => setQuick(true)}>
           <Icon name="plus" size={18} /> Registrar
         </button>
+        {bar ? <OngoingSessionBar session={bar} variant="sidebar" /> : null}
         <nav className="flex flex-col gap-0.5" aria-label="Principal">
           {MAIN_NAV.map((i) => (
             <SideLink key={i.to} item={i} />
           ))}
         </nav>
-        <div className="mb-1 mt-5 px-3 text-[13px] font-medium text-faint">Más</div>
-        <nav className="flex flex-col gap-0.5" aria-label="Secundaria">
-          {MORE_NAV.map((i) => (
+        <div className="mb-1 mt-5 px-3 text-label font-medium text-faint">Salud</div>
+        <nav className="flex flex-col gap-0.5" aria-label="Salud">
+          {HEALTH_NAV.map((i) => (
             <SideLink key={i.to} item={i} />
           ))}
         </nav>
-        <div className="mt-auto px-3 pt-4 text-[11px] leading-snug text-faint">
-          Datos guardados solo en este dispositivo. Sin sincronización.
+        {MORE_GROUPS.map((g) => (
+          <div key={g.title}>
+            <div className="mb-1 mt-5 px-3 text-label font-medium text-faint">{g.title}</div>
+            <nav className="flex flex-col gap-0.5" aria-label={g.title}>
+              {g.items.map((i) => (
+                <SideLink key={i.to} item={i} />
+              ))}
+            </nav>
+          </div>
+        ))}
+        <div className="mt-auto px-3 pt-4 text-micro text-faint">
+          {STORAGE_NOTE_TINY}
         </div>
       </aside>
 
       <div className="min-w-0 flex-1">
-        {/* Mobile top bar */}
-        <header className="pt-safe sticky top-0 z-30 border-b border-line bg-bg/95 lg:hidden">
+        {/* Mobile top bar (hidden while the live session owns the screen) */}
+        {focus ? null : (
+        <header className="pt-safe sticky top-0 z-30 border-b border-line/70 bg-bg/85 backdrop-blur-xl lg:hidden">
           <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-2 px-4">
             <div className="min-w-0 flex-1">{header}</div>
             <NavLink to="/mas" className="btn-ghost p-2" aria-label="Más secciones">
@@ -121,13 +144,22 @@ export function AppShell({ header, children }: { header?: ReactNode; children: R
             </NavLink>
           </div>
         </header>
+        )}
 
-        <main className="mx-auto w-full max-w-3xl px-4 pb-28 pt-5 lg:max-w-5xl lg:px-10 lg:pb-14 lg:pt-10">{children}</main>
+        <main
+          className={`mx-auto w-full max-w-3xl px-4 lg:max-w-5xl lg:px-10 lg:pb-[calc(3.5rem+var(--update-banner-inset,0px))] ${focus ? 'pb-10 pt-0' : bar ? 'pb-[calc(11rem+var(--update-banner-inset,0px))] pt-5 lg:pt-10' : 'pb-[calc(7rem+var(--update-banner-inset,0px))] pt-5 lg:pt-10'}`}
+        >
+          {children}
+        </main>
+
+        {/* "Sesión en curso": above the bottom navigation, never over the page (main is padded) */}
+        {bar && !focus ? <MobileSessionBar session={bar} /> : null}
 
         {/* Mobile bottom nav */}
+        {focus ? null : (
         <nav
           aria-label="Principal"
-          className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface lg:hidden"
+          className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/90 backdrop-blur-xl lg:hidden"
         >
           <div className="mx-auto grid h-[62px] max-w-md grid-cols-5 items-stretch px-2">
             {MAIN_NAV.slice(0, 2).map((i) => (
@@ -148,8 +180,9 @@ export function AppShell({ header, children }: { header?: ReactNode; children: R
             ))}
           </div>
         </nav>
+        )}
       </div>
-      <QuickAddSheet open={quick} onClose={() => setQuick(false)} />
+      <QuickAdd open={quick} onClose={() => setQuick(false)} />
     </div>
   )
 }
@@ -160,7 +193,7 @@ function BottomLink({ item }: { item: NavItem }) {
       to={item.to}
       end={item.end}
       className={({ isActive }) =>
-        `relative flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors before:absolute before:top-0 before:h-[3px] before:w-8 before:rounded-b-full ${
+        `relative flex flex-col items-center justify-center gap-1 text-micro font-medium transition-colors before:absolute before:top-0 before:h-[3px] before:w-8 before:rounded-b-full ${
           isActive ? 'text-ink before:bg-accent' : 'text-muted before:bg-transparent'
         }`
       }

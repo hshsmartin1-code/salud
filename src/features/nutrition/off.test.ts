@@ -9,6 +9,7 @@ describe('offToRefFood', () => {
       brands: 'Marca X, Otra',
       quantity: '300 g',
       serving_quantity: 30,
+      serving_quantity_unit: 'g',
       serving_size: '30 g',
       nutriments: {
         'energy-kcal_100g': 450,
@@ -42,5 +43,54 @@ describe('offToRefFood', () => {
   it('refuses products without energy or without name', () => {
     expect('error' in offToRefFood({ code: '7700000000003', product_name: 'X', nutriments: {} })).toBe(true)
     expect('error' in offToRefFood({ code: '7700000000004', nutriments: { 'energy-kcal_100g': 10 } })).toBe(true)
+  })
+  it('rejects a gram serving and package for a milliliter basis', () => {
+    const r = offToRefFood({ code: '7700000000005', product_name: 'Bebida',
+      product_quantity: 500, product_quantity_unit: 'ml', serving_quantity: 30,
+      serving_quantity_unit: 'g', serving_size: '30 g', nutriments: { 'energy-kcal_100g': 20 } })
+    if (!('food' in r)) throw new Error('expected food')
+    expect(r.food.basis).toBe('100ml')
+    expect(r.food.portions).toEqual([['Envase completo', 500]])
+  })
+  it('does not add a portion when the normalized unit is unknown', () => {
+    const r = offToRefFood({ code: '7700000000006', product_name: 'Producto',
+      serving_quantity: 30, product_quantity: 200, nutriments: { 'energy-kcal_100g': 100 } })
+    if (!('food' in r)) throw new Error('expected food')
+    expect(r.food.portions).toEqual([])
+  })
+  it('uses a single explicit package volume but never a partial multipack size', () => {
+    const base = { code: '7700000000007', product_name: 'Bebida', nutriments: { 'energy-kcal_100g': 30 } }
+    const single = offToRefFood({ ...base, quantity: '1,5 L' })
+    const multi = offToRefFood({ ...base, quantity: '2 x 250 ml' })
+    if (!('food' in single) || !('food' in multi)) throw new Error('expected food')
+    expect(single.food.portions).toEqual([['Envase completo', 1500]])
+    expect(multi.food.portions).toEqual([])
+  })
+  it('uses an explicit serving measure when normalized quantity is absent', () => {
+    const r = offToRefFood({ code: '7700000000008', product_name: 'Cereal', serving_size: '2 cucharadas (0,03 kg)',
+      quantity: '300 g', nutriments: { 'energy-kcal_100g': 100 } })
+    if (!('food' in r)) throw new Error('expected food')
+    expect(r.food.portions).toEqual([['1 porción (2 cucharadas (0,03 kg))', 30], ['Envase completo', 300]])
+  })
+  it('rejects contradictory normalized and printed serving measurements', () => {
+    const r = offToRefFood({ code: '7700000000009', product_name: 'Cereal', serving_quantity: 30,
+      serving_quantity_unit: 'g', serving_size: '20 g', product_quantity: 200,
+      product_quantity_unit: 'g', quantity: '200 g', nutriments: { 'energy-kcal_100g': 100 } })
+    if (!('food' in r)) throw new Error('expected food')
+    expect(r.food.portions).toEqual([['Envase completo', 200]])
+  })
+  it('rejects serving larger than a known package', () => {
+    const r = offToRefFood({ code: '7700000000010', product_name: 'Cereal', serving_size: '250 g',
+      product_quantity: 200, product_quantity_unit: 'g', nutriments: { 'energy-kcal_100g': 100 } })
+    if (!('food' in r)) throw new Error('expected food')
+    expect(r.food.portions).toEqual([['Envase completo', 200]])
+  })
+  it('rejects contradictory package measurements and ambiguous serving text', () => {
+    const r = offToRefFood({ code: '7700000000011', product_name: 'Cereal', serving_size: '2 x 30 g',
+      serving_quantity: 30, serving_quantity_unit: 'g',
+      quantity: '200 g', product_quantity: 100, product_quantity_unit: 'g',
+      nutriments: { 'energy-kcal_100g': 100 } })
+    if (!('food' in r)) throw new Error('expected food')
+    expect(r.food.portions).toEqual([])
   })
 })

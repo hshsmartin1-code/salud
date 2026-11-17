@@ -7,6 +7,7 @@ import { formatDateEs } from '../../domain/dates'
 import { formatNumber } from '../../domain/units'
 import { Icon } from '../../ui/Icon'
 import { Badge, Card, ScaleBar, Segmented, Sheet } from '../../ui/kit'
+import { TdeeTrend } from './TdeeTrend'
 import { applyProposal, useAdaptiveEnergy } from './adaptive'
 
 const RATES: Record<EnergyPhase, number[]> = { deficit: [-0.25, -0.5, -0.75, -1], maintenance: [0], surplus: [0.1, 0.25, 0.5] }
@@ -66,7 +67,7 @@ export function AdaptiveEnergyCard() {
         {statusBadge}
       </div>
       <Card className="space-y-4">
-        <div className="metric-strip grid-cols-3 overflow-hidden rounded-xl border border-line">
+        <div className="grid grid-cols-3 gap-3">
           <Readout label="Gasto por fórmula" value={f0(formula?.tdee)} sub={formula ? `TMB ${f0(formula.bmr)} × ${formatNumber(formula.factor, 3)}` : 'Faltan datos'} />
           <Readout
             label="Gasto adaptativo"
@@ -87,7 +88,7 @@ export function AdaptiveEnergyCard() {
               <div className="mb-1 flex justify-between text-xs text-muted">
                 <span>Días de comida válidos</span>
                 <span className="num">
-                  {observed.validIntakeDays} de {observed.requiredValidIntakeDays}
+                  {reached(observed.validIntakeDays, observed.requiredValidIntakeDays)}
                 </span>
               </div>
               <ScaleBar value={observed.validIntakeDays} target={observed.requiredValidIntakeDays} colorVar="accent" height={8} label="Días de comida válidos" />
@@ -96,13 +97,15 @@ export function AdaptiveEnergyCard() {
               <div className="mb-1 flex justify-between text-xs text-muted">
                 <span>Días con peso</span>
                 <span className="num">
-                  {observed.weighIns} de {settings.minWeighIns}
+                  {reached(observed.weighIns, settings.minWeighIns)}
                 </span>
               </div>
               <ScaleBar value={observed.weighIns} target={settings.minWeighIns} colorVar="accent" height={8} label="Días con peso" />
             </div>
           </div>
         ) : null}
+
+        {formula ? <TdeeTrend points={s.weekly} formula={formula.tdee} /> : null}
 
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
           <Item k="Fase" v={PHASE_LABELS[settings.phase]} />
@@ -111,10 +114,18 @@ export function AdaptiveEnergyCard() {
           <Item k="Tendencia del peso" v={observed?.trendKgPerWeek !== null && observed?.trendKgPerWeek !== undefined ? `${observed.trendKgPerWeek > 0 ? '+' : ''}${formatNumber(observed.trendKgPerWeek, 2)} kg/sem` : '—'} />
           <Item k="Promedio ingerido" v={observed?.meanIntakeKcal ? `${f0(observed.meanIntakeKcal)} kcal` : '—'} />
           <Item k="Último ajuste" v={last ? `${formatDateEs(last.date)} (${last.applied === 'auto' ? 'automático' : 'aceptado'})` : 'Ninguno'} />
+          <Item k="Completitud" v={observed ? `${Math.round((observed.validIntakeDays / observed.window.days) * 100)} % de días con comida válida` : '—'} />
+          <Item
+            k="Actividad registrada"
+            v={s.activity.meanKcal !== null ? `${f0(s.activity.meanKcal)} kcal activas/día (${s.activity.days} días · ${s.activity.sources})` : 'Sin datos'}
+          />
         </dl>
+        <p className="text-[11px] leading-snug text-faint">
+          La actividad registrada es solo contexto: el gasto observado ya la incluye (sale de lo que comes y de cómo cambia tu peso), por eso no se suma. Las kcal activas de pulseras o Health Connect no son tu gasto total.
+        </p>
 
         {proposal ? (
-          <div className={`rounded-xl px-3 py-3 text-sm ${canAccept ? 'border border-accent/40 bg-accent/5' : 'bg-surface2'}`} data-testid="adaptive-explanation">
+          <div className={`border-l-2 py-1 pl-3 text-sm ${canAccept ? 'border-accent' : 'border-line-strong'}`} data-testid="adaptive-explanation">
             <p className="leading-relaxed">{proposal.explanation}</p>
             {canAccept ? (
               <button
@@ -186,7 +197,7 @@ export function AdaptiveEnergyCard() {
           {settings.phase !== 'maintenance' ? (
             <div>
               <span className="label">Ritmo por semana (% del peso corporal)</span>
-              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Ritmo por semana">
+              <div className="flex flex-wrap gap-x-2 gap-y-3" role="radiogroup" aria-label="Ritmo por semana">
                 {RATES[settings.phase].map((v) => (
                   <button
                     key={v}
@@ -197,7 +208,7 @@ export function AdaptiveEnergyCard() {
                     onClick={() => void save({ targetRatePctPerWeek: v })}
                   >
                     {pct(v)}
-                    {formula ? <span className="text-[11px] opacity-70">≈ {formatNumber((formula.weightKg * Math.abs(v)) / 100, 2)} kg</span> : null}
+                    {formula ? <span className="text-micro opacity-70">≈ {formatNumber((formula.weightKg * Math.abs(v)) / 100, 2)} kg</span> : null}
                   </button>
                 ))}
               </div>
@@ -265,15 +276,20 @@ export function AdaptiveEnergyCard() {
   )
 }
 
+/** Counts above the requirement read as "17 de 17 o más", never "19 de 17". */
+function reached(value: number, target: number): string {
+  return value >= target ? `${target} de ${target} o más` : `${value} de ${target}`
+}
+
 function Readout({ label, value, sub, testId }: { label: string; value: string; sub: string; testId?: string }) {
   return (
-    <div className="bg-surface px-3 py-3">
-      <div className="text-[12px] leading-tight text-muted">{label}</div>
+    <div className="min-w-0">
+      <div className="text-label leading-tight text-muted">{label}</div>
       <div className="readout mt-1 text-[26px] leading-none" data-testid={testId}>
         {value}
         {value !== '—' ? <span className="ml-1 text-xs font-medium text-muted">kcal</span> : null}
       </div>
-      <div className="mt-1 truncate text-[11px] text-faint">{sub}</div>
+      <div className="mt-1 break-words text-micro text-faint">{sub}</div>
     </div>
   )
 }
@@ -282,7 +298,7 @@ function Item({ k, v }: { k: string; v: string }) {
   return (
     <div className="min-w-0">
       <dt className="text-xs text-muted">{k}</dt>
-      <dd className="truncate font-medium">{v}</dd>
+      <dd className="break-words font-medium">{v}</dd>
     </div>
   )
 }

@@ -1,5 +1,4 @@
-import { fileURLToPath } from 'node:url'
-import { expect, kcalToday, logFood, onboard, saveFood, test } from './helpers'
+import { expect, kcalToday, logFood, onboard, saveFood, test, chooseUnit } from './helpers'
 
 // V1.1: label text / OCR review, exercise illustrations, adaptive energy, day marks. Synthetic data only.
 
@@ -46,35 +45,30 @@ test('pasted label text → review (nothing saved yet) → confirm → log by ml
   await page.getByLabel('Nombre del producto').fill('Leche sintética')
   await page.getByTestId('save-label').click()
   await page.getByTestId('log-label-food').click()
+  await chooseUnit(page, 'ml')
   await page.getByRole('textbox', { name: 'Cantidad' }).fill('250')
   await saveFood(page)
   expect(await kcalToday(page)).toBe('155') // 62 kcal/100 ml × 2,5
 })
 
-test('photo → local OCR → editable text → review form', async ({ page }) => {
-  test.setTimeout(120_000)
-  const external: string[] = []
-  page.on('request', (r) => {
-    const u = new URL(r.url())
-    // blob:/data: URLs are in-page (the OCR worker is started from a blob); only network hosts count.
-    if ((u.protocol === 'http:' || u.protocol === 'https:') && u.hostname !== 'localhost') external.push(r.url())
-  })
+test('photo OCR unavailable is explained; manual values and pasted text stay usable', async ({ page }) => {
   await onboard(page)
   await page.goto('./#/comida/etiqueta')
-  await page.getByRole('radio', { name: 'Foto' }).click()
-  await page.getByTestId('label-photo-file').setInputFiles(fileURLToPath(new URL('./fixtures/etiqueta-sintetica.png', import.meta.url)))
-  await page.getByTestId('run-ocr').click()
+  await expect(page.getByRole('radio', { name: 'Foto' })).toHaveCount(0)
+  await expect(page.getByTestId('photo-ocr-unavailable')).toContainText('precisión verificada')
+  await expect(page.getByLabel('Nombre del producto')).toBeVisible()
+  await page.getByLabel('Nombre del producto').fill('Producto sintético')
+  await page.locator('input[name="n-kcal"]').fill('120')
+  await expect(page.locator('input[name="n-kcal"]')).toHaveValue('120')
+  await page.getByRole('radio', { name: 'Pegar texto' }).click()
   const text = page.getByTestId('label-text')
-  await expect(text).toBeVisible({ timeout: 90_000 })
-  await expect(text).toHaveValue(/120/)
+  await text.fill('Calorías 120 kcal\nProteína 3 g')
   await page.getByTestId('parse-label').click()
   await expect(page.getByTestId('parse-review')).toBeVisible()
   await expect(page.locator('input[name="n-kcal"]')).toHaveValue('120')
   await expect(page.locator('input[name="n-protein"]')).toHaveValue('3')
-  // The user can still correct any value before saving.
   await page.locator('input[name="n-protein"]').fill('3,5')
   await expect(page.locator('input[name="n-protein"]')).toHaveValue('3,5')
-  expect(external, 'the photo and OCR stay on the device').toEqual([])
 })
 
 test('exercise detail shows RepDB poses with credit, or a fallback when there is no verified image', async ({ page }) => {
@@ -82,16 +76,19 @@ test('exercise detail shows RepDB poses with credit, or a fallback when there is
   await page.goto('./#/entreno/ejercicios')
   await page.getByTestId('exercise-search').fill('plancha')
   await expect(page.getByTestId('exercise-results').getByTestId('exercise-thumb').first()).toBeVisible()
-  await page.getByTestId('exercise-results').locator('button', { hasText: /^Plancha/ }).first().click()
+  await page.getByTestId('exercise-results').getByRole('link', { name: /^Plancha/ }).first().click()
   await expect(page.getByTestId('exercise-illustration')).toBeVisible()
   await expect(page.getByTestId('exercise-illustration').getByRole('link', { name: 'Exercise data by RepDB (repdb.co)' })).toHaveAttribute('href', 'https://repdb.co')
-  await page.keyboard.press('Escape')
+  await page.goBack()
 
   await page.getByTestId('exercise-search').fill('gusano')
-  await page.getByTestId('exercise-results').locator('button').first().click()
+  await page.getByTestId('exercise-results').getByRole('link').first().click()
   await expect(page.getByTestId('exercise-illustration-fallback')).toBeVisible()
+  await expect(page.getByTestId('exercise-tile')).toBeVisible()
 
   await page.goto('./#/ajustes')
+  // Credits live inside "Avanzado" (V3.1): open it first.
+  await page.getByTestId('settings-advanced').getByText('Avanzado', { exact: true }).click()
   await expect(page.getByTestId('repdb-credit')).toContainText('Exercise data by RepDB (repdb.co)')
 })
 

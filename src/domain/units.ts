@@ -2,12 +2,25 @@ import type { FoodBasis, NutrientMap } from '../db/catalogTypes';
 import { atwaterCheck, scaleNutrients } from './nutrients';
 
 /**
- * Parse a user-typed decimal. Accepts "72,5", "72.5", "1.234,5", "1,234.5".
- * Two kinds of separators → the LAST one is the decimal. One kind appearing once = decimal;
- * one kind repeated (e.g. "1.234.567") = thousands groups, only if well-formed.
+ * Parse a user-typed number. ONE rule for every manual field of the app (Spanish, Colombia):
+ *
+ * - Comma is the decimal separator: "72,5" → 72.5, "0,75" → 0.75, "1,200" → 1.2.
+ * - A single dot followed by exactly three digits, after an integer part of 1–3 digits that does not
+ *   start with 0, is a thousands separator: "1.200" → 1200, "10.000" → 10000 ("0.500" → 0.5).
+ * - Any other single dot is a decimal point: "72.5" → 72.5, "1.25" → 1.25, "1234.567" → 1234.567.
+ * - Thousands groups require a 1–3 digit head and exactly three digits per group, all with the
+ *   same separator; an optional decimal part uses the OTHER separator and at least one digit
+ *   ("1.200,5" → 1200.5; "1,234.5" → 1234.5; "1.234.567" → 1234567).
+ * - Only ASCII digits; outer whitespace and an optional + are accepted, - only with allowNegative.
+ *   A leading decimal separator is accepted (".5", ",5"); a trailing one or internal whitespace is not.
+ *   Everything outside this grammar returns null, including "1.2,3", "1,2.3" and "1.23.456".
+ *
+ * "1.200" therefore means 1200 everywhere (kcal, mg, ml, g of quantity), as the label OCR reads it
+ * for mg/kcal/kJ. Fields where such a value is impossible (kg of body weight, cm of height) must
+ * reject it with `rangeError` instead of storing it. Storage formats are unchanged.
  */
 export function parseDecimal(input: string, opts: { allowNegative?: boolean } = {}): number | null {
-  let s = (input ?? '').trim().replace(/\s+/g, '');
+  let s = (input ?? '').trim();
   if (s === '') return null;
   let sign = 1;
   if (s[0] === '-' || s[0] === '+') {
@@ -17,37 +30,38 @@ export function parseDecimal(input: string, opts: { allowNegative?: boolean } = 
     }
     s = s.slice(1);
   }
-  if (!/^[0-9.,]+$/.test(s) || !/[0-9]/.test(s)) return null;
-  const lastDot = s.lastIndexOf('.');
-  const lastComma = s.lastIndexOf(',');
   let normalized: string;
-  if (lastDot >= 0 && lastComma >= 0) {
-    const decSep = lastDot > lastComma ? '.' : ',';
-    const grpSep = decSep === '.' ? ',' : '.';
-    const decIdx = s.lastIndexOf(decSep);
-    const intPart = s.slice(0, decIdx);
-    const frac = s.slice(decIdx + 1);
-    if (intPart.includes(decSep) || frac.includes(grpSep)) return null;
-    normalized = intPart.split(grpSep).join('') + '.' + frac;
-  } else if (lastDot >= 0 || lastComma >= 0) {
-    const sep = lastDot >= 0 ? '.' : ',';
-    const count = s.split(sep).length - 1;
-    if (count === 1) {
-      normalized = s.replace(sep, '.');
-    } else if (new RegExp(`^\\d{1,3}(\\${sep}\\d{3})+$`).test(s)) {
-      normalized = s.split(sep).join('');
-    } else {
-      return null;
-    }
-  } else {
+  if (/^\d+$/.test(s)) {
     normalized = s;
+  } else if (/^\d*[.,]\d+$/.test(s)) {
+    // Preserve the single-dot ambiguity rule; a single comma is always decimal.
+    normalized = /^[1-9]\d{0,2}\.\d{3}$/.test(s) ? s.replace('.', '') : s.replace(',', '.');
+  } else if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) {
+    normalized = s.replace(/\./g, '').replace(',', '.');
+  } else if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) {
+    normalized = s.replace(/,/g, '');
+  } else {
+    return null;
   }
-  if (normalized.startsWith('.')) normalized = '0' + normalized;
-  if (normalized.endsWith('.')) normalized += '0';
-  if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
   const n = Number(normalized);
   if (!Number.isFinite(n)) return null;
   return sign * n;
+}
+
+/**
+ * Plausible-range check for a parsed manual value: null when `n` is inside [min, max], otherwise the
+ * message to show. An out-of-range value is rejected, never stored or clamped silently.
+ */
+export function rangeError(n: number | null, min: number, max: number, unit = ''): string | null {
+  if (n === null) return 'Número no válido';
+  if (n < min || n > max) return `Escribe un valor entre ${formatNumber(min, 2)} y ${formatNumber(max, 2)}${unit ? ` ${unit}` : ''}.`;
+  return null;
+}
+
+/** `rangeError` for an optional typed field: null when the text is empty, otherwise parse and check. */
+export function textRangeError(text: string | undefined, min: number, max: number, unit = ''): string | null {
+  if (!text || text.trim() === '') return null;
+  return rangeError(parseDecimal(text), min, max, unit);
 }
 
 export function formatNumber(n: number, maxDecimals = 1): string {

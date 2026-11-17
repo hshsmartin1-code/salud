@@ -1,5 +1,5 @@
 import { db as defaultDb, type SaludDB } from './schema'
-import { PERSONAL_TABLES } from './tables'
+import { PERSONAL_TABLES, SYNC_STATE_TABLES } from './tables'
 import { nowIso, uuid } from './repo'
 import type { Profile } from './types'
 
@@ -24,8 +24,12 @@ export async function updateProfile(id: string, changes: Partial<NewProfile>, da
 /** Deletes a profile and every personal row it owns (single transaction). */
 export async function deleteProfile(id: string, database: SaludDB = defaultDb): Promise<number> {
   let removed = 0
-  await database.transaction('rw', [database.profiles, ...PERSONAL_TABLES.map((t) => database.table(t))], async () => {
+  const tables = [...PERSONAL_TABLES, ...SYNC_STATE_TABLES]
+  await database.transaction('rw', [database.profiles, ...tables.map((t) => database.table(t))], async () => {
     for (const t of PERSONAL_TABLES) removed += await database.table(t).where('profileId').equals(id).delete()
+    // The account link and sync bookkeeping go with the local profile, in the same transaction, so
+    // removing a profile from this device can never be read as "delete everything in the cloud".
+    for (const t of SYNC_STATE_TABLES) await database.table(t).where('profileId').equals(id).delete()
     await database.profiles.delete(id)
   })
   return removed

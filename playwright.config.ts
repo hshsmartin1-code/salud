@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test'
 
-const PORT = 4173
+const PORT = Number(process.env.PW_PORT ?? 4173)
 
 export default defineConfig({
   testDir: './e2e',
@@ -20,6 +20,8 @@ export default defineConfig({
   webServer: {
     command: `npm run build && npx vite preview --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}/salud/`,
+    // Never any real Firebase config in the regular e2e build, whatever .env.local holds.
+    env: { VITE_SYNC_DISABLED: '1' },
     reuseExistingServer: true,
     timeout: 240_000,
   },

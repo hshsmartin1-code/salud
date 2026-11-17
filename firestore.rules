@@ -1,0 +1,62 @@
+rules_version = '2';
+
+// Salud: per-account isolation. Deny by default; a signed-in user can only read and write
+// users/{their uid} and its rows. Writes must follow the sync format and bump the revision by
+// exactly one, so a stale device cannot overwrite a newer version.
+// The table list must match src/sync/syncTables.ts (a unit test checks it).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function syncedTables() {
+      return ['_profile', 'goals', 'foodLogs', 'customFoods', 'foodPortions', 'recipes', 'mealTemplates', 'favorites', 'recents',
+              'routines', 'trainingSessions', 'exerciseSets', 'customExercises', 'exerciseFavorites', 'bodyMeasurements',
+              'activityLogs', 'sleepLogs', 'recoveryLogs', 'habits', 'habitLogs', 'importedDaily', 'dayMarks',
+              'energyAdjustments', 'vitals', 'hydrationLogs'];
+    }
+
+    function validRow(key) {
+      let r = request.resource.data;
+      return r.keys().hasOnly(['t', 'id', 'rev', 'del', 'd', 'h', 'at'])
+        && r.keys().hasAll(['t', 'id', 'rev', 'del', 'd', 'h', 'at'])
+        && r.t is string && r.t in syncedTables()
+        && r.id is string && r.id.size() > 0 && r.id.size() <= 300
+        && r.rev is int && r.rev >= 1
+        && r.del is bool
+        && r.at == request.time
+        && ((r.del == true && r.d == null && r.h == null)
+            || (r.del == false && r.d is string && r.d.size() > 1 && r.d.size() <= 200000 && r.h is string && r.h.size() <= 64))
+        && key.size() <= 700
+        && key.matches('^' + r.t + '~.+$');
+    }
+
+    function validMeta() {
+      let m = request.resource.data;
+      return m.keys().hasOnly(['profileName', 'createdAt', 'schema', 'appVersion'])
+        && (m.profileName == null || (m.profileName is string && m.profileName.size() <= 100))
+        && (m.createdAt == null || m.createdAt is int)
+        && m.schema is int
+        && m.appVersion is string && m.appVersion.size() <= 20;
+    }
+
+    match /users/{uid} {
+      allow get: if isOwner(uid);
+      allow create, update: if isOwner(uid) && validMeta();
+      allow delete: if isOwner(uid);
+
+      match /rows/{key} {
+        allow get, list: if isOwner(uid);
+        allow create: if isOwner(uid) && validRow(key) && request.resource.data.rev == 1;
+        allow update: if isOwner(uid) && validRow(key)
+          && request.resource.data.rev == resource.data.rev + 1
+          && request.resource.data.t == resource.data.t
+          && request.resource.data.id == resource.data.id;
+        // Real deletion is only used by "Borrar datos de la nube"; sync deletions are tombstones.
+        allow delete: if isOwner(uid);
+      }
+    }
+  }
+}

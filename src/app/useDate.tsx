@@ -1,14 +1,17 @@
 import { useSearchParams } from 'react-router-dom'
 import { addDays, formatDateEs, todayLocal } from '../domain/dates'
-import { Icon } from '../ui/Icon'
+import { useToday } from './useToday'
+import { IconButton } from '../ui/IconButton'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /** Selected day from ?d=YYYY-MM-DD (defaults to today in Bogotá). */
 export function useDateParam(): [string, (d: string) => void] {
   const [params, setParams] = useSearchParams()
+  // Without ?d= the day follows the clock: it rolls over at local midnight and on resume.
+  const today = useToday()
   const d = params.get('d')
-  const date = d && DATE_RE.test(d) ? d : todayLocal()
+  const date = d && DATE_RE.test(d) ? d : today
   return [
     date,
     (next) => {
@@ -29,12 +32,11 @@ export function dayLabel(date: string): string {
 }
 
 export function DateNav({ date, onChange }: { date: string; onChange: (d: string) => void }) {
-  const isToday = date === todayLocal()
+  const today = useToday()
+  const isToday = date === today
   return (
     <div className="flex items-center gap-1">
-      <button type="button" className="btn-ghost p-2" aria-label="Día anterior" onClick={() => onChange(addDays(date, -1))}>
-        <Icon name="chevronLeft" />
-      </button>
+      <IconButton icon="chevronLeft" label="Día anterior" className="-mx-1" onClick={() => onChange(addDays(date, -1))} />
       <label className="relative cursor-pointer rounded-xl px-2 py-1 text-center hover:bg-surface2">
         <span className="block text-sm font-semibold">{dayLabel(date)}</span>
         <span className="block text-[11px] text-muted">{formatDateEs(date, 'short')}</span>
@@ -46,9 +48,7 @@ export function DateNav({ date, onChange }: { date: string; onChange: (d: string
           aria-label="Elegir fecha"
         />
       </label>
-      <button type="button" className="btn-ghost p-2" aria-label="Día siguiente" onClick={() => onChange(addDays(date, 1))}>
-        <Icon name="chevronRight" />
-      </button>
+      <IconButton icon="chevronRight" label="Día siguiente" className="-mx-1" onClick={() => onChange(addDays(date, 1))} />
       {!isToday ? (
         <button type="button" className="chip ml-1" onClick={() => onChange(todayLocal())}>
           Hoy

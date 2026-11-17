@@ -1,36 +1,45 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useRepo } from '../../app/profile'
+import { dayLabel, useDateParam } from '../../app/useDate'
 import { uuid } from '../../db/repo'
-import type { MealTemplate, Recipe, RecipeIngredient } from '../../db/types'
-import { todayLocal } from '../../domain/dates'
-import { formatNumber } from '../../domain/units'
-import { NumField, TextField, numStr, toNum } from '../../ui/fields'
+import type { MealKey, MealTemplate, Recipe, RecipeIngredient } from '../../db/types'
+import { formatNumber, textRangeError } from '../../domain/units'
+import { useConfirm } from '../../ui/Confirm'
+import { NumField, TextArea, TextField, numStr, toNum } from '../../ui/fields'
 import { Icon } from '../../ui/Icon'
-import { Badge, Card, EmptyState, PageHeader, Sheet } from '../../ui/kit'
+import { IconButton } from '../../ui/IconButton'
+import { Card, EmptyState, PageHeader, Sheet } from '../../ui/kit'
 import { FoodSearch } from './FoodSearch'
-import { describeQty, fromRecipe, MEAL_LABEL, recipeTotals, SOURCE_SHORT, type Food } from './food'
+import { describeQty, fromRecipe, recipeTotals, type Food } from './food'
+import { useMealSlots } from './useMealSlots'
 import { MacroLine, NutrientTable } from './NutrientView'
+import { dateQuery, diaryPath, routeGuard } from './paths'
 import { QuantitySheet } from './QuantitySheet'
+import { logSnapshots } from './quickAdd'
+import { useQuickLog } from './useQuickLog'
 import { sumNutrients } from '../../domain/nutrients'
+import { createRecipeSaver, recipeServingsError } from './recipeSave'
 
 export function RecipesPage() {
   const r = useRepo()
+  const [date] = useDateParam()
+  const dq = dateQuery(date)
   const recipes = useLiveQuery(() => r.all('recipes'), [r])
   return (
     <>
       <PageHeader
         title="Recetas"
-        back="/comida"
+        back={diaryPath(date)}
         actions={
-          <Link className="btn-primary px-3" to="/comida/recetas/nueva">
+          <Link className="btn-primary px-3" to={`/comida/recetas/nueva${dq}`}>
             <Icon name="plus" size={18} /> Nueva
           </Link>
         }
       />
       {recipes && recipes.length ? (
-        <ul className="card divide-y divide-line overflow-hidden">
+        <ul className="card divide-y divide-line overflow-hidden lg:max-w-3xl">
           {recipes
             .slice()
             .sort((a, b) => a.name.localeCompare(b.name))
@@ -38,22 +47,23 @@ export function RecipesPage() {
               const t = recipeTotals(rc)
               return (
                 <li key={rc.id}>
-                  <Link to={`/comida/recetas/${rc.id}`} className="block px-4 py-3 hover:bg-surface2/60">
+                  <Link to={`/comida/recetas/${rc.id}${dq}`} className="block px-4 py-3 hover:bg-surface2/60">
                     <div className="font-medium">{rc.name}</div>
                     <div className="mt-0.5 text-xs text-muted">
                       {rc.ingredients.length} ingredientes · {formatNumber(rc.servings, 1)} porciones
                       {rc.cookedWeightG ? ` · ${formatNumber(rc.cookedWeightG, 0)} g cocido` : ''}
                     </div>
                     <div className="mt-1">
-                      <MacroLine n={t.perServing} partial={t.partial} /> <span className="text-[11px] text-faint">por porción</span>
+                      <MacroLine n={t.perServing} partial={t.partial} /> <span className="text-micro text-muted">por porción</span>
                     </div>
+                    {rc.notes?.trim() ? <p className="mt-1 line-clamp-2 text-label text-muted" data-testid="recipe-note">{rc.notes}</p> : null}
                   </Link>
                 </li>
               )
             })}
         </ul>
       ) : (
-        <EmptyState icon="book" title="Sin recetas" action={<Link className="btn-primary" to="/comida/recetas/nueva">Crear receta</Link>}>
+        <EmptyState icon="book" title="Sin recetas" action={<Link className="btn-primary" to={`/comida/recetas/nueva${dq}`}>Crear receta</Link>}>
           Combina ingredientes pesados en crudo; registra la receta por porciones o por gramos si pesas el resultado cocinado.
         </EmptyState>
       )}
@@ -66,6 +76,9 @@ export function RecipeEditor() {
   const isNew = !id || id === 'nueva'
   const r = useRepo()
   const nav = useNavigate()
+  const confirm = useConfirm()
+  const [date] = useDateParam()
+  const dq = dateQuery(date)
   const existing = useLiveQuery(() => (isNew ? undefined : r.get('recipes', id as string)), [r, id])
   const [name, setName] = useState('')
   const [servings, setServings] = useState('1')
@@ -76,6 +89,9 @@ export function RecipeEditor() {
   const [pickFood, setPickFood] = useState<Food | null>(null)
   const [logOpen, setLogOpen] = useState(false)
   const [savedId, setSavedId] = useState<string | null>(null)
+  const saveRecipe = useRef(createRecipeSaver()).current
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!existing) return
@@ -92,28 +108,40 @@ export function RecipeEditor() {
     cookedWeightG: toNum(cooked),
   }
   const t = recipeTotals(draft)
-  const canSave = name.trim() && ings.length > 0 && (toNum(servings) ?? 0) > 0
+  const servingsErr = recipeServingsError(servings)
+  const cookedErr = textRangeError(cooked, 1, 50000, 'g')
+  const canSave = name.trim() && ings.length > 0 && !servingsErr && !cookedErr
 
   async function save(): Promise<Recipe | null> {
     if (!canSave) return null
+    const same = routeGuard()
+    setSaving(true)
+    setSaveError(null)
     const data = { name: name.trim(), servings: toNum(servings) as number, cookedWeightG: toNum(cooked), ingredients: ings, notes }
-    const row = existing ? await r.put('recipes', { ...existing, ...data }) : await r.add('recipes', data)
-    setSavedId(row.id)
-    if (isNew) nav(`/comida/recetas/${row.id}`, { replace: true })
-    return row
+    try {
+      const row = await saveRecipe(r, data, existing?.id)
+      setSavedId(row.id)
+      if (isNew && same()) nav(`/comida/recetas/${row.id}${dq}`, { replace: true })
+      return row
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'No se pudo guardar la receta.')
+      return null
+    } finally { setSaving(false) }
   }
 
   const recipeForLog = existing && savedId === existing.id ? existing : existing
   return (
     <>
-      <PageHeader title={isNew ? 'Nueva receta' : 'Receta'} back="/comida/recetas" />
-      <div className="space-y-4">
+      <PageHeader title={isNew ? 'Nueva receta' : 'Receta'} back={`/comida/recetas${dq}`} />
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start lg:gap-x-8">
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
         <Card className="space-y-3">
           <TextField label="Nombre" value={name} onChange={setName} autoFocus={isNew} placeholder="p. ej. Arroz con pollo" />
           <div className="grid grid-cols-2 gap-3">
-            <NumField label="Porciones" value={servings} onChange={setServings} />
-            <NumField label="Peso cocido total" unit="g" value={cooked} onChange={setCooked} hint="Opcional: permite registrar por gramos" />
+            <NumField label="Porciones" value={servings} onChange={setServings} error={servings.trim() ? (servingsErr ?? undefined) : undefined} />
+            <NumField label="Peso cocido total" unit="g" value={cooked} onChange={setCooked} hint="Opcional: permite registrar por gramos" error={cookedErr ?? undefined} />
           </div>
+          <TextArea label="Notas" value={notes} onChange={setNotes} rows={3} placeholder="Preparación, marca de los ingredientes, cómo medir el plato…" testId="recipe-notes" resize />
         </Card>
 
         <div>
@@ -129,9 +157,7 @@ export function RecipeEditor() {
                 <li key={i.key} className="flex items-center gap-3 px-4 py-2.5">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{i.name}</div>
-                    <div className="text-xs text-muted">
-                      {describeQty(i)} · <Badge>{SOURCE_SHORT[i.source]}</Badge>
-                    </div>
+                    <div className="text-xs text-muted">{describeQty(i)}</div>
                   </div>
                   <MacroLine n={i.nutrients} />
                   <button className="btn-ghost p-1.5" aria-label="Quitar ingrediente" onClick={() => setIngs((s) => s.filter((x) => x.key !== i.key))}>
@@ -145,19 +171,21 @@ export function RecipeEditor() {
           )}
         </div>
 
+        </div>
+        <div className="contents lg:sticky lg:top-6 lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
         {ings.length ? (
           <Card className="space-y-3">
             <div className="grid grid-cols-3 gap-2 text-center text-xs text-muted">
               <div>
-                <div className="readout text-[22px] text-ink">{t.totals.kcal !== undefined ? formatNumber(t.totals.kcal, 0) : '—'}</div>
+                <div className="readout text-title text-ink">{t.totals.kcal !== undefined ? formatNumber(t.totals.kcal, 0) : '—'}</div>
                 kcal total
               </div>
               <div>
-                <div className="readout text-[22px] text-ink">{t.perServing.kcal !== undefined ? formatNumber(t.perServing.kcal, 0) : '—'}</div>
+                <div className="readout text-title text-ink">{t.perServing.kcal !== undefined ? formatNumber(t.perServing.kcal, 0) : '—'}</div>
                 kcal / porción
               </div>
               <div>
-                <div className="readout text-[22px] text-ink">{t.per100g?.kcal !== undefined ? formatNumber(t.per100g.kcal, 0) : '—'}</div>
+                <div className="readout text-title text-ink">{t.per100g?.kcal !== undefined ? formatNumber(t.per100g.kcal, 0) : '—'}</div>
                 kcal / 100 g cocido
               </div>
             </div>
@@ -183,26 +211,28 @@ export function RecipeEditor() {
               <Icon name="utensils" size={16} /> Registrar
             </button>
           ) : null}
-          <button className="btn-primary flex-1" disabled={!canSave} onClick={() => void save()} data-testid="save-recipe">
+          <button className="btn-primary flex-1" disabled={!canSave || saving} onClick={() => void save()} data-testid="save-recipe">
             Guardar receta
           </button>
         </div>
+        {saveError ? <p role="alert" className="text-body text-bad">{saveError}</p> : null}
         {existing ? (
           <button
             className="btn-danger w-full"
             onClick={async () => {
-              if (!confirm('¿Eliminar esta receta? Los registros ya hechos conservan sus valores.')) return
+              if (!(await confirm({ title: '¿Eliminar esta receta?', body: 'Los registros ya hechos conservan sus valores.', confirmLabel: 'Eliminar receta', tone: 'danger' }))) return
               await r.remove('recipes', existing.id)
-              nav('/comida/recetas')
+              nav(`/comida/recetas${dq}`)
             }}
           >
             <Icon name="trash" size={16} /> Eliminar receta
           </button>
         ) : null}
+        </div>
       </div>
 
       <Sheet open={picker} onClose={() => setPicker(false)} title="Agregar ingrediente" wide>
-        <FoodSearch onSelect={(f) => setPickFood(f)} />
+        <FoodSearch inSheet onSelect={(f) => setPickFood(f)} />
       </Sheet>
       <QuantitySheet
         open={!!pickFood}
@@ -215,7 +245,7 @@ export function RecipeEditor() {
         }}
       />
       {recipeForLog ? (
-        <QuantitySheet open={logOpen} food={fromRecipe(recipeForLog)} date={todayLocal()} onClose={() => setLogOpen(false)} onSaved={() => nav('/comida')} />
+        <QuantitySheet open={logOpen} food={fromRecipe(recipeForLog)} date={date} onClose={() => setLogOpen(false)} onSaved={(_, same) => same && nav(diaryPath(date))} />
       ) : null}
     </>
   )
@@ -223,35 +253,62 @@ export function RecipeEditor() {
 
 export function TemplatesPage() {
   const r = useRepo()
+  const nav = useNavigate()
+  const confirm = useConfirm()
+  const [date] = useDateParam()
   const templates = useLiveQuery(() => r.all('mealTemplates'), [r])
   const [view, setView] = useState<MealTemplate | null>(null)
+  const slots = useMealSlots()
+  const [meal, setMeal] = useState<MealKey>(() => slots.now.key)
+  const quickLog = useQuickLog()
+
+  function open(t: MealTemplate) {
+    setMeal(t.meal ?? slots.now.key)
+    setView(t)
+  }
+
+  async function apply() {
+    if (!view) return
+    const t = view
+    const same = routeGuard()
+    const ok = await quickLog.run(
+      `tpl-page:${date}:${meal}:${t.id}`,
+      () => logSnapshots(r, t.items.map((snapshot) => ({ snapshot, time: null })), date, meal),
+      (b) => `Plantilla «${t.name}» aplicada a ${slots.lower(meal)}: ${b.ids.length} ${b.ids.length === 1 ? 'alimento' : 'alimentos'}`,
+      800,
+    )
+    if (ok) {
+      setView(null)
+      if (same()) nav(diaryPath(date))
+    }
+  }
+
   return (
     <>
-      <PageHeader title="Plantillas de comidas" back="/comida" />
+      <PageHeader title="Plantillas de comidas" back={diaryPath(date)} />
       {templates && templates.length ? (
         <ul className="card divide-y divide-line overflow-hidden">
           {templates.map((t) => {
             const { totals, partial } = sumNutrients(t.items)
             return (
-              <li key={t.id} className="flex items-center gap-3 px-4 py-3">
-                <button className="min-w-0 flex-1 text-left" onClick={() => setView(t)}>
+              <li key={t.id} className="flex items-center gap-1 pl-4 pr-1">
+                <button className="min-h-[52px] min-w-0 flex-1 py-3 text-left" onClick={() => open(t)} data-testid="template-open">
                   <div className="font-medium">{t.name}</div>
-                  <div className="text-xs text-muted">
-                    {t.items.length} alimentos{t.meal ? ` · ${MEAL_LABEL[t.meal]}` : ''}
+                  <div className="text-label text-muted">
+                    {t.items.length} alimentos{t.meal ? ` · ${slots.label(t.meal)}` : ''}
                   </div>
                   <div className="mt-1">
                     <MacroLine n={totals} partial={partial} />
                   </div>
                 </button>
-                <button
-                  className="btn-ghost p-2"
-                  aria-label="Eliminar plantilla"
-                  onClick={() => {
-                    if (confirm(`¿Eliminar la plantilla «${t.name}»?`)) void r.remove('mealTemplates', t.id)
+                <IconButton
+                  icon="trash"
+                  tone="danger"
+                  label={`Eliminar plantilla ${t.name}`}
+                  onClick={async () => {
+                    if (await confirm({ title: `¿Eliminar la plantilla «${t.name}»?`, body: 'Las comidas ya registradas no cambian.', confirmLabel: 'Eliminar plantilla', tone: 'danger' })) await r.remove('mealTemplates', t.id)
                   }}
-                >
-                  <Icon name="trash" size={16} />
-                </button>
+                />
               </li>
             )
           })}
@@ -261,18 +318,35 @@ export function TemplatesPage() {
           En la vista del día, abre el menú «⋯» de una comida y elige «Guardar como plantilla». Luego aplícala con un toque.
         </EmptyState>
       )}
-      <Sheet open={!!view} onClose={() => setView(null)} title={view?.name}>
-        <ul className="space-y-2 pb-2">
+      <Sheet
+        open={!!view}
+        onClose={() => setView(null)}
+        title={view?.name}
+        footer={
+          <button type="button" className="btn-primary w-full" onClick={() => void apply()} data-testid="apply-template">
+            Aplicar a {dayLabel(date).toLowerCase()} · {slots.lower(meal)}
+          </button>
+        }
+      >
+        <ul className="space-y-2 pb-3">
           {view?.items.map((i, k) => (
-            <li key={k} className="flex items-center justify-between gap-3 text-sm">
+            <li key={k} className="flex items-center justify-between gap-3 text-body">
               <span className="min-w-0">
                 <span className="block truncate font-medium">{i.name}</span>
-                <span className="text-xs text-muted">{describeQty(i)}</span>
+                <span className="text-label text-muted">{describeQty(i)}</span>
               </span>
               <MacroLine n={i.nutrients} />
             </li>
           ))}
         </ul>
+        <span className="label" id="tpl-meal-label">Comida</span>
+        <div role="radiogroup" aria-labelledby="tpl-meal-label" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
+          {slots.choices(view?.meal, meal).map((m) => (
+            <button key={m.key} type="button" role="radio" aria-checked={meal === m.key} className={`chip min-h-11 shrink-0 ${meal === m.key ? 'chip-on' : ''}`} onClick={() => setMeal(m.key)}>
+              {m.label}
+            </button>
+          ))}
+        </div>
       </Sheet>
     </>
   )

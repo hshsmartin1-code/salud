@@ -1,0 +1,101 @@
+[
+  {
+    "id": "co-100g-comma-sodium",
+    "kind": "synthetic-text",
+    "text": "Información nutricional\nPor 100 g\nEnergía 420 kJ 100 kcal\nProteína 8,5 g\nCarbohidratos totales 12,5 g\nGrasa total 2,5 g\nSodio 0,15 g",
+    "expected": {
+      "100g:kj": { "value": 420, "sourceUnit": "kJ" },
+      "100g:kcal": { "value": 100, "sourceUnit": "kcal" },
+      "100g:protein": { "value": 8.5, "sourceUnit": "g" },
+      "100g:carbs": { "value": 12.5, "sourceUnit": "g" },
+      "100g:fat": { "value": 2.5, "sourceUnit": "g" },
+      "100g:sodium": { "value": 150, "sourceUnit": "g" }
+    }
+  },
+  {
+    "id": "co-serving-micrograms",
+    "kind": "synthetic-text",
+    "text": "Tamaño de porción: 30 g\nPor porción\nCalorías 120 kcal\nProteína 3 g\nGrasa total 4 g\nCarbohidratos totales 18 g\nVitamina D 5 µg\nHierro 2 mg",
+    "expected": {
+      "serving:kcal": { "value": 120, "sourceUnit": "kcal" },
+      "serving:protein": { "value": 3, "sourceUnit": "g" },
+      "serving:fat": { "value": 4, "sourceUnit": "g" },
+      "serving:carbs": { "value": 18, "sourceUnit": "g" },
+      "serving:vitD": { "value": 5, "sourceUnit": "µg" },
+      "serving:iron": { "value": 2, "sourceUnit": "mg" }
+    },
+    "expectedServingSize": 30,
+    "expectedServingUnit": "g"
+  },
+  {
+    "id": "en-100ml-dot",
+    "kind": "synthetic-text",
+    "text": "Nutrition facts\nPer 100 ml\nEnergy 200 kJ 48 kcal\nProtein 3.2 g\nTotal carbohydrate 5.1 g\nTotal fat 1.5 g\nSodium 50 mg",
+    "expected": {
+      "100ml:kj": { "value": 200, "sourceUnit": "kJ" },
+      "100ml:kcal": { "value": 48, "sourceUnit": "kcal" },
+      "100ml:protein": { "value": 3.2, "sourceUnit": "g" },
+      "100ml:carbs": { "value": 5.1, "sourceUnit": "g" },
+      "100ml:fat": { "value": 1.5, "sourceUnit": "g" },
+      "100ml:sodium": { "value": 50, "sourceUnit": "mg" }
+    },
+    "note": "English recognition is measured honestly; unsupported labels count as misses."
+  },
+  {
+    "id": "co-package-salt",
+    "kind": "synthetic-text",
+    "text": "Por envase\nCalorías 220 kcal\nProteína 6 g\nGrasa total 10 g\nCarbohidratos totales 25 g\nSal 0,5 g",
+    "expected": {
+      "package:kcal": { "value": 220, "sourceUnit": "kcal" },
+      "package:protein": { "value": 6, "sourceUnit": "g" },
+      "package:fat": { "value": 10, "sourceUnit": "g" },
+      "package:carbs": { "value": 25, "sourceUnit": "g" },
+      "package:sodium": { "value": 200, "sourceUnit": "g", "uncertain": true }
+    }
+  },
+  {
+    "id": "co-two-columns",
+    "kind": "synthetic-text",
+    "text": "Por 100 g    Por porción 25 g\nCalorías 400 kcal 100 kcal\nProteína 12 g 3 g\nGrasa total 16 g 4 g\nCarbohidratos totales 40 g 10 g\nSodio 320 mg 80 mg",
+    "expected": {
+      "100g:kcal": { "value": 400, "sourceUnit": "kcal" },
+      "serving:kcal": { "value": 100, "sourceUnit": "kcal" },
+      "100g:protein": { "value": 12, "sourceUnit": "g" },
+      "serving:protein": { "value": 3, "sourceUnit": "g" },
+      "100g:fat": { "value": 16, "sourceUnit": "g" },
+      "serving:fat": { "value": 4, "sourceUnit": "g" },
+      "100g:carbs": { "value": 40, "sourceUnit": "g" },
+      "serving:carbs": { "value": 10, "sourceUnit": "g" },
+      "100g:sodium": { "value": 320, "sourceUnit": "mg" },
+      "serving:sodium": { "value": 80, "sourceUnit": "mg" }
+    },
+    "expectedServingSize": 25,
+    "expectedServingUnit": "g"
+  },
+  {
+    "id": "ambiguous-column-count",
+    "kind": "synthetic-text-ambiguous",
+    "text": "Por 100 g   Por porción\nProteína 8 g\nSodio 100 mg 25 mg",
+    "expected": {
+      "100g:sodium": { "value": 100, "sourceUnit": "mg" },
+      "serving:sodium": { "value": 25, "sourceUnit": "mg" }
+    },
+    "mustReject": ["100g:protein", "serving:protein"],
+    "mustWarn": "no se importó"
+  },
+  {
+    "id": "ambiguous-gram-thousands",
+    "kind": "synthetic-text-ambiguous",
+    "text": "Por 100 g\nCarbohidratos totales 1.250 g",
+    "expected": { "100g:carbs": { "value": 1.25, "sourceUnit": "g", "uncertain": true } },
+    "mustWarn": "ambiguo"
+  },
+  {
+    "id": "ambiguous-unitless-mineral",
+    "kind": "synthetic-text-ambiguous",
+    "text": "Por 100 g\nCalcio 120\nVitamina A 500 UI\nHierro 2 mg",
+    "expected": { "100g:iron": { "value": 2, "sourceUnit": "mg" } },
+    "mustReject": ["100g:calcium", "100g:vitA"],
+    "mustWarn": "no se importó"
+  }
+]

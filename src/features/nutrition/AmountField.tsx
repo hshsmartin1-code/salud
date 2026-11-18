@@ -21,6 +21,7 @@ export function AmountField({
   onEnter,
   label = 'Cantidad',
   fractions = false,
+  autoFocus = true,
 }: {
   value: string
   onChange: (v: string) => void
@@ -29,6 +30,7 @@ export function AmountField({
   label?: string
   /** Measures are counted in halves and quarters: the phone keyboard then offers "/" (text) instead of the decimal pad. */
   fractions?: boolean
+  autoFocus?: boolean
 }) {
   const id = useId()
   const n = parseAmount(value)
@@ -54,8 +56,8 @@ export function AmountField({
         <input
           id={id}
           name="qty"
-          data-autofocus=""
-          autoFocus
+          data-autofocus={autoFocus ? '' : undefined}
+          autoFocus={autoFocus}
           inputMode={fractions ? 'text' : 'decimal'}
           enterKeyHint="done"
           autoComplete="off"

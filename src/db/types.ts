@@ -225,6 +225,9 @@ export interface RefFood {
   flags: string[]
   datasetVersion: string
   fetchedAt: string
+  imageUrl?: string
+  packageLabel?: string
+  soldInColombia?: boolean
 }
 
 export interface RecipeIngredient extends FoodSnapshot {

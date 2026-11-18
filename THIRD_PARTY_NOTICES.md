@@ -10,6 +10,8 @@ The 13,648-row USDA snapshot is public-domain data released under CC0 1.0 Univer
 ### Open Food Facts Colombia
 The 641-row `public/data/foods-off-co.json` is a curated/filtered extraction of Open Food Facts product records. The Open Food Facts database is licensed under ODbL 1.0; individual contents are under DbCL 1.0. Attribution: “© Open Food Facts contributors”; source: https://world.openfoodfacts.org/ ; database license https://opendatacommons.org/licenses/odbl/1-0/ ; contents license https://opendatacommons.org/licenses/dbcl/1-0/ . This extracted database is distributed under ODbL 1.0 with changes (selection, nutrient normalization and local Colombian catalog curation) described in `data-pipeline/REPORT.md`.
 
+On-demand product results follow the same data attribution. Only the selected reference is saved locally. Product thumbnails remain hosted by Open Food Facts, are credited to its contributors, and are under CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/). Each product detail links to the source record and its credits.
+
 ### Exercise metadata — open-exercise-db and free-exercise-db
 The Spanish exercise records originate in Cawlumm/open-exercise-db. Its repository code declares MIT, Copyright (c) 2026 cwlumm; the database contents are separately CC0 1.0 per upstream `DATA_LICENSE`. Fields sourced from free-exercise-db retain that source's Unlicense. The corresponding notices are reproduced below. No upstream exercise photographs from free-exercise-db are included. Sources: https://github.com/Cawlumm/open-exercise-db and https://github.com/yuhonas/free-exercise-db . Pipeline provenance: `data-pipeline/EXERCISES_REPORT.md`.
 

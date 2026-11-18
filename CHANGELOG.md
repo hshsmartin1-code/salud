@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.2.1 — 2026-11-18 (paquete de interfaz)
+
+- Búsqueda local por nombre, marca y código, con variantes colombianas y tolerancia a errores de escritura. Open Food Facts permite ampliar resultados y filtrar por Colombia.
+- Registro de un alimento a partir de una frase o etiqueta pegada. Se revisan la cantidad, la base nutricional y la comida antes de guardar. Las entradas con nutrición pendiente se pueden completar desde el diario.
+- En móvil, los resultados locales aparecen primero. La hoja de cantidad agrupa los detalles secundarios, mantiene la acción principal a mano y respeta el movimiento reducido.
+
 ## 3.2.0 — 2026-11-16 (paquete de interfaz)
 
 Llega como actualización dentro de la app a una instalación 3.1.1 o posterior. Mismo esquema de datos; nada se migra.

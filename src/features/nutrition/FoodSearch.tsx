@@ -4,19 +4,21 @@ import { Link } from 'react-router-dom'
 import { useRepo } from '../../app/profile'
 import { refFoods } from '../../db/shared'
 import type { FoodLog, MealKey, RefFood } from '../../db/types'
-import { searchIndex } from '../../domain/search'
 import { Icon } from '../../ui/Icon'
 import { EmptyState, Segmented, Sheet } from '../../ui/kit'
 import { BarcodeScanner, barcodeScanSupported } from './BarcodeScanner'
-import { describeQty, fromRefFood, type Food } from './food'
-import { dedupeByRef, orderQueryResults, type FoodUsage } from './foodList'
-import { FoodGlyph } from './FoodGlyph'
+import { describeQty, fromRefFood, SOURCE_LABEL, type Food } from './food'
+import { findFoods, foodBarcode, foodQuery, orderOffHits, sameBrandedFood, type FoodUsage } from './foodSearchIndex'
+import { FoodThumbnail } from './FoodThumbnail'
 import { habitualFor } from './habitual'
-import { fetchOffBarcode, searchOff } from './off'
+import { offClient, type OffScope } from './offClient'
+import { labelPath } from './paths'
 import { lastLogByFood, suggestForMeal } from './suggestions'
 import { useDesktop } from './useDesktop'
 import { useFoods } from './useFoods'
 import { useMealSlots } from './useMealSlots'
+import { useOffSearch } from './useOffSearch'
+import { isFoodNarrative } from './foodText'
 
 type SourceFilter = 'all' | 'icbf' | 'usda' | 'off' | 'mine'
 type KindFilter = 'all' | 'raw' | 'cooked' | 'prepared'
@@ -73,6 +75,7 @@ export function FoodSearch({
   selectedRef,
   filtersExtra,
   inSheet = false,
+  onText,
 }: {
   onSelect: (f: Food) => void
   autoScan?: boolean
@@ -89,10 +92,12 @@ export function FoodSearch({
   filtersExtra?: ReactNode
   /** Inside a sheet (no top bar above): the search field sticks to the top of the sheet. */
   inSheet?: boolean
+  onText?: (text: string) => void
 }) {
   const r = useRepo()
   const mealLower = useMealSlots().lower
   const foods = useFoods()
+  const { indexes, resolve, byBarcode } = foods
   const [q, setQ] = useState('')
   const dq = useDeferredValue(q)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -105,15 +110,23 @@ export function FoodSearch({
   const [scan, setScan] = useState(autoScan && barcodeScanSupported())
   const [barcodeMode, setBarcodeMode] = useState(autoScan)
   const [code, setCode] = useState('')
-  const [online, setOnline] = useState<{ busy: boolean; error: string | null; results: RefFood[] | null; note?: string }>({
-    busy: false,
-    error: null,
-    results: null,
-  })
+  const [barcodeResult, setBarcodeResult] = useState<{ busy?: boolean; error?: string; note?: string }>({})
+  const barcodeRequest = useRef(0)
+  const [scope, setScope] = useState<OffScope>('world')
+  const remoteQuery = foodQuery(q).remote
+  const narrative = useMemo(() => !!onText && isFoodNarrative(q), [onText, q])
+  const canSearchOnline = !narrative && (src === 'all' || src === 'off') && kind === 'all' && remoteQuery.length >= 3
+  const remote = useOffSearch(barcodeMode || !canSearchOnline ? '' : remoteQuery, scope)
+  const remoteSection = useRef<HTMLElement>(null)
+  const [expandedResults, setExpandedResults] = useState<string | null>(null)
+  const [choosing, setChoosing] = useState(false)
+  const [selectionError, setSelectionError] = useState('')
+  const selection = useRef(false)
 
   const recents = useLiveQuery(() => r.all('recents'), [r])
   const favs = useLiveQuery(() => r.all('favorites'), [r])
   const filterActive = src !== 'all' || kind !== 'all'
+  const labelContext = { date: quick?.date, meal: quick?.meal }
 
   // Touch devices (Android) start in the field so the keyboard is ready. With a fine pointer the browser keeps
   // the natural Tab order: the sequential-focus starting point would otherwise skip the controls above the field.
@@ -122,76 +135,104 @@ export function FoodSearch({
   }, [autoScan])
   useEffect(() => {
     if (!clearSignal) return
+    barcodeRequest.current++
     setQ('')
     setBarcodeMode(false)
+    setBarcodeResult({})
     inputRef.current?.focus()
   }, [clearSignal])
 
-  const results = useMemo(() => {
-    if (!dq.trim()) return []
-    const filter = src === 'all' && kind === 'all' ? undefined : (f: Food) => matchSource(f, src) && (kind === 'all' || f.kind === kind)
-    return dedupeByRef(searchIndex(foods.index, dq, { limit: 60, filter }), foods.resolve)
-  }, [dq, src, kind, foods.index, foods.resolve])
-
-  useEffect(() => setOnline({ busy: false, error: null, results: null }), [dq])
-
-  // Typed-query order: own foods first, Spanish matches next, English-only names folded at the end.
   const usage = useMemo(() => new Map<string, FoodUsage>((recents ?? []).map((x) => [x.foodRef, { count: x.count, lastUsedAt: x.lastUsedAt }])), [recents])
-  const ordered = useMemo(() => orderQueryResults(results, dq, usage), [results, dq, usage])
+  const favorites = useMemo(() => new Set((favs ?? []).map((f) => f.foodRef)), [favs])
+  const matches = useMemo(() => findFoods(indexes, dq, {
+    filter: (f) => resolve(f.ref) === f && matchSource(f, src) && (kind === 'all' || f.kind === kind),
+    usage, favorites,
+  }), [dq, src, kind, indexes, resolve, usage, favorites])
+  const ordered = useMemo(() => {
+    const main: Food[] = [], english: Food[] = []
+    for (const { food, tier } of matches) {
+      const folded = food.englishOnly && tier > 1 && !usage.has(food.ref) && !favorites.has(food.ref)
+      if (folded) english.push(food)
+      else main.push(food)
+    }
+    return { main, english }
+  }, [matches, usage, favorites])
+  const { foods: remoteFoods, tier: remoteTier } = useMemo(() => {
+    const candidates = (remote.foods ?? []).map(fromRefFood).filter((f) => !matches.some(({ food }) => sameBrandedFood(food, f)))
+    return orderOffHits(candidates, dq)
+  }, [remote.foods, matches, dq])
+  const remoteFirst = remoteTier !== undefined && remoteTier < (matches[0]?.tier ?? Infinity)
   const [englishFor, setEnglishFor] = useState<string | null>(null)
   const showEnglish = englishFor === dq
 
+  useEffect(() => () => { barcodeRequest.current++ }, [])
+
+  function changeBarcode(value: string) {
+    barcodeRequest.current++
+    setCode(value)
+    setBarcodeResult({})
+  }
+
   const lookupCode = useCallback(
     async (raw: string, allowOnline: boolean) => {
-      const c = raw.replace(/\D/g, '')
-      if (c.length < 6) {
-        setOnline({ busy: false, error: 'Código demasiado corto', results: null })
+      const request = ++barcodeRequest.current
+      const c = foodBarcode(raw)
+      if (!c) {
+        setBarcodeResult({ error: 'Ingresa un código de 6 a 14 dígitos.' })
         return
       }
-      const local = foods.byBarcode(c) ?? (await refFoods.byBarcode(c).then((x) => (x ? fromRefFood(x) : undefined)))
-      if (local) {
-        onSelect(local)
-        return
-      }
-      if (!allowOnline) {
-        setOnline({ busy: false, error: null, results: null, note: `El código ${c} no está en el catálogo local.` })
-        return
-      }
-      setOnline({ busy: true, error: null, results: null })
       try {
-        const res = await fetchOffBarcode(c)
-        if ('error' in res) setOnline({ busy: false, error: res.error, results: null })
-        else {
-          await refFoods.put(res.food)
-          setOnline({ busy: false, error: null, results: null })
-          onSelect(fromRefFood(res.food))
+        const local = byBarcode(c) ?? (await refFoods.byBarcode(c).then((x) => (x ? fromRefFood(x) : undefined)))
+        if (request !== barcodeRequest.current) return
+        if (local && !allowOnline) {
+          setBarcodeResult(local.source === 'off' ? { note: `Ficha local disponible para ${c}.` } : {})
+          onSelect(local)
+          return
         }
+        if (!allowOnline) return setBarcodeResult({ note: `El código ${c} no está en el catálogo local.` })
+        setBarcodeResult({ busy: true })
+        const res = await offClient.barcode(c)
+        if (request !== barcodeRequest.current) return
+        if ('error' in res) return setBarcodeResult({ error: res.error })
+        await refFoods.put(res.food)
+        if (request !== barcodeRequest.current) return
+        setBarcodeResult({})
+        onSelect(fromRefFood(res.food))
       } catch {
-        setOnline({ busy: false, error: 'No se pudo conectar con Open Food Facts.', results: null })
+        if (request === barcodeRequest.current) setBarcodeResult({ error: 'No se pudo abrir el producto.' })
       }
     },
-    [foods, onSelect],
+    [byBarcode, onSelect],
   )
 
-  async function onlineSearch() {
-    setOnline({ busy: true, error: null, results: null })
+  async function pickOnline(f: RefFood) {
+    if (selection.current) return
+    selection.current = true
+    setChoosing(true)
+    setSelectionError('')
     try {
-      const res = await searchOff(dq.trim())
-      if ('error' in res) setOnline({ busy: false, error: res.error, results: null })
-      else setOnline({ busy: false, error: null, results: res.foods, note: res.skipped ? `${res.skipped} productos sin datos de energía omitidos.` : undefined })
+      await refFoods.put(f)
+      onSelect(fromRefFood(f))
     } catch {
-      setOnline({ busy: false, error: 'No se pudo conectar con Open Food Facts.', results: null })
+      setSelectionError('No se pudo guardar la ficha en este dispositivo. Intenta de nuevo.')
+    } finally {
+      selection.current = false
+      setChoosing(false)
     }
   }
 
-  async function pickOnline(f: RefFood) {
-    await refFoods.put(f)
-    onSelect(fromRefFood(f))
+  function searchOnline() {
+    const barcode = foodBarcode(q)
+    if (barcode) {
+      changeBarcode(barcode)
+      setBarcodeMode(true)
+      void lookupCode(barcode, true)
+    } else remote.search()
   }
 
   const resolveAll = useCallback(
-    (refs: { foodRef: string }[]) => refs.map((x) => foods.resolve(x.foodRef)).filter((f): f is Food => !!f),
-    [foods.resolve],
+    (refs: { foodRef: string }[]) => refs.map((x) => resolve(x.foodRef)).filter((f): f is Food => !!f),
+    [resolve],
   )
 
   const lastLogs = useMemo(() => (quick ? lastLogByFood(quick.logs, quick.meal) : null), [quick])
@@ -224,7 +265,13 @@ export function FoodSearch({
   // Desktop keyboard: from the field, ArrowDown enters the results; arrows walk the rows; Enter opens the
   // focused row (the browser clicks it) or, from the field, the first result; Escape goes back to the field.
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    if (!desktop || e.defaultPrevented) return
+    if (e.defaultPrevented) return
+    if (e.target === inputRef.current && e.key === 'Enter' && !e.nativeEvent.isComposing && narrative && onText) {
+      e.preventDefault()
+      onText(q)
+      return
+    }
+    if (!desktop) return
     const target = e.target as HTMLElement
     const input = inputRef.current
     const rows = [...(rootRef.current?.querySelectorAll<HTMLElement>('[data-food-row]') ?? [])]
@@ -232,7 +279,7 @@ export function FoodSearch({
       if (e.key === 'ArrowDown' && rows[0]) {
         e.preventDefault()
         rows[0].focus()
-      } else if (e.key === 'Enter' && dq.trim() && rows[0]) {
+      } else if (e.key === 'Enter' && q === dq && dq.trim() && rows[0]) {
         e.preventDefault()
         rows[0].click()
       }
@@ -250,6 +297,52 @@ export function FoodSearch({
       input?.focus()
     }
   }
+
+  const onlineAction = canSearchOnline ? (
+    <div className="mb-2 space-y-1.5 border-b border-line pb-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {remote.page ? <button type="button" className="btn-secondary min-h-11" onClick={() => remoteSection.current?.scrollIntoView({ block: 'start' })}>
+          <Icon name="link" size={16} /> Ver resultados en línea
+        </button> : <button type="button" className="btn-secondary min-h-11" onClick={searchOnline} aria-label={remote.busy ? undefined : "Buscar en Open Food Facts"} disabled={remote.busy}>
+          <Icon name="link" size={16} /> {remote.busy ? 'Buscando…' : matches.length && !foodBarcode(q) ? 'Buscar más productos' : 'Buscar en Open Food Facts'}
+        </button>}
+        {!foodBarcode(q) ? (
+          <label className="flex min-h-11 items-center gap-2 px-1 text-label text-muted">
+            <input type="checkbox" className="size-4 accent-[rgb(var(--accent))]" checked={scope === 'co'}
+              onChange={(event) => setScope(event.target.checked ? 'co' : 'world')} /> Solo Colombia
+          </label>
+        ) : null}
+      </div>
+      <p className="text-label text-muted">Se envía solo el texto o el código de búsqueda.</p>
+      {remote.error && !remote.page ? <p role="status" className="text-label text-warn">{remote.error}</p> : null}
+    </div>
+  ) : null
+
+  const onlineResults = canSearchOnline && !!remote.page ? (
+    <section ref={remoteSection} className="mt-4 scroll-mt-36 space-y-2" aria-label="Resultados de Open Food Facts">
+      <h3 className="section-title">Productos de Open Food Facts</h3>
+      <p className="text-label text-muted">Datos y fotos de los colaboradores de Open Food Facts.</p>
+      <div aria-busy={choosing || remote.busy}>
+        <ResultList foods={remoteFoods} {...rowProps} testId="food-results-online"
+          onSelect={(f) => { const selected = remote.foods?.find((x) => x.id === f.ref); if (selected) void pickOnline(selected) }} />
+      </div>
+      {!remoteFoods.length && !remote.unavailable?.length ? <p className="text-body text-muted">Sin productos adicionales para esta búsqueda.</p> : null}
+      {remote.unavailable?.length ? (
+        <details className="rounded-xl bg-surface2/50 px-3 py-2 text-body">
+          <summary className="cursor-pointer">{remote.unavailable.length} {remote.unavailable.length === 1 ? 'producto requiere' : 'productos requieren'} revisar la etiqueta</summary>
+          <ul className="divide-rows">
+            {remote.unavailable.map((p) => <li key={p.code} className="py-2">
+              <p className="font-medium">{p.name}</p><p className="text-label text-muted">{p.issue}</p>
+              <Link className="btn-ghost px-0" to={labelPath({ ...labelContext, barcode: p.code, name: p.name })}>Registrar desde etiqueta</Link>
+            </li>)}
+          </ul>
+        </details>
+      ) : null}
+      {remote.hasMore ? <button type="button" className="btn-secondary min-h-11" onClick={remote.search} disabled={remote.busy}>Ver más productos</button> : null}
+      {remote.error ? <p role="status" className="text-body text-warn">{remote.error}</p> : null}
+      {selectionError ? <p role="alert" className="text-body text-warn">{selectionError}</p> : null}
+    </section>
+  ) : null
 
   return (
     <div ref={rootRef} onKeyDown={onKeyDown}>
@@ -270,10 +363,10 @@ export function FoodSearch({
                 placeholder="Código de barras"
                 value={code}
                 autoFocus
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => changeBarcode(e.target.value)}
                 aria-label="Código de barras"
               />
-              <button className="btn-primary px-3" type="submit" disabled={!code.trim()}>
+              <button className="btn-primary px-3" type="submit" disabled={!code.trim() || barcodeResult.busy}>
                 Buscar
               </button>
             </form>
@@ -284,11 +377,16 @@ export function FoodSearch({
                 ref={inputRef}
                 type="search"
                 className="field pl-10"
-                placeholder="Buscar alimento"
+                placeholder={onText ? 'Busca, escribe o pega' : 'Alimento, marca o código'}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
+                onPaste={(event) => {
+                  const pasted = event.clipboardData.getData('text')
+                  if (onText && isFoodNarrative(pasted)) { event.preventDefault(); onText(pasted) }
+                }}
                 aria-label="Buscar alimento"
                 data-testid="food-search"
+                autoComplete="off"
               />
             </div>
           )}
@@ -297,7 +395,7 @@ export function FoodSearch({
             className={`btn-secondary px-3 ${barcodeMode ? 'border-accent text-accent' : ''}`}
             aria-label="Código de barras"
             aria-pressed={barcodeMode}
-            onClick={() => setBarcodeMode((v) => !v)}
+            onClick={() => { barcodeRequest.current++; setBarcodeResult({}); setBarcodeMode((v) => !v) }}
           >
             <Icon name="barcode" />
           </button>
@@ -325,25 +423,25 @@ export function FoodSearch({
 
       {barcodeMode ? (
         <div className="mt-3 space-y-3">
-          {online.note ? (
+          {barcodeResult.note ? (
             <div className="card p-4 text-body">
-              <p>{online.note}</p>
+              <p>{barcodeResult.note}</p>
               <p className="mt-1 text-label text-muted">Puedes consultarlo en Open Food Facts (requiere internet; se envía solo el código).</p>
               <div className="mt-3 flex gap-2">
-                <button className="btn-primary" onClick={() => void lookupCode(code, true)} disabled={online.busy}>
+                <button className="btn-primary" onClick={() => void lookupCode(code, true)} disabled={barcodeResult.busy}>
                   <Icon name="link" size={16} /> Consultar en línea
                 </button>
-                <Link className="btn-secondary" to={`/comida/etiqueta?barcode=${encodeURIComponent(code.replace(/\D/g, ''))}`}>
+                <Link className="btn-secondary" to={labelPath({ ...labelContext, barcode: foodBarcode(code) ?? undefined })}>
                   <Icon name="tag" size={16} /> Desde la etiqueta
                 </Link>
               </div>
             </div>
           ) : null}
-          {online.busy ? <p className="text-body text-muted">Consultando Open Food Facts…</p> : null}
-          {online.error ? (
+          {barcodeResult.busy ? <p role="status" className="text-body text-muted">Consultando Open Food Facts…</p> : null}
+          {barcodeResult.error ? (
             <div className="rounded-xl bg-warn/10 p-3 text-body text-warn">
-              {online.error}{' '}
-              <Link className="font-semibold underline" to={`/comida/etiqueta?barcode=${encodeURIComponent(code.replace(/\D/g, ''))}`}>
+              {barcodeResult.error}{' '}
+              <Link className="font-semibold underline" to={labelPath({ ...labelContext, barcode: foodBarcode(code) ?? undefined })}>
                 Registrar desde la etiqueta
               </Link>
             </div>
@@ -351,7 +449,15 @@ export function FoodSearch({
         </div>
       ) : dq.trim() ? (
         <>
-          <ResultList foods={ordered.main} {...rowProps} />
+          {narrative && onText ? (
+            <button type="button" className="btn-primary mt-2 w-full" onClick={() => onText(q)}>Revisar alimento escrito</button>
+          ) : null}
+          {!matches.length || foodBarcode(q) ? onlineAction : null}
+          {remoteFirst ? onlineResults : null}
+          <ResultList foods={expandedResults === dq ? ordered.main : ordered.main.slice(0, 12)} {...rowProps} onSelect={(f) => { if (q === dq) onSelect(f) }} />
+          {ordered.main.length > 12 && expandedResults !== dq ? (
+            <button className="btn-ghost min-h-11" type="button" onClick={() => setExpandedResults(dq)}>Ver más resultados locales</button>
+          ) : null}
           {ordered.english.length ? (
             <div className="border-t border-line">
               <button
@@ -367,43 +473,21 @@ export function FoodSearch({
               {showEnglish ? <ResultList foods={ordered.english} {...rowProps} testId="food-results-english" /> : null}
             </div>
           ) : null}
-          {results.length === 0 && foods.ready ? (
-            <EmptyState icon="search" title="Sin resultados locales">
-              Prueba otro término, quita filtros o crea el alimento desde su etiqueta.
+          {!narrative && matches.length === 0 && foods.ready && !remoteFoods.length ? (
+            <EmptyState icon="search" title="Sin resultados locales"
+              action={onText ? <button type="button" className="btn-secondary" onClick={() => onText(q)}>Registrar por texto</button>
+                : <Link className="btn-secondary" to={labelPath(labelContext)}>Crear desde etiqueta</Link>}>
+              {filterActive ? 'Prueba otro nombre o cambia los filtros.' : 'Prueba con el nombre, la marca o el código del empaque.'}
             </EmptyState>
           ) : null}
-          <div className="mt-4 space-y-2">
-            {online.results ? (
-              <>
-                <h3 className="section-title">Open Food Facts (en línea)</h3>
-                {online.results.length ? (
-                  <ResultList
-                    foods={dedupeByRef(online.results.map(fromRefFood), foods.resolve)}
-                    {...rowProps}
-                    onSelect={(f) => void pickOnline(online.results!.find((x) => x.id === f.ref)!)}
-                    testId="food-results-online"
-                  />
-                ) : (
-                  <p className="text-body text-muted">Sin resultados con datos de energía.</p>
-                )}
-                {online.note ? <p className="text-label text-muted">{online.note}</p> : null}
-              </>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn-secondary" onClick={() => void onlineSearch()} disabled={online.busy}>
-                  <Icon name="link" size={16} /> {online.busy ? 'Buscando…' : 'Buscar en Open Food Facts'}
-                </button>
-                <Link className="btn-ghost" to="/comida/etiqueta">
-                  <Icon name="tag" size={16} /> Crear desde etiqueta
-                </Link>
-              </div>
-            )}
-            {online.error ? <p className="text-body text-warn">{online.error}</p> : null}
-            <p className="text-label text-muted">La búsqueda en línea envía solo el texto escrito a Open Food Facts.</p>
-          </div>
+          {matches.length > 0 && !foodBarcode(q) ? onlineAction : null}
+          {!remoteFirst ? onlineResults : null}
         </>
       ) : (
         <div className="mt-1">
+          {onText ? <button type="button" className="btn-ghost min-h-11 px-2 font-semibold text-accent" onClick={() => onText('')}>
+            <Icon name="edit" size={16} /> Escribir o pegar un alimento
+          </button> : null}
           <Segmented<Tab> value={activeTab} onChange={setTab} options={tabs} size="sm" ariaLabel="Lista de alimentos" />
           {activeTab === 'recent' ? (
             recentFoods.length ? (
@@ -435,7 +519,7 @@ export function FoodSearch({
           ) : mineFoods.length ? (
             <ResultList foods={mineFoods} {...rowProps} testId="food-mine" />
           ) : (
-            <EmptyState icon="tag" title="Sin alimentos propios" action={<Link className="btn-primary" to="/comida/etiqueta">Crear desde etiqueta</Link>}>
+            <EmptyState icon="tag" title="Sin alimentos propios" action={<Link className="btn-primary" to={labelPath(labelContext)}>Crear desde etiqueta</Link>}>
               Los alimentos creados desde etiquetas y tus recetas aparecen aquí.
             </EmptyState>
           )}
@@ -478,7 +562,7 @@ export function FoodSearch({
         onCode={(c) => {
           setScan(false)
           setBarcodeMode(true)
-          setCode(c)
+          changeBarcode(c)
           void lookupCode(c, false)
         }}
       />
@@ -526,8 +610,8 @@ export function FoodRow({
         onClick={() => onSelect(food)}
         className="flex min-h-[60px] min-w-0 flex-1 items-center gap-3 py-2 text-left transition-colors hover:bg-surface2/50 aria-[current=true]:bg-surface2 lg:scroll-mt-32 lg:rounded-xl lg:px-2"
       >
-        <FoodGlyph size={40} food={food} />
-        <span className="min-w-0 flex-1">
+        <FoodThumbnail food={food} />
+        <span className="min-w-0 flex-1" title={SOURCE_LABEL[food.source]}>
           <span className="line-clamp-2 text-body font-medium leading-snug">
             {food.name}
             {inDiary ? (
@@ -536,7 +620,9 @@ export function FoodRow({
               </span>
             ) : null}
           </span>
-          {food.brand ? <span className="block truncate text-label text-muted">{food.brand}</span> : null}
+          {food.brand || food.packageLabel ? <span className="block truncate text-label text-muted">
+            {[food.brand, food.packageLabel].filter(Boolean).join(' · ')}
+          </span> : null}
         </span>
         {habitual ? (
           <span className="num max-w-[38%] shrink-0 text-right" data-testid="food-habitual">

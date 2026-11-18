@@ -205,9 +205,11 @@ test.describe('typed food search order', () => {
     await page.getByTestId('food-search').fill('arroz blanco cocido')
     await page.getByTestId('food-results').locator('button', { hasText: 'Arroz blanco cocido' }).first().click()
     await page.getByTestId('save-food').click()
+    // The sheet leaves with a short animation and the search field is cleared once it has gone.
+    await expect(page.getByRole('dialog')).toHaveCount(0)
     await page.goto('./#/comida/buscar?meal=cena')
     await page.getByTestId('food-search').fill('arroz')
-    const rows = page.getByTestId('food-results').locator(':scope > li')
+    const rows =page.getByTestId('food-results').locator(':scope > li')
     await expect(rows.first()).toContainText('Arroz blanco cocido')
     await expect(page.getByTestId('food-results')).not.toContainText('nombre en inglés')
     const toggle = page.getByTestId('english-toggle')

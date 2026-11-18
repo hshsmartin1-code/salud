@@ -15,12 +15,14 @@ import { useSwipeNav } from '../../ui/useSwipeNav'
 import { Menu, type MenuItem } from '../../ui/Menu'
 import { useToast } from '../../ui/Toast'
 import { DaySummary } from './DaySummary'
-import { describeQty, shortQty } from './food'
+import { describeQty, formatLogAmount, shortQty } from './food'
 import { PartialMark } from './PartialMark'
 import { useMealSlots } from './useMealSlots'
 import { MacroLine } from './NutrientView'
 import { searchPath } from './paths'
 import { QuantitySheet } from './QuantitySheet'
+import { TextFoodSheet } from './TextFoodSheet'
+import { hasPendingNutrition } from './textFoodDraft'
 import { logSnapshots, type LogEntry } from './quickAdd'
 import { CopyMealSheet } from './CopyMealSheet'
 import { habitsForSlot, type SlotHabit } from './slotHabits'
@@ -41,6 +43,7 @@ export function NutritionPage() {
   const recent = useRecentLogs(date)
   const quickLog = useQuickLog()
   const [editing, setEditing] = useState<FoodLog | null>(null)
+  const [completing, setCompleting] = useState<FoodLog | null>(null)
   const [saveTpl, setSaveTpl] = useState<MealKey | null>(null)
   const [applyTpl, setApplyTpl] = useState<MealKey | null>(null)
   const [copyFor, setCopyFor] = useState<MealKey | null>(null)
@@ -192,8 +195,10 @@ export function NutritionPage() {
           date={date}
           onClose={() => setEditing(null)}
           onDelete={() => void removeLog(editing)}
+          onCompleteNutrition={hasPendingNutrition(editing) ? () => { setCompleting(editing); setEditing(null) } : undefined}
         />
       ) : null}
+      {completing ? <TextFoodSheet startingText="" existing={completing} date={completing.date} meal={completing.meal} onClose={() => setCompleting(null)} /> : null}
 
       <SaveTemplateSheet meal={saveTpl} date={date} onClose={() => setSaveTpl(null)} />
       <CopyMealSheet meal={copyFor} date={date} onClose={() => setCopyFor(null)} onCopy={copyPrevious} />
@@ -312,7 +317,7 @@ function MealSection({
                 >
                   <span className="min-w-0 flex-1 lg:contents">
                     <span className="block truncate text-body font-medium lg:col-start-1">{l.name}</span>
-                    <span className="num block truncate text-label text-muted lg:col-start-2 lg:text-right" title={describeQty(l)}>{describeQty(l)}</span>
+                    <span className="num block truncate text-label text-muted lg:col-start-2 lg:text-right" title={describeQty(l)}>{formatLogAmount(l)}{hasPendingNutrition(l) ? ' · Nutrición pendiente' : ''}</span>
                   </span>
                   {MACRO_COLS.map((m, i) => (
                     <span key={m.code} aria-hidden className={`num hidden text-right text-label text-muted xl:block ${MACRO_COL_START[i]}`}>

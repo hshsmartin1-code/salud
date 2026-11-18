@@ -165,7 +165,7 @@ export function SettingsPage() {
               Datos de productos © colaboradores de Open Food Facts, disponibles bajo la Open Database License (ODbL 1.0); los contenidos individuales, bajo la
               Database Contents License (DbCL 1.0). Se incluye una instantánea parcial de productos de Colombia
               {count('off') ? ` (${formatNumber(count('off')!, 0)} productos)` : ''} y se consultan otros bajo demanda. Si redistribuyes esta base derivada, debe
-              hacerse bajo la misma licencia ODbL. Los datos pueden contener errores: verifica con la etiqueta.
+              hacerse bajo la misma licencia ODbL. Las fotos de los colaboradores se muestran bajo CC BY-SA 3.0, con enlace a la ficha. Los datos pueden contener errores: verifica con la etiqueta.
             </Source>
             <Source title="Tabla de Composición de Alimentos Colombianos (ICBF, 2015)" href="https://www.icbf.gov.co/">
               Instituto Colombiano de Bienestar Familiar. No se distribuye con la app: cada persona la genera localmente desde el PDF oficial y la carga en su

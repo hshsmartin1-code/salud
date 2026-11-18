@@ -144,13 +144,13 @@ export function convertLabel(d: LabelDraft): StoredLabelFood {
 }
 
 /** Plausibility checks on the printed values (errors block saving; warnings ask for review). */
-export function checkLabelDraft(d: LabelDraft): { errors: string[]; warnings: string[] } {
+export function checkLabelDraft(d: LabelDraft, { requireEnergy = true } = {}): { errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
   const n = d.nutrients;
   const has = (v: number | undefined): v is number => typeof v === 'number' && Number.isFinite(v);
   for (const [code, v] of Object.entries(n)) if (typeof v === 'number' && v < 0) errors.push(`El valor de "${code}" no puede ser negativo`);
-  if (!has(n.kcal)) errors.push('Falta la energía (kcal)');
+  if (requireEnergy && !has(n.kcal)) errors.push('Falta la energía (kcal)');
   const ref =
     d.basis === '100g' || d.basis === '100ml'
       ? 100

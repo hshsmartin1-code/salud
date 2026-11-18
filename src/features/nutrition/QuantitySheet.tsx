@@ -15,13 +15,15 @@ import { AmountField, stepFor } from './AmountField'
 import { amountError } from './amountRange'
 import { parseAmount } from './amountParse'
 import { Chooser, type ChoiceOption } from './Chooser'
-import { buildSnapshot, isRealPortion, KIND_LABEL, NOT_A_PORTION, measureText, shortQty, SOURCE_LABEL, unitOptions, type Food, type UnitOption } from './food'
+import { buildSnapshot, formatLogAmount, isRealPortion, KIND_LABEL, NOT_A_PORTION, measureText, shortQty, SOURCE_LABEL, unitOptions, type Food, type UnitOption } from './food'
 import { FoodGlyph } from './FoodGlyph'
+import { FoodThumbnail } from './FoodThumbnail'
 import { foodGlyph } from './glyphKind'
 import { NutrientTable } from './NutrientView'
 import { routeGuard } from './paths'
 import { useMealSlots } from './useMealSlots'
 import { logSnapshots, recentId, touchRecent, type LoggedBatch } from './quickAdd'
+import { useFoodSheetClose } from './useFoodSheetClose'
 
 export { recentId, touchRecent }
 
@@ -67,6 +69,7 @@ export function QuantitySheet({
   onPicked,
   onSaved,
   onDelete,
+  onCompleteNutrition,
   presentation = 'sheet',
 }: {
   /** Null with `existing` = the food is not on this device: the stored snapshot is scaled proportionally. */
@@ -82,6 +85,7 @@ export function QuantitySheet({
   /** `sameRoute` is false when the person left this screen while the save was running: do not navigate then. */
   onSaved?: (saved?: SavedInfo, sameRoute?: boolean) => void
   onDelete?: () => void
+  onCompleteNutrition?: () => void
   /** 'panel' renders the same detail inline (desktop right pane) instead of in a modal sheet. */
   presentation?: 'sheet' | 'panel'
 }) {
@@ -118,6 +122,7 @@ export function QuantitySheet({
   const [portionForm, setPortionForm] = useState<{ id?: string; label: string; amount: string } | null>(null)
   const [portionError, setPortionError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const { leaving, close } = useFoodSheetClose()
   const defaultOption = () => options.find(isRealPortion) ?? options.find((o) => o.unit === 'g' || o.unit === 'ml') ?? options[0]
 
   // Initialise from the entry being edited, then from the last use, then from defaults.
@@ -190,7 +195,7 @@ export function QuantitySheet({
   }
 
   async function save() {
-    if (!ok || !dateOk || savingRef.current) return
+    if (!ok || !dateOk || savingRef.current || leaving) return
     savingRef.current = true
     const sameRoute = routeGuard()
     setSaving(true)
@@ -206,8 +211,7 @@ export function QuantitySheet({
       } else {
         saved = { batch: await logSnapshots(r, [{ snapshot: ok }], date as string, meal), name: ok.name, qty: shortQty(ok), meal }
       }
-      onSaved?.(saved, sameRoute())
-      onClose()
+      close(() => { onSaved?.(saved, sameRoute()); onClose() }, presentation === 'sheet')
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'No se pudo guardar.')
     } finally {
@@ -231,9 +235,11 @@ export function QuantitySheet({
   const moreChoices: ChoiceOption[] = offered.filter((o) => RARE_UNITS.has(o.unit) && o.key !== 'recorded').map((o) => ({ key: o.key, label: o.label }))
   const mealName = slotsApi.label(meal)
   const Frame = presentation === 'panel' ? PanelFrame : Sheet
-  const glyph = <FoodGlyph size={40} kind={food ? foodGlyph(food) : existing ? foodGlyph({ name: existing.name, category: null, kind: existing.kind ?? 'generic', source: existing.source, brand: existing.brand }) : 'generic'} />
+  const compact = presentation === 'sheet' && !!globalThis.window?.matchMedia?.('(pointer: coarse)').matches
+  const Details = compact ? 'details' : 'div'
+  const glyph = food ? <FoodThumbnail food={food} /> : <FoodGlyph size={40} kind={existing ? foodGlyph({ name: existing.name, category: null, kind: existing.kind ?? 'generic', source: existing.source, brand: existing.brand }) : 'generic'} />
   const cell = (label: string, code: 'kcal' | 'protein' | 'carbs' | 'fat', color: string, unit?: string) => (
-    <div className="min-w-0 rounded-xl border border-line px-1 py-2 text-center">
+    <div className="min-w-0 px-1 py-1 text-center">
       <div className="num text-[17px] font-semibold leading-6" style={code === 'kcal' ? undefined : { color: `rgb(var(--${color}))` }}>
         {ok ? formatNutrient(code, ok.nutrients[code], false) : '—'}
         {ok && unit && ok.nutrients[code] !== undefined ? <span className="ml-0.5 text-micro font-normal text-muted">{unit}</span> : null}
@@ -245,13 +251,14 @@ export function QuantitySheet({
     <>
       <Frame
         open={open}
-        onClose={onClose}
+        leaving={leaving}
+        onClose={() => { if (!savingRef.current) close(onClose, presentation === 'sheet') }}
         title={
           <span className="flex min-w-0 items-center gap-3">
             {glyph}
             <span className="min-w-0">
               <span className="line-clamp-2 leading-snug">{title}</span>
-              {brand ? <span className="block truncate text-label font-normal text-muted">{brand}</span> : null}
+              {brand || food?.packageLabel ? <span className="block truncate text-label font-normal text-muted">{[brand, food?.packageLabel].filter(Boolean).join(' · ')}</span> : null}
             </span>
           </span>
         }
@@ -269,12 +276,12 @@ export function QuantitySheet({
             ) : null}
             {mode === 'log' ? (
               <div className="flex min-w-0 flex-1 items-stretch">
-                <button type="button" className="btn-primary min-w-0 flex-1 rounded-r-none" disabled={!ok || !dateOk || saving} onClick={() => void save()} data-testid="save-food">
+                <button type="button" className="btn-primary min-w-0 flex-1" disabled={!ok || !dateOk || saving || leaving} onClick={() => void save()} data-testid="save-food">
                   <span className="truncate">{existing ? `Guardar en ${mealName.toLowerCase()}` : `Agregar a ${mealName.toLowerCase()}`}</span>
                 </button>
                 <button
                   type="button"
-                  className="btn-primary hit-44 w-11 shrink-0 rounded-l-none border-l border-ink-contrast/25 px-0"
+                  className="btn-secondary hit-44 ml-2 w-11 shrink-0 px-0"
                   aria-label={`Cambiar la comida, ahora ${mealName.toLowerCase()}`}
                   aria-haspopup="dialog"
                   data-testid="meal-change"
@@ -292,7 +299,7 @@ export function QuantitySheet({
         }
       >
         <div className="space-y-3">
-          <div data-testid="qty-preview" aria-live="polite" className="grid grid-cols-[1fr_1fr_1.4fr_1fr] gap-2">
+          <div data-testid="qty-preview" aria-live="polite" className="grid grid-cols-[1fr_1fr_1.4fr_1fr] gap-1 rounded-2xl bg-accent/10 px-1 py-1.5">
             {cell('kcal', 'kcal', 'ink')}
             {cell('proteína', 'protein', 'protein', 'g')}
             {cell('carbohidratos', 'carbs', 'carbs', 'g')}
@@ -300,7 +307,8 @@ export function QuantitySheet({
           </div>
 
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] items-end gap-3">
-            <AmountField value={qty} onChange={setQty} step={stepFor(opt?.unit)} onEnter={() => void save()} fractions={isMeasure} />
+            <AmountField value={qty} onChange={setQty} step={stepFor(opt?.unit)} onEnter={() => void save()} fractions={isMeasure}
+              autoFocus={!compact} />
             <div className="min-w-0">
               <span className="label !mb-1" id="unit-label">
                 Unidad
@@ -329,7 +337,7 @@ export function QuantitySheet({
                   type="button"
                   aria-label={p.aria}
                   aria-pressed={q === p.v}
-                  className={`chip num min-h-11 justify-center text-body ${q === p.v ? 'chip-on' : ''}`}
+                  className={`chip num min-h-11 justify-center text-body ${q === p.v ? 'border-accent bg-accent/15 text-ink' : ''}`}
                   onClick={() => setQty(numStr(p.v, 3))}
                 >
                   {p.label}
@@ -350,8 +358,14 @@ export function QuantitySheet({
             </p>
           ) : null}
           {saveError ? <p role="alert" className="text-label text-bad">{saveError}</p> : null}
+          {ok && opt?.unit !== 'portion' ? <p className="text-label font-medium text-muted">{formatLogAmount(ok)}</p> : null}
+          {onCompleteNutrition ? <button type="button" className="btn-secondary w-full" onClick={() => close(onCompleteNutrition)}>Completar nutrición</button> : null}
+          {food?.source === 'off' && (ok?.missing.length || food.flags.includes('off_basis_conflict') || food.flags.includes('atwater_mismatch')) ? (
+            <p className="text-label text-warn">Datos incompletos o inconsistentes. Verifica la etiqueta del producto.</p>
+          ) : null}
 
-          <div className="divide-rows border-t border-line">
+          <Details className="divide-rows border-t border-line">
+            {compact ? <summary className="min-h-11 cursor-pointer py-3 text-label font-medium text-muted">Más detalles</summary> : null}
             <Disclosure summary="Información nutricional" testId="detail-nutrition">
               <div className="space-y-3">
                 {ok?.missing.length ? <p className="text-label text-warn">Sin dato en la fuente: {ok.missing.map((c) => nutrientEs(c)).join(', ')}.</p> : null}
@@ -374,7 +388,13 @@ export function QuantitySheet({
                 {food?.datasetVersion ? <div className="flex justify-between gap-3"><dt>Versión</dt><dd className="text-right text-ink">{food.datasetVersion}</dd></div> : null}
                 {food ? <div className="flex justify-between gap-3"><dt>Referencia</dt><dd className="break-all text-right text-ink">{food.ref}</dd></div> : null}
                 {opt?.unit === 'portion' ? <div className="flex justify-between gap-3"><dt>Medida</dt><dd className="text-right text-ink" data-testid="portion-source">{opt.key === 'recorded' ? 'valores guardados en el registro' : opt.portionVerification === 'custom' ? 'equivalencia personalizada' : 'equivalencia de la fuente'}</dd></div> : null}
-                {food?.englishOnly ? <div className="flex justify-between gap-3"><dt>Nombre original</dt><dd className="text-right text-ink">{food.nameOrig}</dd></div> : null}
+                {food?.source.startsWith('usda_') ? <div className="flex justify-between gap-3"><dt>Nombre original</dt><dd className="text-right text-ink">{food.nameOrig}</dd></div> : null}
+                {food?.source === 'off' && food.barcode && /^\d{6,14}$/.test(food.barcode) ? (
+                  <div className="pt-2">
+                    <a className="font-semibold underline" href={`https://world.openfoodfacts.org/product/${food.barcode}`} target="_blank" rel="noreferrer">Ver ficha y créditos</a>
+                    {food.imageUrl ? <p className="mt-1">Foto de colaboradores de Open Food Facts · <a className="underline" href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noreferrer">CC BY-SA 3.0</a></p> : null}
+                  </div>
+                ) : null}
               </dl>
             </Disclosure>
 
@@ -418,7 +438,7 @@ export function QuantitySheet({
                 {!existing && !food ? <p className="text-label text-muted">Sin notas.</p> : null}
               </div>
             </Disclosure>
-          </div>
+          </Details>
         </div>
       </Frame>
       <Chooser
@@ -444,7 +464,7 @@ export function QuantitySheet({
 }
 
 /** The detail without the modal: a bordered panel with the same title, body and footer as the sheet. */
-function PanelFrame({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title?: ReactNode; children: ReactNode; footer?: ReactNode }) {
+function PanelFrame({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title?: ReactNode; children: ReactNode; footer?: ReactNode; leaving?: boolean }) {
   const ref = useRef<HTMLElement>(null)
   const [maxH, setMaxH] = useState<number | null>(null)
   // The panel lives in the page, so an on-screen keyboard (which shrinks the visible area, sometimes by more than half on a
@@ -498,6 +518,10 @@ export function DataNotes({ food }: { food: Food }) {
   const notes: string[] = []
   if (food.flags.includes('kcal_from_kj')) notes.push('Energía calculada desde kJ (estimada).')
   if (food.flags.includes('sodium_from_salt')) notes.push('Sodio calculado desde la sal (sal ÷ 2,5).')
+  if (food.flags.includes('kj_inconsistent_nulled')) notes.push('Se omitieron los kJ por discrepancia con las kcal declaradas.')
+  if (food.flags.includes('off_salt_conflict')) notes.push('La sal y el sodio declarados no concuerdan. Se conserva el sodio declarado.')
+  if (food.flags.includes('off_basis_conflict')) notes.push('Los valores por porción y por 100 g/ml difieren. Se usaron los datos por porción de la etiqueta.')
+  if (food.flags.includes('off_serving_unverified')) notes.push('La ficha no permite verificar la equivalencia de la porción en gramos o mililitros.')
   if (food.flags.includes('atwater_mismatch')) notes.push('Las kcal declaradas no coinciden con los macronutrientes (>25 %). Revisa la etiqueta.')
   if (food.flags.includes('kcal_atwater_general') || food.flags.includes('kcal_atwater_specific')) notes.push('Energía según factores Atwater de la fuente.')
   if (food.flags.includes('partial')) notes.push('Receta con ingredientes sin algunos datos: totales parciales.')

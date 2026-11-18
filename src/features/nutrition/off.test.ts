@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { offToRefFood } from './off'
+import { buildSnapshot, fromRefFood, unitOptions } from './food'
 
 describe('offToRefFood', () => {
   it('converts units: minerals g to mg, vitamins g to µg, sodium from salt', () => {
@@ -92,5 +93,29 @@ describe('offToRefFood', () => {
       nutriments: { 'energy-kcal_100g': 100 } })
     if (!('food' in r)) throw new Error('expected food')
     expect(r.food.portions).toEqual([])
+  })
+
+  it('normalizes a declared serving in ml and preserves its conversion for fractional logging', () => {
+    const result = offToRefFood({ code: '7700000000012', product_name: 'Bebida de prueba', quantity: '500 ml',
+      serving_size: '1 vaso (200 ml)', nutrition_data_per: 'serving', rev: 12,
+      image_front_small_url: 'https://images.openfoodfacts.org/images/products/770/000/000/0012/front_es.9.200.jpg',
+      nutriments: { 'energy-kcal_serving': 110, 'energy-kcal_100g': 30, proteins_serving: 6, sodium_serving: 0.25, salt_serving: 0.1 } })
+    if (!('food' in result)) throw new Error(result.error)
+    expect(result.food).toMatchObject({ basis: '100ml', nutrients: { kcal: 55, protein: 3, sodium: 125 }, packageLabel: '500 ml', imageUrl: expect.any(String) })
+    expect(result.food.flags).toEqual(expect.arrayContaining(['off_basis_conflict', 'off_salt_conflict']))
+    expect(result.food.datasetVersion).toContain('rev. 12')
+    const food = fromRefFood(result.food)
+    const unit = unitOptions(food).find((o) => o.portionGrams === 200)!
+    expect(buildSnapshot(food, 0.5, unit)).toMatchObject({ foodRef: result.food.id, ml: 100, grams: null, nutrients: { kcal: 55 }, missing: expect.arrayContaining(['carbs', 'fat']) })
+    expect(buildSnapshot(food, 2, unit)).toMatchObject({ ml: 400, nutrients: { kcal: 220 } })
+  })
+
+  it('keeps directly declared values per serving when the serving has no reliable measure', () => {
+    const result = offToRefFood({ code: '7700000000013', product_name: 'Galletas de prueba', nutrition_data_per: 'serving',
+      serving_size: '2 galletas', nutriments: { 'energy-kcal_serving': 50, 'energy-kj_serving': 9 } })
+    if (!('food' in result)) throw new Error(result.error)
+    expect(result.food).toMatchObject({ basis: 'serving', nutrients: { kcal: 50 }, portions: [] })
+    expect(result.food.nutrients.kj).toBeUndefined()
+    expect(result.food.flags).toContain('kj_inconsistent_nulled')
   })
 })

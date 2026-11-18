@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { CatalogFoodFile } from '../../db/catalogTypes'
-import { buildSearchIndex, type SearchIndex } from '../../domain/search'
-import { foodRank, foodSearchText, fromCatalogRow, type Food } from './food'
+import { fromCatalogRow, type Food } from './food'
+import { barcodeKey, indexFoods, type FoodSearchIndex } from './foodSearchIndex'
 
 export interface ManifestFile {
   path: string
@@ -19,7 +19,7 @@ export interface FoodCatalog {
   foods: Food[]
   byRef: Map<string, Food>
   byBarcode: Map<string, Food>
-  index: SearchIndex<Food>
+  index: FoodSearchIndex
   files: ManifestFile[]
 }
 
@@ -38,22 +38,6 @@ export function loadManifest(): Promise<ManifestFile[]> {
     .then((m) => m.files)
     .catch(() => [])
   return manifestPromise
-}
-
-export function makeIndex(foods: Food[]): SearchIndex<Food> {
-  return buildSearchIndex(foods, { text: foodSearchText, name: (f) => f.name, rank: foodRank })
-}
-
-/** Concatenate two indexes without re-normalizing. */
-export function mergeIndexes<T>(a: SearchIndex<T>, b: SearchIndex<T>): SearchIndex<T> {
-  return {
-    items: a.items.concat(b.items),
-    hay: a.hay.concat(b.hay),
-    tokens: a.tokens.concat(b.tokens),
-    rank: a.rank.concat(b.rank),
-    nameLen: a.nameLen.concat(b.nameLen),
-    names: a.names.concat(b.names),
-  }
 }
 
 let catalogPromise: Promise<FoodCatalog> | null = null
@@ -85,8 +69,8 @@ export function loadFoodCatalog(): Promise<FoodCatalog> {
     if (foods.length === 0) throw new Error('No se pudo cargar el catálogo de alimentos')
     const byRef = new Map(foods.map((f) => [f.ref, f]))
     const byBarcode = new Map<string, Food>()
-    for (const f of foods) if (f.barcode) byBarcode.set(f.barcode, f)
-    return { foods, byRef, byBarcode, index: makeIndex(foods), files: infos }
+    for (const f of foods) if (f.barcode) byBarcode.set(barcodeKey(f.barcode), f)
+    return { foods, byRef, byBarcode, index: indexFoods(foods), files: infos }
   })()
   catalogPromise.catch(() => {
     catalogPromise = null

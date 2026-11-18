@@ -19,6 +19,16 @@ export function dateQuery(date: string, today: string = todayLocal()): string {
   return date === today ? '' : `?d=${date}`
 }
 
+export function labelPath(options: { date?: string; meal?: string; barcode?: string; name?: string; edit?: string } = {}) {
+  const params = new URLSearchParams(options.date ? dateQuery(options.date) : '')
+  for (const key of ['meal', 'barcode', 'name', 'edit'] as const) {
+    const value = options[key]
+    if (value) params.set(key, value)
+  }
+  const query = params.toString()
+  return `/comida/etiqueta${query ? `?${query}` : ''}`
+}
+
 /**
  * Remembers the route a save started on. Call it when the save starts; the returned function says, once the
  * save has resolved, whether the person is still there. The app's own "back to the diary" only happens then,

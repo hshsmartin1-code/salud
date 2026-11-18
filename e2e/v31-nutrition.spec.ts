@@ -224,7 +224,7 @@ test.describe('food detail', () => {
     await expect(cells).toContainText('grasa')
     await saveFood(page)
     expect(await kcalToday(page)).toBe('1.200') // 400 kcal/100 g x 300 g
-    await expect(page.getByTestId('meal-desayuno')).toContainText('2 × porción (150 g)')
+    await expect(page.getByTestId('meal-desayuno')).toContainText('2 porciones · 300 g')
     const stored = await page.evaluate(
       () =>
         new Promise<{ qty: number; unit: string; grams: number; portionLabel: string; kcal: number }>((resolve, reject) => {

@@ -20,7 +20,7 @@ import type { Profile } from './types'
 export const BACKUP_FORMAT = 'pho-backup'
 /** v2 (app 2.0): adds `includedTables` / `media`; new tables (vitals, photos, Health Connect…). */
 export const BACKUP_VERSION = 2
-export const APP_VERSION = '3.2.0'
+export const APP_VERSION = '3.2.1'
 
 /** Per-device state that must never travel inside a backup. */
 export const DEVICE_TABLES = ['integrations'] as const satisfies readonly PersonalTable[]

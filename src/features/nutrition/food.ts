@@ -5,6 +5,7 @@ import { quantityFactor, type QtyUnit } from '../../domain/units'
 import { SOURCE_RANK } from '../../domain/search'
 import { formatEach, normalizePortion } from '../../domain/portionLabel'
 import { legacyPortion, portionForFood, type HouseholdPortion, type PortionEquivalentUnit, type PortionVerification } from '../../domain/portions'
+import { reviewedUsdaName } from './usdaNames'
 
 /** Unified food model used by search, the quantity sheet and recipes. */
 export interface Food {
@@ -13,6 +14,9 @@ export interface Food {
   name: string
   nameOrig: string
   brand: string | null
+  imageUrl?: string
+  packageLabel?: string
+  soldInColombia?: boolean
   barcode: string | null
   category: string | null
   kind: FoodKind
@@ -78,32 +82,30 @@ export function foodRank(f: Food): number {
   return SOURCE_RANK[f.source] ?? 6
 }
 
-export function foodSearchText(f: Food): string {
-  return [f.name, f.nameOrig !== f.name ? f.nameOrig : '', f.brand ?? '', f.synonyms, f.barcode ?? ''].join(' ')
-}
-
 export function fromCatalogRow(row: CatalogFoodRow, order: readonly NutrientCode[], datasetVersion: string): Food {
   const [id, name, nameEs, brand, barcode, category, kind, basis, values, portions, synonyms, flags] = row
   const source = id.slice(0, id.indexOf(':')) as FoodSource
   const flagList = flags ? flags.split(';').filter(Boolean) : []
   const isUsda = source.startsWith('usda_')
+  const reviewed = isUsda ? reviewedUsdaName(id, name) : null
   return {
     ref: id,
     source,
-    name: nameEs || name,
+    name: reviewed?.display || nameEs || name,
     nameOrig: name,
     brand,
     barcode,
+    soldInColombia: source === 'off',
     category,
     kind,
     basis,
     nutrients: rowToNutrientMap(values, order),
     portions: portions ?? [],
     flags: flagList,
-    synonyms: synonyms ?? '',
+    synonyms: [reviewed?.aliases, synonyms].filter(Boolean).join(' '),
     datasetVersion,
-    curated: flagList.includes('curated_es'),
-    englishOnly: isUsda && !nameEs,
+    curated: !!reviewed || flagList.includes('curated_es'),
+    englishOnly: isUsda && !nameEs && !reviewed,
     servingGrams: null,
   }
 }
@@ -115,6 +117,9 @@ export function fromRefFood(r: RefFood): Food {
     name: r.nameEs || r.name,
     nameOrig: r.name,
     brand: r.brand,
+    imageUrl: r.imageUrl,
+    packageLabel: r.packageLabel,
+    soldInColombia: r.soldInColombia,
     barcode: r.barcode,
     category: r.category,
     kind: r.kind,
@@ -397,4 +402,17 @@ export function shortQty(s: QtyView): string {
     default:
       return `${q} ${s.unit}`
   }
+}
+
+/** A compact amount for confirmation, including the measured weight or volume when available. */
+const fractions = new Map([[0.25, '¼'], [0.5, '½'], [0.75, '¾'], [1.5, '1½']])
+const pluralMeasures: Record<string, string> = { porción: 'porciones', unidad: 'unidades', tajada: 'tajadas', vaso: 'vasos', taza: 'tazas', cucharada: 'cucharadas', cucharadita: 'cucharaditas' }
+
+export function formatLogAmount(s: QtyView): string {
+  if (s.unit !== 'portion' && s.unit !== 'serving') return describeQty(s)
+  const fraction = fractions.get(s.qty)
+  const title = s.unit === 'portion' ? measureText(s).name : 'porción'
+  const measure = s.qty >= 2 ? `${fmtQty(s.qty)} ${pluralMeasures[title] ?? `× ${title}`}` : `${fraction ?? fmtQty(s.qty)} ${title}`
+  const physical = s.grams !== null ? `${fmtQty(s.grams)} g` : s.ml !== null ? `${fmtQty(s.ml)} ml` : null
+  return physical ? `${measure} · ${physical}` : measure
 }

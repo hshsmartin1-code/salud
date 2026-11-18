@@ -8,7 +8,7 @@ import { NUTRIENTS, type NutrientCode, type NutrientMap } from '../../db/catalog
 import { repo } from '../../db/repo'
 import type { CustomFood } from '../../db/types'
 import { checkLabelDraft, convertLabel, type LabelBasis, type LabelDraft } from '../../domain/labelConvert'
-import { parseLabelText, type LabelColumnBasis, type ParsedLabel } from '../../domain/labelText'
+import type { LabelColumnBasis, ParsedLabel } from '../../domain/labelText'
 import { formatNutrient } from '../../domain/nutrients'
 import { textRangeError } from '../../domain/units'
 import { labelBaseAmount, labelValueError } from './labelRanges'
@@ -16,10 +16,11 @@ import { NumField, TextArea, TextField, numStr, toNum } from '../../ui/fields'
 import { useConfirm } from '../../ui/Confirm'
 import { Icon } from '../../ui/Icon'
 import { Card, PageHeader, Segmented, Sheet, Toggle } from '../../ui/kit'
-import { fromCustomFood, type Food } from './food'
-import { dateQuery, diaryPath } from './paths'
+import { fromCustomFood, MEALS, type Food } from './food'
+import { diaryPath, labelPath } from './paths'
 import { QuantitySheet } from './QuantitySheet'
 import { createLabelSaver } from './labelSave'
+import { readPastedLabel } from './foodText'
 
 const MAIN: NutrientCode[] = ['kcal', 'protein', 'carbs', 'fat', 'satFat', 'transFat', 'fiber', 'sugars', 'addedSugars', 'sodium']
 const MORE: NutrientCode[] = ['kj', 'carbsAvail', 'monoFat', 'polyFat', 'cholesterol', 'potassium', 'calcium', 'iron', 'magnesium', 'phosphorus', 'zinc', 'vitA', 'vitC', 'vitD', 'vitE', 'vitB12', 'folate']
@@ -43,6 +44,7 @@ function defaultColumn(p: ParsedLabel): LabelColumnBasis | null {
 export function LabelPage() {
   const [params] = useSearchParams()
   const editId = params.get('edit')
+  const meal = MEALS.find(({ key }) => key === params.get('meal'))?.key
   const r = useRepo()
   const nav = useNavigate()
   const confirm = useConfirm()
@@ -52,7 +54,7 @@ export function LabelPage() {
   const existingPhoto = useLiveQuery(() => (existing?.labelImageId ? r.get('labelImages', existing.labelImageId) : undefined), [r, existing?.labelImageId])
 
   const [entry, setEntry] = useState<Entry>('manual')
-  const [name, setName] = useState('')
+  const [name, setName] = useState(() => params.get('name')?.slice(0, 120) ?? '')
   const [brand, setBrand] = useState('')
   const [barcode, setBarcode] = useState(params.get('barcode') ?? '')
   const [basis, setBasis] = useState<LabelBasis>('serving')
@@ -165,7 +167,7 @@ export function LabelPage() {
   function interpret() {
     setParseError(null)
     setReviewConfirmed(false)
-    const p = parseLabelText(text)
+    const { parsed: p, name: detectedName } = readPastedLabel(text)
     const col = defaultColumn(p)
     if (!col) {
       setParsed(null)
@@ -174,8 +176,10 @@ export function LabelPage() {
     }
     setParsed(p)
     setColumn(col)
+    if (!name.trim() && detectedName) setName(detectedName)
     fillFromParsed(p, col)
-    window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'
+    window.setTimeout(() => formRef.current?.scrollIntoView({ behavior, block: 'start' }), 50)
   }
 
   async function save() {
@@ -219,8 +223,7 @@ export function LabelPage() {
     setSaved(fromCustomFood(row))
     // From now on this page edits the new row: saving again (e.g. after fixing a typo) updates it.
     if (!existing) {
-      const dq = dateQuery(date)
-      nav(`/comida/etiqueta?edit=${encodeURIComponent(row.id)}${dq ? `&${dq.slice(1)}` : ''}`, { replace: true })
+      nav(labelPath({ edit: row.id, date, meal }), { replace: true })
     }
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -241,7 +244,7 @@ export function LabelPage() {
     setParsed(null)
     setColumn(null)
     setReviewConfirmed(false)
-    nav(`/comida/etiqueta${dateQuery(date)}`, { replace: true })
+    nav(labelPath({ date, meal }), { replace: true })
   }
 
   const others = (profiles ?? []).filter((p) => p.id !== active?.id)
@@ -525,7 +528,7 @@ export function LabelPage() {
         </div>
       </div>
 
-      <QuantitySheet open={logOpen && !!saved} food={saved} onClose={() => setLogOpen(false)} date={date} onSaved={(_, same) => same && nav(diaryPath(date))} />
+      <QuantitySheet open={logOpen && !!saved} food={saved} onClose={() => setLogOpen(false)} date={date} meal={meal} onSaved={(_, same) => same && nav(diaryPath(date))} />
       <CopySheet open={copyOpen} onClose={() => setCopyOpen(false)} food={existing ?? null} targets={others.map((p) => ({ id: p.id, name: p.name }))} />
     </>
   )

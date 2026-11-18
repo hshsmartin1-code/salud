@@ -17,6 +17,7 @@ import { diaryPath, routeGuard } from './paths'
 import { useKeepAdding } from './prefs'
 import { useDesktop } from './useDesktop'
 import { QuantitySheet, type SavedInfo } from './QuantitySheet'
+import { TextFoodSheet } from './TextFoodSheet'
 import type { LoggedBatch } from './quickAdd'
 import { useDayNutrition, type DayNutrition } from './useDayNutrition'
 import { useQuickLog, useRecentLogs } from './useQuickLog'
@@ -33,7 +34,9 @@ function SearchHeader({ day, meal, date, onMeal }: { day: DayNutrition | undefin
   const budget = day?.kcalBudget ?? null
   let text = ''
   if (day) {
-    if (budget !== null) {
+    if (day.logs.some((log) => log.nutrients.kcal === undefined)) {
+      text = 'Nutrición parcial'
+    } else if (budget !== null) {
       const left = budget - kcal
       text = `${left >= 0 ? 'Quedan' : 'Pasaste'} ${formatNumber(Math.abs(left), 0)} kcal`
     } else text = `Hoy: ${formatNumber(kcal, 0)} kcal`
@@ -126,6 +129,7 @@ export function FoodSearchPage() {
   const [added, setAdded] = useState(0)
   const [clearSignal, setClearSignal] = useState(0)
   const [mealChooser, setMealChooser] = useState(false)
+  const [textDraft, setTextDraft] = useState<string | null>(null)
   const desktop = useDesktop()
   const day = useDayNutrition(date)
   const logs = useRecentLogs(date, 180)
@@ -182,7 +186,7 @@ export function FoodSearchPage() {
   function saved(info?: SavedInfo, sameRoute = true) {
     if (!info) return
     if (!keepAdding && sameRoute) nav(diaryPath(date))
-    quickLog.announce(`sheet:${info.batch.ids[0]}`, info.batch, `Agregado a ${lower(info.meal)}: ${info.name} · ${info.qty}`)
+    quickLog.announce(`sheet:${info.batch.ids[0]}`, info.batch, `Agregado a ${lower(info.meal)} · ${info.qty}`)
   }
 
   // Escape in the side editor closes it and hands the keyboard back to the search field.
@@ -218,6 +222,7 @@ export function FoodSearchPage() {
           ) : null}
           <FoodSearch
             onSelect={setFood}
+            onText={(text) => { setFood(null); setTextDraft(text) }}
             autoScan={params.get('scan') === '1'}
             quick={quick}
             ideas={desktop ? null : ideasNode}
@@ -245,6 +250,7 @@ export function FoodSearchPage() {
         ) : null}
       </div>
       {desktop ? null : <QuantitySheet open={!!food} food={food} date={date} meal={meal} onClose={() => setFood(null)} onSaved={saved} />}
+      {textDraft !== null ? <TextFoodSheet startingText={textDraft} date={date} meal={meal} onClose={() => setTextDraft(null)} onSaved={saved} /> : null}
       <Chooser
         open={mealChooser}
         onClose={() => setMealChooser(false)}

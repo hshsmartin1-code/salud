@@ -1,13 +1,8 @@
 /**
- * Open Food Facts runtime lookups (barcode / text). Mirrors data-pipeline/off_foods.py conversions.
- * Data: Open Food Facts contributors, ODbL 1.0. Results are cached locally as reference foods.
+ * Convert community-contributed Open Food Facts data (ODbL 1.0 / DbCL 1.0).
  */
 import type { NutrientCode, NutrientMap } from '../../db/catalogTypes'
 import type { RefFood } from '../../db/types'
-
-const FIELDS =
-  'code,product_name,product_name_es,brands,quantity,serving_size,serving_quantity,serving_quantity_unit,nutriments,categories_tags,product_quantity,product_quantity_unit'
-const OFF = 'https://world.openfoodfacts.org'
 
 type Nutriments = Record<string, unknown>
 export interface OffProduct {
@@ -23,8 +18,11 @@ export interface OffProduct {
   categories_tags?: string[]
   product_quantity?: number | string
   product_quantity_unit?: string
+  nutrition_data_per?: string
+  countries_tags?: string[]
+  image_front_small_url?: string
+  rev?: number
 }
-
 const MAP: [string, NutrientCode, number][] = [
   ['proteins', 'protein', 1],
   ['carbohydrates', 'carbs', 1],
@@ -61,6 +59,7 @@ function num(v: unknown): number | null {
 const r2 = (n: number) => Math.round(n * 100) / 100
 
 function isLiquid(p: OffProduct): boolean {
+  if (p.nutrition_data_per === '100ml') return true
   const u = String(p.product_quantity_unit ?? '').trim().toLowerCase()
   if (u) return ['ml', 'l', 'cl', 'dl'].includes(u)
   return /\b\d+(?:[.,]\d+)?\s*(ml|cl|dl|l|lt|lts|litros?|cc)\b/i.test(String(p.quantity ?? ''))
@@ -124,63 +123,102 @@ function packageQuantity(p: OffProduct): Measure | null {
 
 export type OffResult = { food: RefFood } | { error: string }
 
+export function offImageUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  try {
+    const url = new URL(value)
+    if (url.origin === 'https://images.openfoodfacts.org' && url.pathname.startsWith('/images/products/')) return url.href
+  } catch { /* No usable product image. */ }
+  return undefined
+}
+
 /** Convert an OFF product to a reference food; refuses products without name or energy. */
 export function offToRefFood(p: OffProduct, fetchedAt = new Date().toISOString()): OffResult {
   const code = String(p.code ?? '').trim()
   if (!/^\d{6,14}$/.test(code)) return { error: 'Código de barras no válido' }
-  const name = (p.product_name_es ?? '').trim() || (p.product_name ?? '').trim()
-  if (!name) return { error: 'El producto no tiene nombre en Open Food Facts' }
+  const name = (typeof p.product_name_es === 'string' ? p.product_name_es.trim() : '') ||
+    (typeof p.product_name === 'string' ? p.product_name.trim() : '')
+  if (!name || /^\d+$/.test(name)) return { error: 'El producto no tiene nombre en Open Food Facts' }
   const nm = (p.nutriments ?? {}) as Nutriments
   const n: NutrientMap = {}
   const flags: string[] = []
-  let kcal = num(nm['energy-kcal_100g'])
-  const kj = num(nm['energy-kj_100g'])
+  const basis = isLiquid(p) ? '100ml' : '100g'
+  const expectedUnit = basis === '100ml' ? 'ml' : 'g'
+  const serving = servingQuantity(p)
+  const pq = packageQuantity(p)
+  const validServing = serving && serving.unit === expectedUnit &&
+    !(pq && pq.unit === expectedUnit && serving.amount > pq.amount + 0.02) ? serving : null
+  if (!validServing && (p.serving_size || p.serving_quantity != null)) flags.push('off_serving_unverified')
+  const servingBasis = p.nutrition_data_per === 'serving'
+  const factor = validServing ? 100 / validServing.amount : null
+  // For declared per-serving labels, derive the base from the checked measure.
+  // A reported serving with no reliable g/ml equivalent remains per serving.
+  const outputBasis = servingBasis && factor === null ? 'serving' : basis
+  let conflict = false
+  function amount(key: string) {
+    const per100 = num(nm[`${key}_100g`])
+    const perServing = num(nm[`${key}_serving`])
+    if (!servingBasis) return per100
+    if (perServing === null) return factor !== null ? per100 : null
+    if (factor === null) return perServing
+    const scaled = perServing * factor
+    if (per100 !== null && Math.abs(per100 - scaled) > Math.max(0.00001, Math.abs(scaled) * 0.06)) conflict = true
+    return scaled
+  }
+  let kcal = amount('energy-kcal')
+  const kj = amount('energy-kj') ?? amount('energy') // OFF's canonical generic energy is kJ.
   if (kcal === null && kj !== null) {
     kcal = kj / 4.184
     flags.push('kcal_from_kj')
   }
-  if (kcal === null) return { error: 'El producto no tiene energía por 100 g/ml en Open Food Facts. Regístralo desde la etiqueta.' }
+  if (kcal === null) return { error: 'El producto no tiene energía utilizable en Open Food Facts. Regístralo desde la etiqueta.' }
+  if (kcal < 0 || (kj !== null && kj < 0) || (outputBasis === '100g' && kcal > 950) || kcal > 10000)
+    return { error: 'Energía fuera de rango en Open Food Facts' }
   n.kcal = r2(kcal)
-  if (kj !== null) n.kj = r2(kj)
+  if (kj !== null) {
+    if (Math.abs(kcal * 4.184 - kj) <= Math.max(5, kcal * 4.184 * 0.1)) n.kj = r2(kj)
+    else flags.push('kj_inconsistent_nulled')
+  }
   for (const [key, c, mult] of MAP) {
-    const v = num(nm[`${key}_100g`])
+    const v = amount(key)
+    if (v !== null && (v < 0 || !Number.isFinite(v * mult) || (outputBasis === '100g' && v > 105)))
+      return { error: 'Nutriente fuera de rango en Open Food Facts' }
     if (v !== null) n[c] = r2(v * mult)
   }
-  const fol = num(nm['vitamin-b9_100g']) ?? num(nm['folates_100g'])
+  const fol = amount('vitamin-b9') ?? amount('folates')
   if (fol !== null) n.folate = r2(fol * 1e6)
-  const sod = num(nm['sodium_100g'])
-  const salt = num(nm['salt_100g'])
-  if (sod !== null) n.sodium = r2(sod * 1000)
+  const sod = amount('sodium')
+  const salt = amount('salt')
+  if (sod !== null) {
+    n.sodium = r2(sod * 1000)
+    if (salt !== null && Math.abs(sod * 2.5 - salt) > Math.max(0.025, salt * 0.1)) flags.push('off_salt_conflict')
+  }
   else if (salt !== null) {
     n.sodium = r2((salt / 2.5) * 1000)
     flags.push('sodium_from_salt')
   }
-  if (Object.values(n).some((v) => (v as number) < 0)) return { error: 'Valores negativos en Open Food Facts' }
+  if (Object.values(n).some((v) => !Number.isFinite(v) || v < 0)) return { error: 'Valores inválidos en Open Food Facts' }
   const macros = (n.protein ?? 0) + (n.carbs ?? 0) + (n.fat ?? 0)
-  if (macros > 105) return { error: 'Datos inconsistentes en Open Food Facts (macros > 100 g)' }
+  if (outputBasis === '100g' && macros > 105) return { error: 'Datos inconsistentes en Open Food Facts (macros > 100 g)' }
   if (n.protein !== undefined && n.carbs !== undefined && n.fat !== undefined) {
     const est = 4 * n.protein + 4 * n.carbs + 9 * n.fat
     if (Math.abs(kcal - est) > 0.25 * Math.max(est, kcal)) flags.push('atwater_mismatch')
   }
-  const basis = isLiquid(p) ? '100ml' : '100g'
-  const expectedUnit = basis === '100ml' ? 'ml' : 'g'
   const portions: [string, number][] = []
-  const serving = servingQuantity(p)
-  const pq = packageQuantity(p)
-  if (serving && serving.unit === expectedUnit && r2(serving.amount) > 0 &&
-      !(pq && pq.unit === expectedUnit && serving.amount > pq.amount + 0.02))
-    portions.push([p.serving_size ? `1 porción (${p.serving_size})`.slice(0, 80) : '1 porción', r2(serving.amount)])
-  if (pq && pq.unit === expectedUnit && r2(pq.amount) > 0)
+  if (validServing && r2(validServing.amount) > 0)
+    portions.push([p.serving_size ? `1 porción (${p.serving_size})`.slice(0, 80) : '1 porción', r2(validServing.amount)])
+  if (outputBasis !== 'serving' && pq && pq.unit === expectedUnit && r2(pq.amount) > 0)
     portions.push(['Envase completo', r2(pq.amount)])
   if (portions.length) flags.push('portion_units_checked')
-  const brands = Array.isArray(p.brands) ? p.brands.join(',') : (p.brands ?? '')
+  if (conflict) flags.push('off_basis_conflict')
+  const brands = Array.isArray(p.brands) ? p.brands.join(',') : (typeof p.brands === 'string' ? p.brands : '')
   const brand =
     brands
       .split(',')
       .map((b) => b.trim())
       .find(Boolean) ?? null
   const cat =
-    (p.categories_tags ?? [])
+    (Array.isArray(p.categories_tags) ? p.categories_tags.filter((t) => typeof t === 'string') : [])
       .map((t) => t.replace(/^[a-z]{2}:/, '').replace(/-/g, ' ').trim())
       .find(Boolean) ?? null
   return {
@@ -190,47 +228,19 @@ export function offToRefFood(p: OffProduct, fetchedAt = new Date().toISOString()
       name,
       nameEs: name,
       brand,
+      imageUrl: offImageUrl(p.image_front_small_url),
+      packageLabel: typeof p.quantity === 'string' ? p.quantity.trim().slice(0, 80) : undefined,
+      soldInColombia: Array.isArray(p.countries_tags) && p.countries_tags.includes('en:colombia'),
       barcode: code,
       category: cat ? cat.charAt(0).toUpperCase() + cat.slice(1) : null,
       kind: 'packaged',
-      basis,
+      basis: outputBasis,
       nutrients: n,
       portions,
-      synonyms: null,
+      synonyms: brands || null,
       flags,
-      datasetVersion: `Open Food Facts API (consulta ${fetchedAt.slice(0, 10)})`,
+      datasetVersion: `Open Food Facts API (${Number.isInteger(p.rev) ? `rev. ${p.rev}, ` : ''}consulta ${fetchedAt.slice(0, 10)})`,
       fetchedAt,
     },
   }
-}
-
-export async function fetchOffBarcode(code: string, signal?: AbortSignal): Promise<OffResult> {
-  if (!navigator.onLine) return { error: 'Sin conexión: no se puede consultar Open Food Facts.' }
-  const res = await fetch(`${OFF}/api/v3/product/${encodeURIComponent(code)}?fields=${FIELDS}`, { signal })
-  if (res.status === 404) return { error: 'Producto no encontrado en Open Food Facts.' }
-  if (res.status === 429) return { error: 'Open Food Facts limitó las consultas. Intenta en un minuto.' }
-  if (!res.ok) return { error: `Error de Open Food Facts (${res.status})` }
-  const body = (await res.json()) as { status?: string; product?: OffProduct }
-  if (!body.product) return { error: 'Producto no encontrado en Open Food Facts.' }
-  return offToRefFood({ code, ...body.product })
-}
-
-export async function searchOff(
-  query: string,
-  signal?: AbortSignal,
-): Promise<{ foods: RefFood[]; skipped: number } | { error: string }> {
-  if (!navigator.onLine) return { error: 'Sin conexión: no se puede consultar Open Food Facts.' }
-  const url = `${OFF}/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=30&fields=${FIELDS}`
-  const res = await fetch(url, { signal })
-  if (res.status === 429) return { error: 'Open Food Facts limitó las búsquedas (máx. ~10 por minuto). Intenta en un momento.' }
-  if (!res.ok) return { error: `Error de Open Food Facts (${res.status})` }
-  const body = (await res.json()) as { products?: OffProduct[] }
-  const foods: RefFood[] = []
-  let skipped = 0
-  for (const p of body.products ?? []) {
-    const r = offToRefFood(p)
-    if ('food' in r) foods.push(r.food)
-    else skipped++
-  }
-  return { foods, skipped }
 }

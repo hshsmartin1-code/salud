@@ -5,6 +5,7 @@ import { formatNumber } from '../../domain/units'
 import { Icon } from '../../ui/Icon'
 import { Meter } from '../../ui/Meter'
 import { PartialMark } from './PartialMark'
+import { hasPendingNutrition } from './textFoodDraft'
 import type { DayNutrition } from './useDayNutrition'
 
 const ROWS: { code: NutrientCode; es: string; color: string; target: 'protein' | 'carbs' | 'fat' | 'fiber' }[] = [
@@ -24,6 +25,7 @@ export function DaySummary({ day, compact = false }: { day: DayNutrition; compac
   const budget = day.kcalBudget
   const remaining = budget !== null && kcal !== undefined ? budget - kcal : budget
   const partialKcal = day.partial.includes('kcal')
+  const pendingKcal = day.logs.some(hasPendingNutrition)
   const over = remaining !== null && remaining < 0
   return (
     <section className="border-b border-line pb-5" data-testid="day-summary" aria-label="Resumen del día">
@@ -44,9 +46,9 @@ export function DaySummary({ day, compact = false }: { day: DayNutrition; compac
           <div className="shrink-0 text-right" data-testid="kcal-remaining">
             <div className={`flex items-center justify-end gap-1 text-label font-medium ${over ? 'text-warn' : 'text-muted'}`}>
               {over ? <Icon name="alert" size={14} /> : null}
-              {over ? 'Excedido' : 'Restante'}
+              {pendingKcal ? 'Total parcial' : over ? 'Excedido' : 'Restante'}
             </div>
-            <div className={`readout mt-1 text-readout ${over ? 'text-warn' : ''}`}>{formatNumber(Math.abs(remaining), 0)}</div>
+            <div className={`readout mt-1 text-readout ${over ? 'text-warn' : ''}`}>{pendingKcal ? '—' : formatNumber(Math.abs(remaining), 0)}</div>
           </div>
         ) : (
           <Link to="/perfil" className="btn-secondary shrink-0 px-3 text-sm">
@@ -62,7 +64,7 @@ export function DaySummary({ day, compact = false }: { day: DayNutrition; compac
             colorVar="energy"
             variant="scale"
             label="Energía frente al objetivo"
-            valueText={`${formatNumber(kcal ?? 0, 0)} de ${formatNumber(budget, 0)} kcal`}
+            valueText={pendingKcal ? 'Energía parcial' : `${formatNumber(kcal ?? 0, 0)} de ${formatNumber(budget, 0)} kcal`}
           />
         </div>
       ) : null}

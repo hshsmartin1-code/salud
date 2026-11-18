@@ -14,6 +14,7 @@ export function Sheet({
   children,
   footer,
   wide = false,
+  leaving = false,
 }: {
   open: boolean
   onClose: () => void
@@ -21,12 +22,15 @@ export function Sheet({
   children: ReactNode
   footer?: ReactNode
   wide?: boolean
+  leaving?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
   const titleId = useId()
   const [viewport, setViewport] = useState<{ top: number; height: number } | null>(null)
+  const leavingRef = useRef(leaving)
   useEffect(() => { closeRef.current = onClose }, [onClose])
+  useEffect(() => { leavingRef.current = leaving }, [leaving])
   useDismissable(open, onClose)
   useEffect(() => {
     if (!open || !window.visualViewport) return
@@ -73,7 +77,8 @@ export function Sheet({
       }
     }
     const onFocus = (e: FocusEvent) => {
-      if (!isTop()) return
+      // While the sheet animates out it no longer owns the focus: whatever the person reaches for keeps it.
+      if (!isTop() || leavingRef.current) return
       if (!ref.current?.contains(e.target as Node)) (focusable()[0] ?? ref.current)?.focus()
       else if (e.target instanceof HTMLElement && e.target.matches('input, select, textarea')) {
         // A keyboard can shrink the visual viewport after focus; keep the field in the sheet's scroll area.
@@ -94,23 +99,25 @@ export function Sheet({
       document.removeEventListener('focusin', onFocus)
       document.body.style.overflow = prev
       window.clearTimeout(t)
-      if (trigger?.isConnected) trigger.focus()
+      // Hand the focus back to the opener unless the person already moved it somewhere else on the page.
+      const active = document.activeElement
+      if (trigger?.isConnected && (!active || active === document.body || !active.isConnected)) trigger.focus()
     }
   }, [open])
   if (!open) return null
   return createPortal(
     <div
-      className="fixed inset-x-0 z-50 flex items-end justify-center sm:items-center sm:p-6"
+      className={`fixed inset-x-0 z-50 flex items-end justify-center sm:items-center sm:p-6 ${leaving ? 'pointer-events-none' : ''}`}
       style={{ top: viewport?.top ?? 0, height: viewport?.height ?? '100dvh' }}
     >
-      <div className="anim-fade absolute inset-0 bg-[rgb(8_12_16/0.5)]" onClick={onClose} />
+      <div className={`${leaving ? 'anim-fade-out' : 'anim-fade'} absolute inset-0 bg-[rgb(8_12_16/0.5)]`} onClick={onClose} />
       <div
         ref={ref}
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        className={`anim-sheet relative flex max-h-[92%] w-full flex-col rounded-t-3xl border border-line bg-surface shadow-pop outline-none sm:rounded-2xl ${
+        className={`${leaving ? 'anim-sheet-out' : 'anim-sheet'} relative flex max-h-[92%] w-full flex-col rounded-t-3xl border border-line bg-surface shadow-pop outline-none sm:rounded-2xl ${
           wide ? 'sm:max-w-2xl' : 'sm:max-w-lg'
         }`}
       >

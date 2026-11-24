@@ -168,6 +168,33 @@ describe('loadAdaptiveState + applyProposal', () => {
     expect(await applyProposal(r, again, 'accepted')).toBeNull()
   })
 
+  it('applies at most once per local date, even when two tabs race from the same state', async () => {
+    const [p, r] = await mkProfile('Perfil Uno', { mode: 'auto', phase: 'deficit', targetRatePctPerWeek: -0.5 })
+    await seedSteadyLoss(r)
+    await r.add('goals', goalRow(2000))
+    const s = await loadAdaptiveState(r, p, TODAY)
+    expect(s.proposal?.status).toBe('auto_apply')
+    const results = await Promise.all([applyProposal(r, s, 'auto'), applyProposal(r, s, 'auto'), applyProposal(r, s, 'accepted')])
+    expect(results.filter((g) => g !== null)).toHaveLength(1)
+    expect(await r.all('energyAdjustments')).toHaveLength(1)
+    const adaptiveGoals = (await r.all('goals')).filter((g) => g.adaptive)
+    expect(adaptiveGoals).toHaveLength(1)
+    expect(adaptiveGoals[0]!.kcal).toBe(2150)
+    // A later attempt from the old state the same day is also a no-op.
+    expect(await applyProposal(r, s, 'auto')).toBeNull()
+    expect(await r.all('energyAdjustments')).toHaveLength(1)
+  })
+
+  it('an adjustment already recorded for today (e.g. from another device) blocks a second one', async () => {
+    const [p, r] = await mkProfile('Perfil Uno', { mode: 'auto', phase: 'deficit', targetRatePctPerWeek: -0.5 })
+    await seedSteadyLoss(r)
+    await r.add('goals', goalRow(2000))
+    const s = await loadAdaptiveState(r, p, TODAY)
+    await r.add('energyAdjustments', { date: TODAY, fromKcal: 2000, toKcal: 2100, formulaTdee: null, observedTdee: null, blendedTdee: 2500, confidence: 'high', phase: 'deficit', ratePctPerWeek: -0.5, applied: 'auto', reason: 'otro dispositivo', goalId: 'x' })
+    expect(await applyProposal(r, s, 'auto')).toBeNull()
+    expect(await r.all('energyAdjustments')).toHaveLength(1)
+  })
+
   it('never changes a manual goal on its own and respects "off"', async () => {
     const [p, r] = await mkProfile('Perfil Uno', { mode: 'auto', phase: 'deficit', targetRatePctPerWeek: -0.5 })
     await seedSteadyLoss(r)

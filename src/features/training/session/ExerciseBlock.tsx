@@ -1,9 +1,11 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useRepo } from '../../../app/profile'
+import { useProfile, useRepo } from '../../../app/profile'
 import type { ExerciseSet, SessionExercise } from '../../../db/types'
 import { isWorkSet } from '../../../domain/setKind'
+import { plateInventory, DEFAULT_BAR } from '../../../domain/plates'
 import { formatNumber } from '../../../domain/units'
+import { warmupPlan } from '../../../domain/warmup'
 import { Icon } from '../../../ui/Icon'
 import { Menu, type MenuItem } from '../../../ui/Menu'
 import { useToast } from '../../../ui/Toast'
@@ -14,9 +16,10 @@ import { matchPreviousSets, previousSessionSets } from '../session'
 import { applyAndTouch } from '../sessionWork'
 import { formatDuration } from '../sets'
 import { useExerciseNoteDraft } from '../useSetDraft'
+import { addWarmupSteps, firstWorkWeight } from '../warmupSets'
 import { useSessionActions } from './actions'
 import { EFFORT_LABEL, FIELD_LABEL, gridTemplate, rowFields, type Effort } from './columns'
-import { exerciseProgress, lastTimeLine, targetLabel, workOrdinals } from './model'
+import { exerciseProgress, lastTimeLine, sessionE1rm, targetLabel, workOrdinals } from './model'
 import { useSaveGuard } from './saveGuard'
 import { progressionHint, progressionText, type ProgressionHint } from './progression'
 import { probeRender } from './renderProbe'
@@ -95,6 +98,9 @@ function OpenBlock({
   equipment,
 }: Pick<ExerciseBlockProps, 'session' | 'item' | 'sets' | 'index' | 'count' | 'collapsible' | 'effort' | 'prs' | 'aliases'> & { thumb: ReactNode; progress: { done: number; total: number }; equipment: string | null | undefined }) {
   const r = useRepo()
+  const profile = useProfile()
+  const toast = useToast()
+  const guard = useSaveGuard()
   const actions = useSessionActions()
   const t = item.trackingType
   const [noteOpen, setNoteOpen] = useState(false)
@@ -123,7 +129,21 @@ function OpenBlock({
   const hint = progressionHint({ tracking: t, targetReps: item.targetReps, equipment, previous: prevSets })
   const below = hint ? sets.filter((s) => !s.done && isWorkSet(s) && (s.weight == null || s.weight < hint.suggested)).map((s) => s.id) : []
 
+  const e1 = t === 'weight_reps' ? sessionE1rm(sets) : null
+
+  /** Warm-up ramp towards the first working weight (typed, or last time's); inserted before the work sets. */
+  const addWarmup = async () => {
+    const work = firstWorkWeight(sets) ?? firstWorkWeight(prevSets ?? [])
+    if (!work) return void toast.show({ message: 'Escribe el peso de la primera serie para calcular el calentamiento.' })
+    const training = profile.settings.training ?? {}
+    const steps = warmupPlan(work, equipment === 'barbell' ? (training.barKg ?? DEFAULT_BAR.kg) : null, plateInventory(training.plates))
+    if (!steps.length) return void toast.show({ message: 'Con ese peso no hace falta calentamiento aparte.' })
+    const out = await guard(addWarmupSteps(r, session, item, steps))
+    if (out?.count) toast.show({ message: out.count === 1 ? '1 serie de calentamiento' : `${out.count} series de calentamiento`, actionLabel: 'Deshacer', onAction: () => void guard(out.undo()) })
+  }
+
   const menu: MenuItem[] = [
+    ...(t === 'weight_reps' ? [{ label: 'Agregar calentamiento', icon: 'flame' as const, onSelect: () => void addWarmup() }] : []),
     { label: 'Historial y técnica', icon: 'chart', onSelect: () => actions.openDetail(item.exerciseId) },
     { label: 'Sustituir', icon: 'swap', onSelect: () => actions.substitute(item.exerciseId) },
     { label: 'Subir', icon: 'chevronUp', disabled: index === 0, onSelect: () => actions.move(item.exerciseId, -1) },
@@ -169,6 +189,11 @@ function OpenBlock({
       </div>
 
       <ContextRow context={context} first={!!prevSets && !context} hint={hint && below.length ? hint : null} sessionId={session.id} ids={below} />
+      {e1 !== null ? (
+        <p className="px-3 pb-0.5 text-label text-muted" data-testid="e1rm">
+          1RM est. <span className="num font-semibold text-ink">{formatNumber(e1, 1)} kg</span>
+        </p>
+      ) : null}
       {noteOpen || hasNote ? <MetaLine session={session} item={item} focusOnMount={noteOpen} onDone={() => setNoteOpen(false)} /> : null}
 
       <div className="px-1.5" role="table" aria-label={`Series de ${item.name}`}>

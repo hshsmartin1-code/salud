@@ -74,6 +74,10 @@ export interface TrainingSettings {
   keepAwake?: boolean
   /** V3.2 weekly plan (absent = no plan). */
   plan?: TrainingPlan
+  /** V4 plate calculator: bar weight in kg (absent = 20). */
+  barKg?: number
+  /** V4 plate calculator: pairs of each plate owned, by denomination in kg as text (absent = defaults, see domain/plates.ts). */
+  plates?: Record<string, number>
 }
 export type DashboardIndicator = 'weight' | 'steps' | 'sleep' | 'training' | 'water' | 'recovery' | 'habits' | 'pressure'
 export interface StoredAdaptiveSettings {

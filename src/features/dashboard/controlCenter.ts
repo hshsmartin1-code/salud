@@ -10,8 +10,9 @@
  * - Weight of a day: a hand-entered measurement wins; otherwise a Health Connect weigh-in.
  * - Active kcal are informational: never treated as total expenditure.
  */
-import type { ActivityLog, BodyMeasurement, HealthRecord, SleepLog } from '../../db/types'
+import type { ActivityLog, BodyMeasurement, DayMark, FoodLog, HealthRecord, ImportedDaily, SleepLog } from '../../db/types'
 import { addDays, dateRange } from '../../domain/dates'
+import { sumNutrients } from '../../domain/nutrients'
 
 export type Source = 'manual' | 'health-connect' | 'phase0'
 
@@ -115,6 +116,50 @@ export function trendWeight(points: DayValue[], alpha = 0.1): DayValue[] {
       prev = { date: p.date, v: t }
       return { ...p, value: t }
     })
+}
+
+export interface IntakeForStats {
+  /** One value per date; null = the day does not count (no logs, marked incomplete, or partial). */
+  values: (number | null)[]
+  /** Days with logs that were left out (marked incomplete, or partial and not confirmed complete). */
+  excluded: number
+}
+
+/**
+ * Daily intake of `nutrient` for weekly means and insights, counting ONLY complete days (the rule of the
+ * adaptive module, intakeExclusionReason): a day marked incomplete never counts; a day where some logged
+ * food lacks the nutrient (a partial total) counts only when the person confirmed it complete; days with no
+ * logs are null, never 0. A Phase 0 daily kcal total counts on days without logs (unless marked incomplete).
+ * Averaging incomplete days biases intake downwards.
+ */
+export function intakeForStats(dates: string[], logs: FoodLog[], imported: ImportedDaily[], marks: DayMark[], nutrient: 'kcal' | 'protein' = 'kcal'): IntakeForStats {
+  const byDay = new Map<string, FoodLog[]>()
+  for (const l of logs) byDay.set(l.date, [...(byDay.get(l.date) ?? []), l])
+  const mark = new Map(marks.map((m) => [m.date, m.complete]))
+  let excluded = 0
+  const values = dates.map((d) => {
+    const ls = byDay.get(d)
+    const complete = mark.get(d)
+    if (ls?.length) {
+      const { totals, partial } = sumNutrients(ls, [nutrient])
+      const v = totals[nutrient]
+      if (v === undefined) return null
+      if (complete === false || (partial.includes(nutrient) && complete !== true)) {
+        excluded++
+        return null
+      }
+      return v
+    }
+    if (nutrient !== 'kcal') return null
+    const imp = imported.find((x) => x.date === d && x.metric === 'kcal_intake' && !x.excludeFromStats && x.value !== null)
+    if (!imp) return null
+    if (complete === false) {
+      excluded++
+      return null
+    }
+    return imp.value
+  })
+  return { values, excluded }
 }
 
 /** Evenly spaced series for `dates` (null where no value). */

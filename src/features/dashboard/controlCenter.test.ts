@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ActivityLog, BodyMeasurement, HealthRecord, SleepLog } from '../../db/types'
-import { activeKcalByDay, buildAlerts, compare, seriesFor, sleepByDay, sourcesLabel, stepsByDay, trendWeight, weekWindows, weightByDay } from './controlCenter'
+import type { ActivityLog, BodyMeasurement, DayMark, FoodLog, HealthRecord, ImportedDaily, SleepLog } from '../../db/types'
+import { activeKcalByDay, buildAlerts, compare, intakeForStats, seriesFor, sleepByDay, sourcesLabel, stepsByDay, trendWeight, weekWindows, weightByDay } from './controlCenter'
 
 // Synthetic data only.
 const base = { profileId: 'p', createdAt: '', updatedAt: '' }
@@ -140,5 +140,37 @@ describe('the latest weight of a day (Salud, Hoy and the "+" sheet all read weig
   })
   it('a row without time of day is the earliest of its day', () => {
     expect(latest([m('a', null, 70, '2026-11-16T20:00:00Z'), m('b', '06:00', 71, '2026-11-16T11:00:00Z')])).toBe(71)
+  })
+})
+
+describe('intakeForStats: weekly means count complete days only', () => {
+  // null = the food has no value for that nutrient (unknown, never 0).
+  const food = (date: string, kcal: number | null, protein: number | null = 20): FoodLog =>
+    ({ ...base, id: `f-${date}-${kcal}-${Math.random()}`, date, meal: 'almuerzo', foodRef: 'user:x', name: 'Comida', source: 'user', qty: 1, unit: 'portion', grams: null, ml: null, nutrients: { ...(kcal === null ? {} : { kcal }), ...(protein === null ? {} : { protein }) }, missing: [] }) as FoodLog
+  const mark = (date: string, complete: boolean): DayMark => ({ ...base, id: `m-${date}`, date, complete })
+  const imp = (date: string, value: number): ImportedDaily => ({ ...base, id: `i-${date}`, date, metric: 'kcal_intake', value, unit: 'kcal' }) as ImportedDaily
+  const dates = ['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15']
+  it('leaves out days marked incomplete, partial days not confirmed, and days without logs', () => {
+    const logs = [
+      food('2026-11-09', 2000),
+      food('2026-11-10', 800), // marked incomplete below
+      food('2026-11-11', 1500),
+      food('2026-11-11', null), // a food without kcal: partial
+      food('2026-11-12', 1700),
+      food('2026-11-12', null), // partial but confirmed complete
+      food('2026-11-14', 2200),
+    ]
+    const marks = [mark('2026-11-10', false), mark('2026-11-12', true)]
+    const r = intakeForStats(dates, logs, [imp('2026-11-13', 2100), imp('2026-11-15', 1000)], [...marks, mark('2026-11-15', false)])
+    expect(r.values).toEqual([2000, null, null, 1700, 2100, 2200, null])
+    expect(r.excluded).toBe(3) // 10 (incomplete), 11 (partial), 15 (Phase 0 total of an incomplete day)
+    // The weekly mean is no longer pulled down by the incomplete 800-kcal day.
+    expect(compare(r.values, r.values).current.mean).toBe((2000 + 1700 + 2100 + 2200) / 4)
+  })
+  it('protein uses the same rule and never Phase 0 kcal totals', () => {
+    const logs = [food('2026-11-09', 2000, 100), food('2026-11-10', 2000, null), food('2026-11-10', 300, 30), food('2026-11-11', 1800, 90)]
+    const r = intakeForStats(dates, logs, [imp('2026-11-13', 2100)], [mark('2026-11-11', false)], 'protein')
+    expect(r.values).toEqual([100, null, null, null, null, null, null])
+    expect(r.excluded).toBe(2)
   })
 })

@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useRepo } from '../../app/profile'
 import { pickGoalForDate } from '../../db/queries'
-import type { BodyMeasurement, FoodLog, Goal, ImportedDaily } from '../../db/types'
+import type { BodyMeasurement, DayMark, FoodLog, Goal, ImportedDaily } from '../../db/types'
 import { addDays, dateRange } from '../../domain/dates'
 import { sumNutrients } from '../../domain/nutrients'
 import { byMoment } from './controlCenter'
@@ -18,9 +18,16 @@ export interface DayIntake {
   source: 'app' | 'imported'
   target: number | null
   proteinTarget: number | null
+  /** Day mark: true = confirmed complete, false = marked incomplete, null = unknown. */
+  complete: boolean | null
 }
 
-export function dailyIntake(logs: FoodLog[], imported: ImportedDaily[], goals: Goal[], from: string, to: string): DayIntake[] {
+/** Whether a day counts for a mean: not marked incomplete, and a partial total only when confirmed complete. */
+export const countsForMean = (d: Pick<DayIntake, 'kcal' | 'partial' | 'complete'>): boolean =>
+  d.kcal !== null && d.complete !== false && (!d.partial || d.complete === true)
+
+export function dailyIntake(logs: FoodLog[], imported: ImportedDaily[], goals: Goal[], from: string, to: string, marks: DayMark[] = []): DayIntake[] {
+  const mark = new Map(marks.map((m) => [m.date, m.complete]))
   const byDay = new Map<string, FoodLog[]>()
   for (const l of logs) byDay.set(l.date, [...(byDay.get(l.date) ?? []), l])
   const imp = new Map(imported.filter((d) => d.metric === 'kcal_intake' && d.value !== null && !d.excludeFromStats).map((d) => [d.date, d.value as number]))
@@ -30,9 +37,9 @@ export function dailyIntake(logs: FoodLog[], imported: ImportedDaily[], goals: G
     const ls = byDay.get(date)
     if (ls && ls.length) {
       const { totals, partial } = sumNutrients(ls)
-      out.push({ date, kcal: totals.kcal ?? null, protein: totals.protein ?? null, carbs: totals.carbs ?? null, fat: totals.fat ?? null, partial: partial.includes('kcal'), source: 'app', target: goal?.kcal ?? null, proteinTarget: goal?.protein ?? null })
+      out.push({ date, kcal: totals.kcal ?? null, protein: totals.protein ?? null, carbs: totals.carbs ?? null, fat: totals.fat ?? null, partial: partial.includes('kcal'), source: 'app', target: goal?.kcal ?? null, proteinTarget: goal?.protein ?? null, complete: mark.get(date) ?? null })
     } else if (imp.has(date)) {
-      out.push({ date, kcal: imp.get(date)!, protein: null, carbs: null, fat: null, partial: false, source: 'imported', target: goal?.kcal ?? null, proteinTarget: goal?.protein ?? null })
+      out.push({ date, kcal: imp.get(date)!, protein: null, carbs: null, fat: null, partial: false, source: 'imported', target: goal?.kcal ?? null, proteinTarget: goal?.protein ?? null, complete: mark.get(date) ?? null })
     }
   }
   return out
@@ -73,7 +80,7 @@ export function useRangeStats(days: number, to: string): RangeStats | undefined 
   const r = useRepo()
   return useLiveQuery(async () => {
     const from = addDays(to, -(days - 1))
-    const [logs, imported, goals, sessions, sets, body, sleep, acts] = await Promise.all([
+    const [logs, imported, goals, sessions, sets, body, sleep, acts, marks] = await Promise.all([
       r.range('foodLogs', from, to),
       r.range('importedDaily', from, to),
       r.all('goals'),
@@ -82,10 +89,12 @@ export function useRangeStats(days: number, to: string): RangeStats | undefined 
       r.range('bodyMeasurements', from, to),
       r.range('sleepLogs', from, to),
       r.range('activityLogs', from, to),
+      r.range('dayMarks', from, to),
     ])
-    const intake = dailyIntake(logs, imported, goals, from, to)
-    const kcalDays = intake.filter((d) => d.kcal !== null)
-    const protDays = intake.filter((d) => d.protein !== null)
+    const intake = dailyIntake(logs, imported, goals, from, to, marks)
+    // Means use complete days only (incomplete or unconfirmed partial days bias intake downwards).
+    const kcalDays = intake.filter(countsForMean)
+    const protDays = intake.filter((d) => d.protein !== null && d.complete !== false)
     const targetDays = kcalDays.filter((d) => d.target !== null)
     const onTarget = targetDays.filter((d) => Math.abs((d.kcal as number) - (d.target as number)) <= (d.target as number) * 0.1)
     const ws = weightSeries(body)

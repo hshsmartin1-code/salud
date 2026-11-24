@@ -5,8 +5,19 @@ import type { Profile } from './types'
 
 export type NewProfile = Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>
 
+/**
+ * A profile row from an old/hand-edited backup or a partial sync may lack `settings` (the backup schema
+ * only requires id, name and sex). Code reads `profile.settings.*`, so every profile that enters the app
+ * (backup import, listing) goes through here.
+ */
+export function normalizeProfile<P extends Pick<Profile, 'settings'>>(p: P): P {
+  const s = (p as { settings?: unknown }).settings
+  if (s && typeof s === 'object' && !Array.isArray(s)) return p
+  return { ...p, settings: { addActivityKcal: false } }
+}
+
 export async function listProfiles(database: SaludDB = defaultDb): Promise<Profile[]> {
-  const all = await database.profiles.toArray()
+  const all = (await database.profiles.toArray()).map(normalizeProfile)
   return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 

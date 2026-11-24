@@ -88,6 +88,13 @@ export function localInstant(date: string, time: string): number {
 /**
  * One-shot reminders for the next `days` days (today included): only future instants, only training days not
  * yet done. Empty when the reminder is off or its time is malformed. `now` is the real clock.
+ *
+ * Time zones (deliberate, see reminderTimezone.test.ts): the app's CALENDAR is Bogota (`APP_TZ`: plan days, done
+ * days and "today" are Bogota dates), but a reminder is a wall-clock alarm ("07:00") that must ring at 07:00 on the
+ * device the person is holding. So the window starts at the DEVICE's calendar day and each instant is the device-local
+ * `date HH:MM`. This never drops a reminder: any date before the device's today has its device-local HH:MM already
+ * in the past, so the window starting there covers every instant that can still be in the future, whatever the offset
+ * between the device and Bogota. The plan weekday of a date is zone-free (it only reads the date string).
  */
 export function remindersFor(plan: TrainingPlan | null | undefined, now: Date | number, done: DoneDates, days = 28): { date: string; atMs: number; routineId: ID | null }[] {
   const p = sanitizePlan(plan)

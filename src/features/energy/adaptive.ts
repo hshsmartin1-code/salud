@@ -26,6 +26,7 @@ import { activeKcalByDay, sourcesLabel } from '../dashboard/controlCenter'
 import { ACTIVITY_LEVELS, ageFromBirthDate, mifflinStJeor } from '../../domain/energy'
 import { sumNutrients } from '../../domain/nutrients'
 import { formatNumber } from '../../domain/units'
+import { dedupeDayMarks } from '../../domain/dayRecords'
 
 export interface FormulaEstimate {
   bmr: number
@@ -82,7 +83,7 @@ export function observedHistory(args: { intake: IntakeDay[]; weights: WeighIn[];
 export function buildIntakeDays(logs: FoodLog[], imported: ImportedDaily[], marks: DayMark[]): IntakeDay[] {
   const byDay = new Map<string, FoodLog[]>()
   for (const l of logs) byDay.set(l.date, [...(byDay.get(l.date) ?? []), l])
-  const mark = new Map(marks.map((m) => [m.date, m.complete]))
+  const mark = new Map(dedupeDayMarks(marks).map((m) => [m.date, m.complete]))
   const out = new Map<string, IntakeDay>()
   for (const [date, ls] of byDay) {
     const { totals, partial } = sumNutrients(ls)
@@ -204,6 +205,24 @@ export function useAdaptiveEnergy(today = todayLocal()): AdaptiveState | undefin
  * Protein and fat grams stay as they were; the change goes to carbohydrates (4 kcal/g).
  */
 export async function applyProposal(r: Repo, s: AdaptiveState, applied: 'auto' | 'accepted'): Promise<Goal | null> {
+  const { goal, proposal, today } = s
+  if (!goal || !proposal) return null
+  if (!toAdjustmentRecord(proposal, today, applied)) return null
+  // Idempotent per local date: the check and both writes share ONE transaction, and the rows have ids
+  // derived from (profile, date). Two tabs (or two synced devices) racing on the same day produce the
+  // same rows, never a second adjustment; a stale state (the goal changed meanwhile) applies nothing.
+  return r.db.transaction('rw', r.db.goals, r.db.energyAdjustments, async () => {
+    if ((await r.onDate('energyAdjustments', today)).length > 0) return null
+    const current = pickGoalForDate(await r.all('goals'), today)
+    if (!current || current.id !== goal.id) return null
+    return writeAdjustment(r, s, applied)
+  })
+}
+
+export const adaptiveAdjustmentId = (profileId: string, date: string) => `${profileId}|adaptive-adjustment:${date}`
+export const adaptiveGoalId = (profileId: string, date: string) => `${profileId}|adaptive-goal:${date}`
+
+async function writeAdjustment(r: Repo, s: AdaptiveState, applied: 'auto' | 'accepted'): Promise<Goal | null> {
   const { goal, proposal, observed, formula, settings, today } = s
   if (!goal || !proposal) return null
   const rec = toAdjustmentRecord(proposal, today, applied)
@@ -224,8 +243,9 @@ export async function applyProposal(r: Repo, s: AdaptiveState, applied: 'auto' |
   void _u
   void _o
   void _s
-  const newGoal = await r.add('goals', {
+  const newGoal = await r.put('goals', {
     ...rest,
+    id: adaptiveGoalId(r.profileId, today),
     origin: 'app',
     validFrom: today,
     kcal: rec.toKcal,
@@ -234,7 +254,8 @@ export async function applyProposal(r: Repo, s: AdaptiveState, applied: 'auto' |
     methodText: `${head}\n\n${goal.methodText}`,
     warnings: goal.warnings.filter((w) => !w.startsWith('Ajuste adaptativo')),
   })
-  await r.add('energyAdjustments', {
+  await r.put('energyAdjustments', {
+    id: adaptiveAdjustmentId(r.profileId, today),
     date: today,
     fromKcal: rec.fromKcal,
     toKcal: rec.toKcal,

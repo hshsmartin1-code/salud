@@ -10,6 +10,7 @@ import { useIdeasHidden } from './prefs'
 import { useMealSlots } from './useMealSlots'
 import type { DayNutrition } from './useDayNutrition'
 import { useRecentLogs } from './useQuickLog'
+import { dayMarkOf } from '../../domain/dayRecords'
 
 /** The one line a diary with no habits yet shows instead of ideas. Never a card. */
 export const IDEAS_NEED_HISTORY = 'Cuando registres tus comidas, aparecerán aquí tus alimentos habituales.'
@@ -25,7 +26,7 @@ export const NEAR_EMPTY_DAY_LOGS = 2
 export function useFoodIdeas(date: string, meal: MealKey, day: DayNutrition | undefined): IdeasResult | undefined {
   const r = useRepo()
   const history = useRecentLogs(date, IDEAS_HISTORY_DAYS)
-  const complete = useLiveQuery(async () => (await r.onDate('dayMarks', date)).some((m) => m.complete), [r, date])
+  const complete = useLiveQuery(async () => dayMarkOf(await r.onDate('dayMarks', date))?.complete === true, [r, date])
   return useMemo(() => {
     if (!day || !history || complete === undefined) return undefined
     const g = day.goal

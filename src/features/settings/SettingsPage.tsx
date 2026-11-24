@@ -194,8 +194,8 @@ export function SettingsPage() {
               propios; las regiones del dorsal ancho y del recto abdominal se aproximan desde la superficie corporal porque el conjunto no las incluye.
             </Source>
             <Source title="Reconocimiento de texto (OCR): Tesseract.js" href="https://github.com/naptha/tesseract.js">
-              Tesseract.js y tesseract.js-core (Apache 2.0) con el modelo de español «best_int» de tessdata (Apache 2.0), incluidos en la app. Las fotos de
-              etiquetas se procesan solo en este dispositivo.
+              El código de Tesseract.js (Apache 2.0) está en la app, pero el reconocimiento de texto en fotos de etiquetas está desactivado y sus archivos
+              (motor y modelo de español «best_int» de tessdata, Apache 2.0) no se incluyen. Las etiquetas se registran escribiendo los valores a mano.
             </Source>
             <Source title="Tipografía: Archivo" href="https://github.com/Omnibus-Type/Archivo">
               Copyright 2020 The Archivo Project Authors. SIL Open Font License 1.1, incluida en la app mediante @fontsource-variable/archivo.

@@ -94,7 +94,8 @@ Cuotas diarias de Cloud Firestore en Spark (sin tarjeta): 1 GiB almacenado, 50 0
 |---|---|
 | Sincronización sin cambios | 2 lecturas: metadatos y una consulta vacía (Firestore cobra 1 lectura por consulta sin resultados) |
 | Cada cambio local | 1 escritura (subida en lotes de hasta 200) |
-| Ventana de solape | Se releen los documentos escritos en los últimos 5 minutos (idempotente) |
+| Ventana de solape | Mientras el último cambio visto tenga menos de 90 s, cada sincronización relee los documentos escritos en los 90 s anteriores a él (por si un cambio se hace visible con una hora del servidor algo anterior; releer no aplica nada dos veces). La primera sincronización pasados 90 s (reloj del dispositivo) la relee una última vez; después se lee solo lo posterior al último documento visto |
+| Primera descarga o relectura completa de N filas | N lecturas (cada documento se lee una sola vez, aunque un lote de 200 quede repartido entre dos páginas) |
 | Verificar o vincular | 25 consultas de conteo: unas 25 lecturas |
 | Primera subida de un historial de N filas | N escrituras |
 

@@ -112,6 +112,31 @@ describe('computeBodyComp', () => {
     expect(dw.warnings.length).toBeGreaterThan(0);
   });
 
+  it('Jackson & Pollock validation ranges by sex: men 18–61 (JP 1978), women 18–55 (JPW 1980)', () => {
+    const f = (sex: 'male' | 'female', ageYears: number) =>
+      computeBodyComp({ protocol: 'jp7', sex, ageYears, skinfolds: sf(jp7Sites, 15) });
+    const out = /fuera del rango de validación/;
+    // Men: 61 inside, 62 outside; the estimate is still shown.
+    expect(f('male', 61).warnings.some((w) => out.test(w))).toBe(false);
+    expect(f('male', 62).warnings.some((w) => out.test(w))).toBe(true);
+    expect(f('male', 62).bodyFatPct).toBeDefined();
+    // Women: 55 inside, 56 outside (the old shared 18–61 range let 56–61 pass silently).
+    expect(f('female', 55).warnings.some((w) => out.test(w))).toBe(false);
+    const w56 = f('female', 56);
+    expect(w56.warnings.some((w) => out.test(w) && /mujeres de 18 a 55/.test(w))).toBe(true);
+    expect(w56.bodyFatPct).toBeDefined();
+    expect(f('female', 17).warnings.some((w) => out.test(w))).toBe(true);
+    // Inside the range, women over 40: the authors' caution, not an out-of-range note.
+    const w45 = f('female', 45);
+    expect(w45.warnings.some((w) => out.test(w))).toBe(false);
+    expect(w45.warnings.some((w) => /mayores de 40/.test(w))).toBe(true);
+    expect(f('female', 30).warnings).toEqual([]);
+    // Protocol notes state the ranges per sex.
+    expect(PROTOCOLS.find((p) => p.id === 'jp3_female')!.note).toMatch(/18 a 55/);
+    expect(PROTOCOLS.find((p) => p.id === 'jp3_male')!.note).toMatch(/18 a 61/);
+    expect(PROTOCOLS.find((p) => p.id === 'jp7')!.note).toMatch(/hombres de 18 a 61.*mujeres de 18 a 55/);
+  });
+
   it('missing sites: no estimate, sum null', () => {
     const r = computeBodyComp({ protocol: 'jp7', sex: 'male', ageYears: 30, skinfolds: { chest: 10, triceps: 10 } });
     expect(r.sum).toBeNull();

@@ -122,7 +122,14 @@ export function NutritionPage() {
           <div className="mb-3 flex justify-center lg:justify-start">
             <DateNav date={date} onChange={setDate} />
           </div>
-          {day ? <div key={date} className={slide}><DaySummary day={day} /></div> : <div className="h-48 rounded-2xl bg-surface2/40" aria-hidden />}
+          {day ? (
+            <div key={date} className={slide}>
+              <DaySummary day={day} />
+              <Link to={`/comida/nutrientes${dq}`} className="btn-ghost -ml-3 mt-1 px-3 text-label" data-testid="nutrients-link">
+                <Icon name="chart" size={16} /> Nutrientes
+              </Link>
+            </div>
+          ) : <div className="h-48 rounded-2xl bg-surface2/40" aria-hidden />}
           {desktop ? dayMark : null}
         </StickyColumn>
 

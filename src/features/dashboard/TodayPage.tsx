@@ -34,6 +34,7 @@ import { DueCard, TrainingRow } from './TrainingNow'
 import { slotPosition, trainingSlot } from './trainingSlot'
 import { WeeklySummary } from './WeeklySummary'
 import { buildInsights } from './insights'
+import { calorieTarget } from '../nutrition/calorieTarget'
 import { habitValueOn } from '../../domain/dayRecords'
 import {
   activeKcalByDay,
@@ -160,6 +161,7 @@ export function TodayPage() {
   const stepsToday = steps7[6]!
   const stepGoal = profile.settings.stepGoal ?? null
   const kcalAct = activeKcalByDay(data.acts, data.health, [today])[0]!
+  const todayTarget = calorieTarget(goal?.kcal, profile.settings.addActivityKcal, kcalAct.value)
 
   // ── Weight (60 days) ──
   const weights = weightByDay(data.body, data.health)
@@ -257,7 +259,7 @@ export function TodayPage() {
 
   const footnote =
     `Comida: tu diario de hoy${todayLogs.length ? '' : ' (nada registrado aún)'}. Pasos: ${stepsToday.source ? sourcesLabel([stepsToday]) : 'sin datos hoy'}.` +
-    (kcalAct.value !== null ? ` Actividad ${formatNumber(kcalAct.value, 0)} kcal activas (informativo, no es tu gasto total).` : '') +
+    (kcalAct.value !== null ? ` Actividad ${formatNumber(kcalAct.value, 0)} kcal activas (${todayTarget.added > 0 ? 'sumadas a tu objetivo de hoy' : 'informativo, no es tu gasto total'}).` : '') +
     (!goal ? ' Define tus objetivos en Perfil.' : '')
 
   const weeklyHasData =
@@ -381,7 +383,7 @@ export function TodayPage() {
   ) : (
     <DaySummary
       kcal={kcal}
-      kcalTarget={goal?.kcal ?? null}
+      kcalTarget={todayTarget.target}
       protein={protein}
       proteinTarget={goal?.protein ?? null}
       steps={stepsToday.value}

@@ -26,6 +26,7 @@ import { activeKcalByDay, sourcesLabel } from '../dashboard/controlCenter'
 import { ACTIVITY_LEVELS, ageFromBirthDate, mifflinStJeor } from '../../domain/energy'
 import { sumNutrients } from '../../domain/nutrients'
 import { formatNumber } from '../../domain/units'
+import { dedupeDayMarks } from '../../domain/dayRecords'
 
 export interface FormulaEstimate {
   bmr: number
@@ -82,7 +83,7 @@ export function observedHistory(args: { intake: IntakeDay[]; weights: WeighIn[];
 export function buildIntakeDays(logs: FoodLog[], imported: ImportedDaily[], marks: DayMark[]): IntakeDay[] {
   const byDay = new Map<string, FoodLog[]>()
   for (const l of logs) byDay.set(l.date, [...(byDay.get(l.date) ?? []), l])
-  const mark = new Map(marks.map((m) => [m.date, m.complete]))
+  const mark = new Map(dedupeDayMarks(marks).map((m) => [m.date, m.complete]))
   const out = new Map<string, IntakeDay>()
   for (const [date, ls] of byDay) {
     const { totals, partial } = sumNutrients(ls)

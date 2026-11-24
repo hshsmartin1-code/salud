@@ -30,6 +30,8 @@ import { useDayNutrition } from './useDayNutrition'
 import { useDesktop } from './useDesktop'
 import { useFoods } from './useFoods'
 import { useQuickLog, useRecentLogs } from './useQuickLog'
+import { setDayMark } from '../../db/dayRecords'
+import { dayMarkOf } from '../../domain/dayRecords'
 
 export function NutritionPage() {
   const slots = useMealSlots()
@@ -488,17 +490,11 @@ function ApplyTemplateSheet({ meal, onClose, onManage, onApply }: { meal: MealKe
  */
 function DayCompleteMark({ date, className = '' }: { date: string; className?: string }) {
   const r = useRepo()
-  const mark = useLiveQuery(async () => (await r.onDate('dayMarks', date))[0] ?? null, [r, date])
+  const mark = useLiveQuery(async () => dayMarkOf(await r.onDate('dayMarks', date)), [r, date])
   if (mark === undefined) return null
   const value: 'none' | 'complete' | 'incomplete' = mark === null ? 'none' : mark.complete ? 'complete' : 'incomplete'
   async function set(v: 'none' | 'complete' | 'incomplete') {
-    const rows = await r.onDate('dayMarks', date)
-    if (v === 'none') {
-      for (const row of rows) await r.remove('dayMarks', row.id)
-      return
-    }
-    if (rows[0]) await r.update('dayMarks', rows[0].id, { complete: v === 'complete' })
-    else await r.add('dayMarks', { date, complete: v === 'complete' })
+    await setDayMark(r, date, v)
   }
   const opts = [
     { v: 'complete', l: 'Completo' },

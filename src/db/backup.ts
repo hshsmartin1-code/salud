@@ -15,6 +15,7 @@ import { isCalendarDate, todayLocal } from '../domain/dates'
 import { validHouseholdPortion } from '../domain/portions'
 import { db as defaultDb, SCHEMA_VERSION, type SaludDB } from './schema'
 import { DATED_TABLES, MEDIA_TABLES, PERSONAL_TABLES, type PersonalTable } from './tables'
+import { normalizeProfile } from './profiles'
 import type { Profile } from './types'
 
 export const BACKUP_FORMAT = 'pho-backup'
@@ -119,6 +120,7 @@ export function parseBackup(text: string): Backup {
     if (dup) problems.push(`La tabla ${t} repite ${dup} identificadores.`)
   }
   if (problems.length) throw new Error('El respaldo no es coherente y no se importó: ' + problems.slice(0, 4).join(' '))
+  b.profiles = b.profiles.map(normalizeProfile)
   return migrateBackup(b)
 }
 

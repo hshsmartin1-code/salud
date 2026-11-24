@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes, useLocation } from 'react-router-dom'
 import { ProfileProvider, useProfiles } from './app/profile'
 import { UpdatePrompt } from './app/UpdatePrompt'
 import { HealthReporter } from './features/updates/HealthReporter'
@@ -17,6 +17,7 @@ import { AdaptiveAutoRunner } from './features/energy/AdaptiveAutoRunner'
 import { TrainingReminderCleanup, TrainingReminderSync } from './features/training/plan/TrainingReminderSync'
 import { EmptyState, ListRow, PageHeader } from './ui/kit'
 import { STORAGE_NOTE_SHORT } from './sync/copy'
+import { ErrorBoundary } from './ui/ErrorBoundary'
 
 // Charts (Recharts) load on demand so the first screen stays light.
 const TrainingHome = lazy(() => import('./features/training/home/TrainingHome').then((m) => ({ default: m.TrainingHome })))
@@ -95,6 +96,7 @@ function MorePage() {
 
 function Gate() {
   const { profiles, active } = useProfiles()
+  const { pathname } = useLocation()
   // First run: keep the onboarding flow mounted until the person finishes it (goals, second profile).
   const [firstRun, setFirstRun] = useState<boolean | null>(null)
   useEffect(() => {
@@ -107,18 +109,20 @@ function Gate() {
   if (profiles === undefined || firstRun === null) return <div className="min-h-dvh bg-bg" />
   if (firstRun || !active)
     return (
-      <Suspense fallback={loadingPage}>{!firstRun ? <TrainingReminderCleanup /> : null}<Routes>
-        <Route path="/respaldo" element={<BackupPage />} />
-        <Route path="*" element={<Onboarding onFinish={() => setFirstRun(false)} />} />
-      </Routes></Suspense>
+      <ErrorBoundary scope="route" resetKey={pathname}>
+        <Suspense fallback={loadingPage}>{!firstRun ? <TrainingReminderCleanup /> : null}<Routes>
+          <Route path="/respaldo" element={<BackupPage />} />
+          <Route path="*" element={<Onboarding onFinish={() => setFirstRun(false)} />} />
+        </Routes></Suspense>
+      </ErrorBoundary>
     )
   return (
     <AppShell header={<ProfileSwitcher />}>
       <ToastProfileGuard profileId={active.id} />
       <UpdateBanner />
-      {active.settings.adaptive?.mode === 'auto' ? <AdaptiveAutoRunner key={`adaptive-${active.id}`} /> : null}
+      {active.settings?.adaptive?.mode === 'auto' ? <AdaptiveAutoRunner key={`adaptive-${active.id}`} /> : null}
       <TrainingReminderSync key={`reminders-${active.id}`} />
-      <Suspense key={active.id} fallback={loadingPage}><Routes key={active.id}>
+      <ErrorBoundary scope="route" resetKey={`${active.id}|${pathname}`}><Suspense key={active.id} fallback={loadingPage}><Routes key={active.id}>
         <Route path="/" element={<TodayPage />} />
         <Route path="/perfil" element={<ProfilePage />} />
         <Route path="/perfiles/nuevo" element={<Onboarding embedded />} />
@@ -170,7 +174,7 @@ function Gate() {
         />
         <Route path="/mas" element={<MorePage />} />
         <Route path="*" element={<NotFound />} />
-      </Routes></Suspense>
+      </Routes></Suspense></ErrorBoundary>
     </AppShell>
   )
 }
@@ -178,6 +182,7 @@ function Gate() {
 export default function App() {
   useTheme()
   return (
+    <ErrorBoundary scope="app">
     <UiProviders>
       <ProfileProvider>
         <HealthReporter />
@@ -192,5 +197,6 @@ export default function App() {
         <UpdatePrompt />
       </ProfileProvider>
     </UiProviders>
+    </ErrorBoundary>
   )
 }

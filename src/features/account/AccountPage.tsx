@@ -234,14 +234,16 @@ function LinkWizard({ profile, account, onStart, onFinish }: { profile: Profile;
           confirmNameMismatch: sameName,
           skipDuplicates: skipDuplicates ? preview?.duplicates?.pairs : undefined,
         })
-        const skipped = r.skippedDuplicates ? `, ${r.skippedDuplicates} duplicados probables omitidos` : ''
+        const n = r.skippedDuplicates
+        const skipped = !n ? '' : n === 1 ? ' Se omitió 1 duplicado probable: cada lado conserva su copia.' : ` Se omitieron ${n} duplicados probables: cada lado conserva su copia.`
         setDone({
           ok: r.verify.ok,
-          detail: r.verify.ok
-            ? `Vinculado y verificado: ${r.sync.pushed} registros subidos, ${r.sync.applied} recibidos${skipped}.`
-            : r.verify.conflicts
-              ? `Vinculado. Hay ${r.verify.conflicts} registros distintos en ambos lados: revísalos abajo; no se sobrescribió nada.`
-              : 'Vinculado, pero la verificación aún no cuadra. Se completa sola en la próxima sincronización.',
+          detail:
+            (r.verify.ok
+              ? `Vinculado y verificado: ${r.sync.pushed} registros subidos, ${r.sync.applied} recibidos.`
+              : r.verify.conflicts
+                ? `Vinculado. Hay ${r.verify.conflicts} registros distintos en ambos lados: revísalos abajo; no se sobrescribió nada.`
+                : 'Vinculado, pero la verificación aún no cuadra. Se completa sola en la próxima sincronización.') + skipped,
         })
       } else {
         const r = await link.createProfileFromAccount(db, remote, account)
@@ -324,9 +326,6 @@ function LinkWizard({ profile, account, onStart, onFinish }: { profile: Profile;
               </span>
             </span>
           </label>
-          {strategy === 'merge' ? (
-            <LinkDuplicates summary={preview.duplicates} failed={preview.duplicatesFailed} skip={skipDuplicates} onSkip={setSkipDuplicates} />
-          ) : null}
           {remoteHasData ? (
             <label className="flex items-start gap-2.5 text-sm">
               <input type="radio" name="strategy" className="mt-1" checked={strategy === 'new-profile'} onChange={() => setStrategy('new-profile')} data-testid="strategy-new" />
@@ -335,6 +334,9 @@ function LinkWizard({ profile, account, onStart, onFinish }: { profile: Profile;
                 <span className="block text-xs text-muted">Crea otro perfil con los datos de la cuenta. «{profile.name}» queda igual y sin vincular.</span>
               </span>
             </label>
+          ) : null}
+          {strategy === 'merge' ? (
+            <LinkDuplicates summary={preview.duplicates} failed={preview.duplicatesFailed} skip={skipDuplicates} onSkip={setSkipDuplicates} />
           ) : null}
           <Notice>
             Recomendado: guarda un respaldo antes.{' '}

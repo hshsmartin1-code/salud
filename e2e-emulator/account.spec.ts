@@ -1,4 +1,4 @@
-import { ANA, BETO, expect, fillProfile, onboard, switchProfile, test } from '../e2e/helpers'
+import { ANA, BETO, expect, fillProfile, installClock, onboard, switchProfile, test } from '../e2e/helpers'
 import type { Page } from '@playwright/test'
 
 // Account linking end to end against the local Firebase emulators (fake Google identities,
@@ -80,4 +80,29 @@ test('links two local profiles to two accounts, refuses mixing, and restores on 
   await expect(page.getByTestId('sync-status')).toContainText('Sesión cerrada')
   await expect(page.getByText('Vuelve a iniciar sesión')).toBeVisible()
   await shot(page, '07-signed-out')
+})
+
+test('"Unir" on a second device that recorded the same weigh-in shows it as a probable duplicate and leaves it out', async ({ page, browser }) => {
+  // Device 1: Ana's profile (onboarding records today's weight) linked to a fresh account.
+  await onboard(page, ANA)
+  await page.goto('./#/cuenta')
+  await signIn(page, 'ana.dup@example.test')
+  await page.getByTestId('confirm-owner').check()
+  await page.getByTestId('link-run').click()
+  await expect(page.getByText(/Vinculado y verificado/)).toBeVisible({ timeout: 30_000 })
+
+  // Device 2: the same person onboarded separately (same weigh-in today, different ids) and joins.
+  const ctx = await browser.newContext({ locale: 'es-CO', timezoneId: 'America/Bogota', viewport: { width: 412, height: 915 } })
+  await installClock(ctx) // same "today" as device 1
+  const other = await ctx.newPage()
+  await onboard(other, ANA)
+  await other.goto('./#/cuenta')
+  await signIn(other, 'ana.dup@example.test')
+  await expect(other.getByTestId('link-duplicates')).toContainText('Posibles duplicados: 1 en mediciones')
+  await expect(other.getByTestId('skip-duplicates')).toBeChecked()
+  await shot(other, '08-duplicates')
+  await other.getByTestId('confirm-owner').check()
+  await other.getByTestId('link-run').click()
+  await expect(other.getByText(/Se omitió 1 duplicado probable/)).toBeVisible({ timeout: 30_000 })
+  await ctx.close()
 })

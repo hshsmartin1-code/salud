@@ -18,7 +18,7 @@ import { useDesktop } from './useDesktop'
 import { useFoods } from './useFoods'
 import { useMealSlots } from './useMealSlots'
 import { useOffSearch } from './useOffSearch'
-import { isFoodNarrative } from './foodText'
+import { isFoodNarrative } from './foodNarrative'
 
 type SourceFilter = 'all' | 'icbf' | 'usda' | 'off' | 'mine'
 type KindFilter = 'all' | 'raw' | 'cooked' | 'prepared'

@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { dayLabel, DateNav, useDateParam } from '../../app/useDate'
 import { useRepo } from '../../app/profile'
@@ -21,7 +21,6 @@ import { useMealSlots } from './useMealSlots'
 import { MacroLine } from './NutrientView'
 import { searchPath } from './paths'
 import { QuantitySheet } from './QuantitySheet'
-import { TextFoodSheet } from './TextFoodSheet'
 import { hasPendingNutrition } from './textFoodDraft'
 import { logSnapshots, type LogEntry } from './quickAdd'
 import { CopyMealSheet } from './CopyMealSheet'
@@ -32,6 +31,9 @@ import { useFoods } from './useFoods'
 import { useQuickLog, useRecentLogs } from './useQuickLog'
 import { setDayMark } from '../../db/dayRecords'
 import { dayMarkOf } from '../../domain/dayRecords'
+
+// The text/label parser (≈ 60 kB) only loads when the sheet opens.
+const TextFoodSheet = lazy(() => import('./TextFoodSheet').then((m) => ({ default: m.TextFoodSheet })))
 
 export function NutritionPage() {
   const slots = useMealSlots()
@@ -207,7 +209,7 @@ export function NutritionPage() {
           onCompleteNutrition={hasPendingNutrition(editing) ? () => { setCompleting(editing); setEditing(null) } : undefined}
         />
       ) : null}
-      {completing ? <TextFoodSheet startingText="" existing={completing} date={completing.date} meal={completing.meal} onClose={() => setCompleting(null)} /> : null}
+      {completing ? <Suspense fallback={null}><TextFoodSheet startingText="" existing={completing} date={completing.date} meal={completing.meal} onClose={() => setCompleting(null)} /></Suspense> : null}
 
       <SaveTemplateSheet meal={saveTpl} date={date} onClose={() => setSaveTpl(null)} />
       <CopyMealSheet meal={copyFor} date={date} onClose={() => setCopyFor(null)} onCopy={copyPrevious} />

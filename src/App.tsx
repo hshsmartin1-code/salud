@@ -9,11 +9,8 @@ import { ProfileSwitcher } from './features/profiles/ProfileSwitcher'
 import { NutritionPage } from './features/nutrition/NutritionPage'
 import { TodayPage } from './features/dashboard/TodayPage'
 import { requestPersistentStorage } from './db/schema'
-import { ExerciseLibraryPage } from './features/training/ExerciseLibrary'
-import { SessionPage } from './features/training/SessionPage'
 import { AppShell, MORE_GROUPS } from './ui/AppShell'
 import { ToastProfileGuard, UiProviders } from './ui/providers'
-import { AdaptiveAutoRunner } from './features/energy/AdaptiveAutoRunner'
 import { TrainingReminderCleanup, TrainingReminderSync } from './features/training/plan/TrainingReminderSync'
 import { EmptyState, ListRow, PageHeader } from './ui/kit'
 import { STORAGE_NOTE_SHORT } from './sync/copy'
@@ -26,6 +23,10 @@ const StatsPage = lazy(() => import('./features/training/stats/StatsPage').then(
 const RoutineLibrary = lazy(() => import('./features/training/routines/RoutineLibrary').then((m) => ({ default: m.RoutineLibrary })))
 const RoutineDetail = lazy(() => import('./features/training/routines/RoutineDetail').then((m) => ({ default: m.RoutineDetail })))
 const RoutineEditor = lazy(() => import('./features/training/routines/RoutineEditor').then((m) => ({ default: m.RoutineEditor })))
+// Only mounted for profiles in automatic energy mode; its engine (adaptiveEnergy) stays out of the entry chunk.
+const AdaptiveAutoRunner = lazy(() => import('./features/energy/AdaptiveAutoRunner').then((m) => ({ default: m.AdaptiveAutoRunner })))
+const ExerciseLibraryPage = lazy(() => import('./features/training/ExerciseLibrary').then((m) => ({ default: m.ExerciseLibraryPage })))
+const SessionPage = lazy(() => import('./features/training/SessionPage').then((m) => ({ default: m.SessionPage })))
 const ExerciseDetailPage = lazy(() => import('./features/training/ExerciseDetail').then((m) => ({ default: m.ExerciseDetailPage })))
 const Onboarding = lazy(() => import('./features/profiles/Onboarding').then((m) => ({ default: m.Onboarding })))
 const ProfilePage = lazy(() => import('./features/profiles/ProfilePage').then((m) => ({ default: m.ProfilePage })))
@@ -121,7 +122,7 @@ function Gate() {
     <AppShell header={<ProfileSwitcher />}>
       <ToastProfileGuard profileId={active.id} />
       <UpdateBanner />
-      {active.settings?.adaptive?.mode === 'auto' ? <AdaptiveAutoRunner key={`adaptive-${active.id}`} /> : null}
+      {active.settings?.adaptive?.mode === 'auto' ? <Suspense fallback={null}><AdaptiveAutoRunner key={`adaptive-${active.id}`} /></Suspense> : null}
       <TrainingReminderSync key={`reminders-${active.id}`} />
       <ErrorBoundary scope="route" resetKey={`${active.id}|${pathname}`}><Suspense key={active.id} fallback={loadingPage}><Routes key={active.id}>
         <Route path="/" element={<TodayPage />} />

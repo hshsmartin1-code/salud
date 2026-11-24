@@ -13,11 +13,15 @@ import { POSES, POSE_LABEL, formatBytes, processPhotoFile, type ProcessedPhoto }
 type Thumb = Omit<ProgressPhoto, 'dataUrl'>
 type PoseFilter = 'all' | PhotoPose
 
+const PAGE = 48
 const FILTERS: readonly { value: PoseFilter; label: string }[] = [{ value: 'all', label: 'Todas' }, ...POSES]
 
 export function PhotosPage() {
   const r = useRepo()
-  const rows = useLiveQuery(async () => (await r.all('progressPhotos')).map(({ dataUrl: _d, ...rest }): Thumb => rest), [r])
+  // Newest photos first, a page at a time: each row carries its full-size image, so loading all of them is the cost.
+  const [limit, setLimit] = useState(PAGE)
+  const rows = useLiveQuery(async () => (await r.latest('progressPhotos', limit)).map(({ dataUrl: _d, ...rest }): Thumb => rest), [r, limit])
+  const total = useLiveQuery(() => r.count('progressPhotos'), [r])
   const [filter, setFilter] = useState<PoseFilter>('all')
   const [adding, setAdding] = useState(false)
   const [viewId, setViewId] = useState<string | null>(null)
@@ -134,11 +138,16 @@ export function PhotosPage() {
                   </section>
                 ))}
               </div>
-            ) : (
+            ) : total != null && rows && total > rows.length ? null : (
               <EmptyState icon="image" title="Sin fotos con esta pose">
                 Cambia el filtro o toma una foto nueva con esta pose.
               </EmptyState>
             )}
+            {total != null && rows && total > rows.length ? (
+              <button className="btn-secondary w-full" onClick={() => setLimit((n) => n + PAGE)} data-testid="photos-more">
+                Mostrar más fotos ({rows.length} de {total})
+              </button>
+            ) : null}
           </>
         ) : null}
       </div>

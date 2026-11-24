@@ -9,7 +9,7 @@
 import type { TrackingType } from '../../db/catalogTypes'
 import type { ExerciseSet } from '../../db/types'
 import { addDays, daysBetween, isoWeekStart } from '../../domain/dates'
-import { e1rm } from '../../domain/training'
+import { E1RM_MAX_REPS, e1rm, e1rmApplies } from '../../domain/training'
 import type { Point, Series } from '../../ui/charts/types'
 
 export type ProgressSet = Pick<
@@ -245,7 +245,12 @@ function pickBest(sets: readonly ProgressSet[], score: (s: ProgressSet) => numbe
   return best
 }
 
-export function recordList(sets: readonly ProgressSet[]): RecordEntry[] {
+/**
+ * Personal records of one exercise. Body-weight exercises (`tracking` = 'bodyweight_reps') get no
+ * «1RM estimado»: their weight is only the added load, so an e1RM from it is not maximal strength
+ * (volume is counted the same way: added load × reps).
+ */
+export function recordList(sets: readonly ProgressSet[], tracking?: TrackingType): RecordEntry[] {
   const work = sets.filter(isWorkSet)
   const out: RecordEntry[] = []
   const add = (id: RecordId, label: string, unit: string, hit: { s: ProgressSet; v: number } | null) => {
@@ -254,7 +259,7 @@ export function recordList(sets: readonly ProgressSet[]): RecordEntry[] {
     out.push({ id, label, value: v, unit, date: s.date, sessionId: s.sessionId, set: { weight: s.weight, reps: s.reps, durationSec: s.durationSec, distanceM: s.distanceM } })
   }
   add('maxWeight', 'Peso máximo', 'kg', pickBest(work, (s) => s.weight))
-  add('e1rm', '1RM estimado', 'kg', pickBest(work, (s) => (s.weight !== null && s.reps !== null ? e1rm(s.weight, s.reps) : null)))
+  if (e1rmApplies(tracking)) add('e1rm', '1RM estimado', 'kg', pickBest(work, (s) => (s.weight !== null && s.reps !== null ? e1rm(s.weight, s.reps) : null)))
   add('volumeSet', 'Serie de mayor volumen', 'kg', pickBest(work, (s) => (s.weight !== null && s.reps !== null ? s.weight * s.reps : null)))
   add('maxReps', 'Más repeticiones', 'reps', pickBest(work, (s) => s.reps))
   add('maxDuration', 'Mayor duración', 's', pickBest(work, (s) => s.durationSec))
@@ -296,4 +301,5 @@ export function repRecords(sets: readonly ProgressSet[]): RepRecord[] {
   return [...best.values()].sort((a, b) => a.reps - b.reps)
 }
 
-export const E1RM_NOTE = '1RM estimado (fórmula de Epley, válida de 1 a 15 repeticiones). No es una medición directa de fuerza máxima.'
+/** Reynolds, Gordon & Robergs 2006: linear 1RM equations only up to 10 reps (see E1RM_MAX_REPS). */
+export const E1RM_NOTE = `1RM estimado con la fórmula de Epley, solo en series de 1 a ${E1RM_MAX_REPS} repeticiones (por encima pierde precisión y no se calcula). Supone una serie al fallo o muy cerca; no es una medición directa de fuerza máxima.`

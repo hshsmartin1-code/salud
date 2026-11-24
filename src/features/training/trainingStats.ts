@@ -8,6 +8,7 @@
  * A set belongs to the week of its SESSION's date.
  */
 import type { ExerciseSet, Routine, TrainingSession } from '../../db/types'
+import type { TrackingType } from '../../db/catalogTypes'
 import { addDays, daysBetween, isoWeekStart } from '../../domain/dates'
 import { isWorkSet } from '../../domain/setKind'
 import { bestSet, e1rm, sessionVolume } from '../../domain/training'
@@ -169,12 +170,19 @@ export function workSetsPerGroup(p: Prepared, weekDate: string, catalog: Catalog
 
 const PR_ORDER: PRType[] = ['max_weight', 'max_e1rm', 'max_reps_at_weight', 'max_volume_set', 'max_duration', 'max_distance']
 
-/** Every set that set a record at the time it was done (setId → types). Warm-ups never do. */
+/**
+ * Every set that set a record at the time it was done (setId → types). Warm-ups never do. The tracking type
+ * of each exercise comes from the sessions that hold it (the most recent one wins), so body-weight
+ * exercises never get an e1RM record from their added load.
+ */
 export function allRecords(p: Prepared): Map<string, PRType[]> {
   const byExercise = new Map<string, ExerciseSet[]>()
   for (const list of p.setsBySession.values()) for (const s of list) byExercise.set(s.exerciseId, [...(byExercise.get(s.exerciseId) ?? []), s])
+  const tracking = new Map<string, TrackingType>()
+  // p.sessions is newest first: keep the first tracking type seen for each exercise.
+  for (const s of p.sessions) for (const o of s.exerciseOrder ?? []) if (!tracking.has(o.exerciseId) && o.trackingType) tracking.set(o.exerciseId, o.trackingType)
   const out = new Map<string, PRType[]>()
-  for (const sets of byExercise.values()) for (const [id, types] of prsBySet(sets)) out.set(id, types)
+  for (const [exerciseId, sets] of byExercise) for (const [id, types] of prsBySet(sets, tracking.get(exerciseId))) out.set(id, types)
   return out
 }
 

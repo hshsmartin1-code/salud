@@ -155,6 +155,15 @@ describe('records', () => {
     expect(headlineRecords(recs, 5)).toHaveLength(1)
     expect(headlineRecords(recs, 0)).toEqual([])
   })
+  it('a body-weight exercise never gets an e1RM record from its added load', () => {
+    const a = session('2026-11-02', { exerciseOrder: [{ exerciseId: 'pullup', name: 'Dominadas', trackingType: 'bodyweight_reps', restSec: 90 }] })
+    const b = session('2026-11-10', { exerciseOrder: [{ exerciseId: 'pullup', name: 'Dominadas', trackingType: 'bodyweight_reps', restSec: 90 }] })
+    const pull = { exerciseId: 'pullup', exerciseName: 'Dominadas' }
+    const p = prepareStats([a, b], [set(a.id, a.date, { ...pull, weight: 10, reps: 6, createdAt: '2026-11-02T10:00:00.000Z' }), set(b.id, b.date, { ...pull, weight: 15, reps: 8, createdAt: '2026-11-10T10:00:00.000Z' })])
+    const types = [...allRecords(p).values()].flat()
+    expect(types).toContain('max_weight')
+    expect(types).not.toContain('max_e1rm')
+  })
   it('counts the exercises that reached a record in each session', () => {
     const { p, recent, edge } = history()
     const c = recordCountBySession(p, allRecords(p))

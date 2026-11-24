@@ -320,7 +320,7 @@ function ProgressSection({ exercise, t, sets }: { exercise: Exercise; t: Trackin
   const periodLong = PERIOD_OPTIONS.find((o) => o.value === period)!.long
   const n = countInRange(series, from, to)
   const freq = useMemo(() => weeklyFrequency(points, from, to), [points, from, to])
-  const recs = useMemo(() => recordList(sets), [sets])
+  const recs = useMemo(() => recordList(sets, t), [sets, t])
   const bestVol = useMemo(() => bestVolumeSession(points), [points])
   const shown = ['maxWeight', 'e1rm', 'volumeSet', 'maxReps', 'maxDuration', 'maxDistance']
     .map((id) => recs.find((x) => x.id === id))
@@ -409,8 +409,9 @@ function setLabel(kind: SetKind, n: number): { text: string; cls: string } {
 function HistoryTab({ sets, t, sessionById, onLeave }: { sets: ExerciseSet[]; t: TrackingType; sessionById: Map<string, TrainingSession>; onLeave?: () => void }) {
   const [shown, setShown] = useState(8)
   const sessions = useMemo(() => summarizeSessions(sets, t), [sets, t])
-  const prs = useMemo(() => prsBySet(sets), [sets])
-  const showE1rm = t === 'weight_reps' || t === 'bodyweight_reps'
+  const prs = useMemo(() => prsBySet(sets, t), [sets, t])
+  // Body-weight exercises: the stored weight is only the added load, so no e1RM (see e1rmApplies).
+  const showE1rm = t === 'weight_reps'
   return (
     <div className="space-y-4">
       <ul className="space-y-6" data-testid="exercise-history">
@@ -502,7 +503,7 @@ function HistoryTab({ sets, t, sessionById, onLeave }: { sets: ExerciseSet[]; t:
 
 // ───────────── Récords ─────────────
 function RecordsTab({ sets, t, sessionById, onLeave }: { sets: ExerciseSet[]; t: TrackingType; sessionById: Map<string, TrainingSession>; onLeave?: () => void }) {
-  const recs = useMemo(() => recordList(sets), [sets])
+  const recs = useMemo(() => recordList(sets, t), [sets, t])
   const points = useMemo(() => sessionPoints(sets), [sets])
   const bestVol = useMemo(() => bestVolumeSession(points), [points])
   const reps = useMemo(() => (t === 'weight_reps' ? repRecords(sets) : []), [sets, t])

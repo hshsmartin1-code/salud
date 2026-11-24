@@ -1,7 +1,7 @@
 import type { TrackingType } from '../../db/catalogTypes'
 import type { ExerciseSet } from '../../db/types'
 import { isWarmupSet } from '../../domain/setKind'
-import { detectPRs, e1rm, type PRType } from '../../domain/training'
+import { detectPRs, e1rm, e1rmApplies, type PRType } from '../../domain/training'
 import { formatNumber } from '../../domain/units'
 
 export const PR_LABEL: Record<PRType, string> = {
@@ -59,19 +59,25 @@ function before(s: ExerciseSet, h: ExerciseSet): boolean {
   return h.date < s.date || (h.date === s.date && h.createdAt < s.createdAt)
 }
 
-/** PRs for each completed set of one exercise, judged only against what came before it. */
-export function prsBySet(all: ExerciseSet[]): Map<string, PRType[]> {
+/**
+ * PRs for each completed set of one exercise, judged only against what came before it. With the exercise's
+ * tracking type, body-weight exercises never get an e1RM record from their added load (see e1rmApplies);
+ * without it (older callers) every record type is considered, as before.
+ */
+export function prsBySet(all: ExerciseSet[], tracking?: TrackingType): Map<string, PRType[]> {
   const done = all.filter((s) => s.done && !isWarmupSet(s))
   const out = new Map<string, PRType[]>()
+  const opts = { e1rm: e1rmApplies(tracking) }
   for (const s of done) {
     const prior = done.filter((h) => before(s, h))
-    const prs = detectPRs(prior, s)
+    const prs = detectPRs(prior, s, opts)
     if (prs.length) out.set(s.id, prs)
   }
   return out
 }
 
-export function bestE1rm(sets: ExerciseSet[]): number | null {
+export function bestE1rm(sets: ExerciseSet[], tracking?: TrackingType): number | null {
+  if (!e1rmApplies(tracking)) return null
   let best: number | null = null
   for (const s of sets) {
     if (!s.done || isWarmupSet(s) || s.weight === null || s.reps === null) continue

@@ -25,10 +25,29 @@ export function brzycki(weight: number, reps: number): number {
   return (weight * 36) / (37 - reps);
 }
 
-/** Estimated 1RM; null if not meaningful (weight ≤ 0, reps < 1 or > 15). */
+/**
+ * Highest rep count for which an estimated 1RM is shown. Linear prediction equations (Epley, Brzycki)
+ * should not be used above 10 repetitions: Reynolds, Gordon & Robergs 2006 (JSCR 20:584, PMID 16937972)
+ * found the error grows with the rep count and recommend ≤ 10; Brzycki (1993) proposed his for < 10;
+ * LeSuer et al. 1997 validated only sets of ≤ 10. Above this, no e1RM is produced (null), never a guess.
+ * All of them assume a set taken to (or very near) failure.
+ */
+export const E1RM_MAX_REPS = 10;
+
+/** Estimated 1RM; null if not meaningful (weight ≤ 0, reps < 1 or > E1RM_MAX_REPS). */
 export function e1rm(weight: number, reps: number, formula: 'epley' | 'brzycki' = 'epley'): number | null {
-  if (!num(weight) || !num(reps) || weight <= 0 || reps < 1 || reps > 15) return null;
+  if (!num(weight) || !num(reps) || weight <= 0 || reps < 1 || reps > E1RM_MAX_REPS) return null;
   return formula === 'epley' ? epley(weight, reps) : brzycki(weight, reps);
+}
+
+/**
+ * Ordering score used ONLY to pick "the best set" of a session (highlight, previous performance): Epley on
+ * 1–15 reps, as before the 10-rep e1RM limit, so a session of 12-rep sets still has a best set. Never shown
+ * as a 1RM; use `e1rm` for that.
+ */
+export function setStrengthScore(weight: number | null | undefined, reps: number | null | undefined): number | null {
+  if (!num(weight) || !num(reps) || weight <= 0 || reps < 1 || reps > 15) return null;
+  return epley(weight, reps);
 }
 
 /** weight × reps; 0 if either is missing; warm-ups count 0 (drop and failure sets count). */
@@ -54,13 +73,27 @@ function setE1rm(s: SetLike): number | null {
   return num(s.weight) && num(s.reps) ? e1rm(s.weight, s.reps) : null;
 }
 
+export interface PROptions {
+  /**
+   * Whether an estimated-1RM record makes sense (default true). false for body-weight exercises: their
+   * `weight` is only the added load (and volume is counted the same way), so an e1RM from it is not the
+   * lifter's maximal strength. See `e1rmApplies`.
+   */
+  e1rm?: boolean;
+}
+
+/** e1RM records and values only for external-load exercises (not body weight ± added load). */
+export function e1rmApplies(tracking: string | null | undefined): boolean {
+  return tracking !== 'bodyweight_reps';
+}
+
 /**
  * Compare `candidate` to non-warm-up history (the candidate object itself is excluded).
  * Design choice: with no prior (non-warm-up) history the first performance is NOT a PR (returns []);
  * likewise each metric needs at least one prior value to beat.
  * max_reps_at_weight = more reps than any previous set done at >= the same weight.
  */
-export function detectPRs(history: SetLike[], candidate: SetLike): PRType[] {
+export function detectPRs(history: SetLike[], candidate: SetLike, opts: PROptions = {}): PRType[] {
   if (isWarmupSet(candidate)) return [];
   const prior = history.filter((h) => h !== candidate && !isWarmupSet(h));
   if (prior.length === 0) return [];
@@ -71,7 +104,7 @@ export function detectPRs(history: SetLike[], candidate: SetLike): PRType[] {
     if (ws.length > 0 && candidate.weight > Math.max(...ws)) prs.push('max_weight');
   }
 
-  const ce = setE1rm(candidate);
+  const ce = opts.e1rm === false ? null : setE1rm(candidate);
   if (ce !== null) {
     const es = prior.map(setE1rm).filter((v): v is number => v !== null);
     if (es.length > 0 && ce > Math.max(...es) + 1e-9) prs.push('max_e1rm');
@@ -101,14 +134,14 @@ export function detectPRs(history: SetLike[], candidate: SetLike): PRType[] {
   return prs;
 }
 
-/** Highest e1RM among non-warm-up sets; fallback to most reps, then longest duration. */
+/** Highest strength score (Epley, 1–15 reps; see setStrengthScore) among non-warm-up sets; fallback to most reps, then longest duration. */
 export function bestSet(sets: SetLike[]): SetLike | null {
   const work = sets.filter((s) => !isWarmupSet(s));
   if (work.length === 0) return null;
   let best: SetLike | null = null;
   let bestE = -Infinity;
   for (const s of work) {
-    const e = setE1rm(s);
+    const e = setStrengthScore(s.weight, s.reps);
     if (e !== null && e > bestE) {
       bestE = e;
       best = s;

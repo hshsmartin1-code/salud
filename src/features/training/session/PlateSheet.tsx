@@ -83,12 +83,12 @@ function PlateBody({ set, onClose }: { set: ExerciseSet; onClose: () => void }) 
         <div className="mt-2 rounded-xl bg-warn/10 px-3 py-2" role="status" data-testid="plate-inexact">
           <p className="text-label text-ink">Con tus discos no se puede cargar {fmt(target)} kg exactos.</p>
           <div className="mt-1 flex flex-wrap gap-2">
-            {res.lower !== null && res.lower !== res.achieved ? (
+            {res.lower !== null ? (
               <button type="button" className="chip min-h-11" onClick={() => setTarget(res.lower!)}>
                 Bajar a {fmt(res.lower)} kg
               </button>
             ) : null}
-            {res.higher !== null && res.higher !== res.achieved ? (
+            {res.higher !== null ? (
               <button type="button" className="chip min-h-11" onClick={() => setTarget(res.higher!)}>
                 Subir a {fmt(res.higher)} kg
               </button>

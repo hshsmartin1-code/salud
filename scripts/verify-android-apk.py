@@ -226,7 +226,7 @@ def verify(apk: Path, dev: bool = False, beta: bool = False) -> dict:
         raise RuntimeError('APK package metadata unavailable.')
     package, code, version = match.groups()
     interface_version = json.loads((ROOT / 'package.json').read_text(encoding='utf-8'))['version']
-    app_version = re.search(r"APP_VERSION = '([^']+)'", (ROOT / 'src/db/backup.ts').read_text(encoding='utf-8')).group(1)
+    app_version = re.search(r"APP_VERSION = '([^']+)'", (ROOT / 'src/appVersion.ts').read_text(encoding='utf-8')).group(1)
     gradle = (ROOT / 'android/app/build.gradle').read_text(encoding='utf-8')
     native_name = re.search(r'\bversionName\s+"([^"]+)"', gradle).group(1)
     expected_code = re.search(r'\bversionCode\s+(\d+)', gradle).group(1)

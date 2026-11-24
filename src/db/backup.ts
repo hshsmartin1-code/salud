@@ -16,12 +16,15 @@ import { validHouseholdPortion } from '../domain/portions'
 import { db as defaultDb, SCHEMA_VERSION, type SaludDB } from './schema'
 import { DATED_TABLES, MEDIA_TABLES, PERSONAL_TABLES, type PersonalTable } from './tables'
 import { normalizeProfile } from './profiles'
+import { APP_VERSION } from '../appVersion'
+import { stableId } from './stableId'
 import type { Profile } from './types'
 
 export const BACKUP_FORMAT = 'pho-backup'
 /** v2 (app 2.0): adds `includedTables` / `media`; new tables (vitals, photos, Health Connect…). */
 export const BACKUP_VERSION = 2
-export const APP_VERSION = '3.2.1'
+/** Re-exported for existing importers; the constant lives in a tiny module so eager code does not pull zod. */
+export { APP_VERSION, stableId }
 
 /** Per-device state that must never travel inside a backup. */
 export const DEVICE_TABLES = ['integrations'] as const satisfies readonly PersonalTable[]
@@ -169,31 +172,6 @@ export function backupStats(b: Backup): { table: PersonalTable; count: number }[
 /** Approximate size of a backup once serialised (bytes). */
 export function backupSize(b: Backup): number {
   return new Blob([JSON.stringify(b)]).size
-}
-
-/**
- * Deterministic id derived from a seed (128-bit, UUID-formatted). Used when a profile backup is
- * imported into a different profile, so a second import of the same file maps to the same ids
- * and is merged instead of duplicated.
- */
-export function stableId(seed: string): string {
-  let h1 = 1779033703,
-    h2 = 3144134277,
-    h3 = 1013904242,
-    h4 = 2773480762
-  for (let i = 0; i < seed.length; i++) {
-    const k = seed.charCodeAt(i)
-    h1 = h2 ^ Math.imul(h1 ^ k, 597399067)
-    h2 = h3 ^ Math.imul(h2 ^ k, 2869860233)
-    h3 = h4 ^ Math.imul(h3 ^ k, 951274213)
-    h4 = h1 ^ Math.imul(h4 ^ k, 2716044179)
-  }
-  h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067)
-  h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233)
-  h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213)
-  h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179)
-  const hex = [h1 ^ h2 ^ h3 ^ h4, h2 ^ h1, h3 ^ h1, h4 ^ h1].map((n) => (n >>> 0).toString(16).padStart(8, '0')).join('')
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
 /**

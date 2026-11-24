@@ -19,7 +19,7 @@
  * the same file twice never duplicates. Everything here is pure except `applyTrainingImport` / `undoTrainingImport`.
  */
 import type { TrackingType } from '../../../db/catalogTypes'
-import { stableId } from '../../../db/backup'
+import { stableId } from '../../../db/stableId'
 import type { NewRow, Repo } from '../../../db/repo'
 import type { CustomExercise, ExerciseSet, SessionExercise, TrainingSession } from '../../../db/types'
 import { APP_TZ } from '../../../domain/dates'

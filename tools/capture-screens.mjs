@@ -22,7 +22,7 @@ const ROUTES = [
   ['hoy', '/'], ['comida', '/comida'], ['buscar', '/comida/buscar'], ['recetas', '/comida/recetas'], ['plantillas', '/comida/plantillas'], ['etiqueta', '/comida/etiqueta'],
   ['entreno', '/entreno'], ['historial', '/entreno/historial'], ['estadisticas', '/entreno/estadisticas'], ['ejercicios', '/entreno/ejercicios'], ['rutinas', '/entreno/rutinas'],
   ['salud', '/salud'], ['actividad', '/actividad'], ['sueno', '/sueno'], ['habitos', '/habitos'], ['signos', '/signos'], ['agua', '/agua'], ['cuerpo', '/cuerpo'],
-  ['progreso', '/progreso'], ['fotos', '/fotos'], ['ajustes', '/ajustes'], ['perfil', '/perfil'], ['mas', '/mas'], ['respaldo', '/respaldo'], ['cuenta', '/cuenta'], ['integraciones', '/integraciones'],
+  ['progreso', '/progreso'], ['fotos', '/fotos'], ['ajustes', '/ajustes'], ['perfil', '/perfil'], ['mas', '/mas'], ['respaldo', '/respaldo'], ['cuenta', '/cuenta'], ['integraciones', '/integraciones'], ['nutrientes', '/comida/nutrientes'],
 ]
 
 const bundle = await rolldown({ input: join(process.cwd(), 'src/test/seed/demoSeed.ts'), platform: 'node', logLevel: 'silent' })

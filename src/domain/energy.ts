@@ -40,6 +40,9 @@ export const PAL_BANDS: readonly { key: PalBand; es: string; min: number; max: n
   { key: 'vigorous', es: 'Intensa', min: 2.0, max: 2.4, pal: 2.2, description: 'Trabajo físico pesado, o varias horas diarias de ejercicio intenso.', legacyActivity: 'very_active' },
 ];
 
+/** A PAL value with two decimals and a decimal comma ("1,40"). */
+export const palText = (v: number): string => v.toFixed(2).replace('.', ',');
+
 export const ENERGY_METHOD_LABELS: Record<EnergyMethod, string> = {
   mifflin: 'Mifflin-St Jeor × factor de actividad',
   rien: 'RIEN Colombia (Schofield × PAL)',
@@ -283,7 +286,7 @@ export function computeTargets(input: TargetInput): {
   const tdee = bmr * inputs.pal;
   lines.push(
     band
-      ? `Gasto energético total estimado (GET): ${f0(bmr)} × ${formatNumber(band.pal, 2)} (PAL ${band.es.toLowerCase()}, punto medio de ${formatNumber(band.min, 2)}–${formatNumber(band.max, 2)}) = ${f0(tdee)} kcal`
+      ? `Gasto energético total estimado (GET): ${f0(bmr)} × ${palText(band.pal)} (PAL ${band.es.toLowerCase()}, punto medio de ${palText(band.min)}–${palText(band.max)}) = ${f0(tdee)} kcal`
       : `Gasto energético total estimado (GET): ${f0(bmr)} × ${formatNumber(level!.factor, 3)} (${level!.es}) = ${f0(tdee)} kcal`,
   );
 

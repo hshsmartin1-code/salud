@@ -7,6 +7,7 @@ import {
   ENERGY_METHOD_LABELS,
   GOAL_LABELS,
   PAL_BANDS,
+  palText,
   computeTargets,
   energyRestriction,
   macroAdvisories,
@@ -55,7 +56,10 @@ export function GoalEditor({
 }) {
   const prev = seed.previous
   const [mode, setMode] = useState<Mode>(prev?.method ?? 'calculated')
-  const [goal, setGoal] = useState<GoalType | ''>(prev?.goal ?? '')
+  // A previous «Perder grasa» is not preselected when a deficit no longer applies (under 18, pregnancy, lactation).
+  const [goal, setGoal] = useState<GoalType | ''>(() =>
+    prev?.goal === 'lose' && energyRestriction({ ageYears: seed.ageYears, physiologicalState: seed.physiologicalState }) ? '' : (prev?.goal ?? ''),
+  )
   const [activity, setActivity] = useState<ActivityKey | ''>(prev?.inputs?.activity ?? seed.activity ?? '')
   // Equation: Mifflin-St Jeor stays the default (existing goals never change); RIEN is opt-in.
   const [method, setMethod] = useState<EnergyMethod>(prev?.inputs?.method ?? 'mifflin')
@@ -246,7 +250,7 @@ export function GoalEditor({
           value={palBand}
           onChange={setPalBand}
           placeholder="Selecciona…"
-          options={PAL_BANDS.map((b) => ({ value: b.key, label: `${b.es} (PAL ${formatNumber(b.min, 2)}–${formatNumber(b.max, 2)}; se usa ${formatNumber(b.pal, 2)}) — ${b.description}` }))}
+          options={PAL_BANDS.map((b) => ({ value: b.key, label: `${b.es} (PAL ${palText(b.min)}–${palText(b.max)}; se usa ${palText(b.pal)}) — ${b.description}` }))}
         />
       ) : (
         <SelectField<ActivityKey>
@@ -325,7 +329,8 @@ export function GoalEditor({
                 label="Ecuación"
                 value={method}
                 onChange={setMethod}
-                options={(['mifflin', 'rien'] as const).map((m) => ({ value: m, label: ENERGY_METHOD_LABELS[m] + (m === 'mifflin' ? ' (predeterminada)' : '') }))}
+                hint="Mifflin-St Jeor es la predeterminada; RIEN es el método oficial colombiano."
+                options={(['mifflin', 'rien'] as const).map((m) => ({ value: m, label: ENERGY_METHOD_LABELS[m] }))}
               />
               <p className="text-xs leading-relaxed text-muted" data-testid="goal-method-text">
                 {method === 'rien'

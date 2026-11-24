@@ -137,7 +137,7 @@ describe('computeTargets', () => {
     expect(t.kcal).toBe(Math.round((15.057 * 70 + 692.2) * 1.55)); // 2707
     expect(t.inputs).toMatchObject({ method: 'rien', palBand: 'light', pal: 1.55, activity: 'moderate' });
     expect(t.method).toContain('TMB (Schofield, FAO/OMS/UNU; RIEN Res. 3803/2016, hombre de 18–30 años): 15,057×70 + 692,2 = 1.746 kcal');
-    expect(t.method).toContain('PAL ligera o sedentaria, punto medio de 1,4–1,69');
+    expect(t.method).toContain('PAL ligera o sedentaria, punto medio de 1,40–1,69');
     // Mifflin stays the default and is unchanged.
     expect(computeTargets({ ...base, goal: 'maintain' }).kcal).toBe(2507);
   });

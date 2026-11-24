@@ -15,6 +15,7 @@ import { formatNumber } from '../../domain/units'
 import { formatMinutes } from '../../integrations/health-connect/format'
 import { activeKcalByDay, compare, sleepByDay, stepsByDay, trendWeight, weightByDay, type DayValue, type Source } from '../dashboard/controlCenter'
 import { metricDef, type Aggregation, type ChartKind, type MetricId } from './metrics'
+import { dedupeHabitLogs } from '../../domain/dayRecords'
 
 // ───────────── Types ─────────────
 export interface DateRange {
@@ -291,7 +292,7 @@ function habitCompletion(input: HealthInput, dates: string[], dateSet: Set<strin
   const createdDay = new Map(active.map((h) => [h.id, todayLocal(new Date(h.createdAt))]))
   const sums = new Map<string, number>() // `${habitId}|${date}` -> value
   const withLogs = new Set<string>()
-  for (const l of input.habitLogs) {
+  for (const l of dedupeHabitLogs(input.habitLogs)) {
     if (!dateSet.has(l.date)) continue
     withLogs.add(l.date)
     const k = `${l.habitId}|${l.date}`

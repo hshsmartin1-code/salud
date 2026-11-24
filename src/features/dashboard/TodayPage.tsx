@@ -34,6 +34,7 @@ import { DueCard, TrainingRow } from './TrainingNow'
 import { slotPosition, trainingSlot } from './trainingSlot'
 import { WeeklySummary } from './WeeklySummary'
 import { buildInsights } from './insights'
+import { habitValueOn } from '../../domain/dayRecords'
 import {
   activeKcalByDay,
   buildAlerts,
@@ -179,7 +180,7 @@ export function TodayPage() {
   const waterToday = data.water.filter((w) => w.date === today).reduce((s, w) => s + w.ml, 0)
   const waterGoal = profile.settings.waterGoalMl ?? null
   const habitsActive = data.habits.filter((h) => h.active)
-  const habitsDone = habitsActive.filter((h) => data.habitLogs.filter((l) => l.habitId === h.id).reduce((s, l) => s + l.value, 0) >= h.target).length
+  const habitsDone = habitsActive.filter((h) => habitValueOn(data.habitLogs, h.id, today) >= h.target).length
   const rec = data.recovery[0]
   const hrHc = [...data.health].filter((h) => h.metric === 'restingHr' && !h.excluded && h.value !== null).sort((a, b) => a.date.localeCompare(b.date)).pop()
   const hrVital = data.vitals.find((v) => v.kind === 'restingHr' && v.value !== null)

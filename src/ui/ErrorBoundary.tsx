@@ -11,6 +11,7 @@ interface Props {
 }
 interface State {
   error: Error | null
+  key: string | undefined
 }
 
 function safeSessionStorage(): Storage | null {
@@ -27,11 +28,16 @@ function safeSessionStorage(): Storage | null {
  * when those are what failed.
  */
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null }
+  state: State = { error: null, key: this.props.resetKey }
   private reloading = false
 
-  static getDerivedStateFromError(error: unknown): State {
+  static getDerivedStateFromError(error: unknown): Pick<State, 'error'> {
     return { error: error instanceof Error ? error : new Error(String(error)) }
+  }
+
+  /** Navigation (a new resetKey) clears the error so the next screen gets a fresh try. */
+  static getDerivedStateFromProps(props: Props, state: State): Partial<State> | null {
+    return props.resetKey !== state.key ? { error: null, key: props.resetKey } : null
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -43,10 +49,6 @@ export class ErrorBoundary extends Component<Props, State> {
       this.reloading = true
       window.location.reload()
     }
-  }
-
-  componentDidUpdate(prev: Props) {
-    if (this.state.error && prev.resetKey !== this.props.resetKey) this.setState({ error: null })
   }
 
   private retry = () => {

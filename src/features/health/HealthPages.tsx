@@ -25,6 +25,8 @@ import { buildSeries, sleepConsistency } from './series'
 import { buildView, figure } from './view'
 import type { MetricId } from './metrics'
 import { useSavedToast } from './useSavedToast'
+import { setHabitValue } from '../../db/dayRecords'
+import { habitValueOn } from '../../domain/dayRecords'
 
 /** `?nuevo=1` opens the "new record" sheet once (links from other screens), then clears itself. */
 function useOpenFromQuery(): [boolean, (v: boolean) => void] {
@@ -326,12 +328,10 @@ export function HabitsPage() {
   const [edit, setEdit] = useState<Habit | 'new' | null>(null)
   const active = (habits ?? []).filter((h) => h.active).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))
   const inactive = (habits ?? []).filter((h) => !h.active)
-  const valueOn = (hid: string, d: string) => (logs ?? []).filter((l) => l.habitId === hid && l.date === d).reduce((s, l) => s + l.value, 0)
+  const valueOn = (hid: string, d: string) => habitValueOn(logs ?? [], hid, d)
 
   async function setValue(h: Habit, v: number) {
-    const existing = (logs ?? []).filter((l) => l.habitId === h.id && l.date === date)
-    await r.removeMany('habitLogs', existing.map((l) => l.id))
-    if (v > 0) await r.add('habitLogs', { habitId: h.id, date, value: v })
+    await setHabitValue(r, h.id, date, v)
   }
   function streak(h: Habit): number {
     let n = 0

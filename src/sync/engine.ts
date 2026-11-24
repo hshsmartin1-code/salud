@@ -1,7 +1,7 @@
 import type { Table } from 'dexie'
 import type { SaludDB } from '../db/schema'
 import type { ExerciseSet, SyncConflict, SyncLink, SyncShadow } from '../db/types'
-import { cloudRowId, decodeRow, docKey, encodeRow, localRowId, sameContent, shadowKey } from './codec'
+import { cloudRowId, decodeRow, docKey, encodeRow, localRowId, sameContent, shadowKey, type EncodedRow } from './codec'
 import { describeFromSets, mergeSessionRows } from './sessionMerge'
 import { RemoteError, type CommitOneResult, type RemoteDoc, type RemoteStore, type RemoteWrite } from './remote'
 import { AUTO_RESOLVE_TABLES, isSyncedTable, PROFILE_TABLE, SYNC_TABLES, TABLES_VERSION, type SyncedTableName } from './syncTables'
@@ -86,8 +86,27 @@ async function readLocal(db: SaludDB, profileId: string, t: SyncedTableName, row
   return row
 }
 
+/**
+ * Encodings made during ONE sync round, keyed by table and row id. The round scans every local row twice
+ * (to upload, then to count what is still pending); the second scan reuses the encoding of a row whose
+ * stored JSON did not change in between. Rows edited meanwhile differ in JSON and are encoded again.
+ * Never kept across rounds: every upload decision starts from fresh encodings.
+ */
+export type EncodeMemo = Map<string, { json: string; enc: EncodedRow }>
+
+function encodeLocal(t: SyncedTableName, row: Row, profileId: string, memo: EncodeMemo | undefined): EncodedRow {
+  if (!memo) return encodeRow(t, row, profileId)
+  const k = `${t}\u0000${row.id}`
+  const json = JSON.stringify(row)
+  const hit = memo.get(k)
+  if (hit && hit.json === json) return hit.enc
+  const enc = encodeRow(t, row, profileId)
+  memo.set(k, { json, enc })
+  return enc
+}
+
 /** Computes local changes against the shadow. Rows with an open conflict are held back. */
-export async function localChanges(db: SaludDB, profileId: string): Promise<{ writes: LocalChange[]; deletes: LocalChange[]; liveSynced: number }> {
+export async function localChanges(db: SaludDB, profileId: string, memo?: EncodeMemo): Promise<{ writes: LocalChange[]; deletes: LocalChange[]; liveSynced: number }> {
   const writes: LocalChange[] = []
   const deletes: LocalChange[] = []
   let liveSynced = 0
@@ -111,7 +130,7 @@ export async function localChanges(db: SaludDB, profileId: string): Promise<{ wr
     const byRow = new Map(shadows.map((s) => [s.rowId, s]))
     for (const s of shadows) if (s.hash !== null) liveSynced++
     for (const row of rows) {
-      const enc = encodeRow(t, row, profileId)
+      const enc = encodeLocal(t, row, profileId, memo)
       const sh = byRow.get(row.id)
       byRow.delete(row.id)
       if (sh && sh.hash === enc.h) continue
@@ -421,9 +440,9 @@ async function saveShadows(db: SaludDB, pid: string, rows: SyncShadow[]) {
   void pid
 }
 
-async function push(db: SaludDB, link: SyncLink, remote: RemoteStore, opts: SyncOptions, now: Date) {
+async function push(db: SaludDB, link: SyncLink, remote: RemoteStore, opts: SyncOptions, now: Date, memo?: EncodeMemo) {
   const pid = link.profileId
-  const { writes, deletes, liveSynced } = await localChanges(db, pid)
+  const { writes, deletes, liveSynced } = await localChanges(db, pid, memo)
   const heldDeletes = !opts.confirmDeletes && deletes.length > deleteThreshold(liveSynced) ? deletes.length : 0
   // A row bigger than the server accepts would be refused forever: keep it local and report it.
   const oversize = new Set(writes.filter((w) => w.d !== null && w.d.length > MAX_ROW_CHARS))
@@ -552,8 +571,9 @@ export async function syncProfile(db: SaludDB, profileId: string, remote: Remote
     const p = await pull(db, link, remote, now, clock)
     await finishSetRestore(db, profileId)
     const fresh = (await db.syncLinks.get(profileId))!
-    const s = await push(db, fresh, remote, opts, now)
-    const after = await localChanges(db, profileId)
+    const memo: EncodeMemo = new Map()
+    const s = await push(db, fresh, remote, opts, now, memo)
+    const after = await localChanges(db, profileId, memo)
     const pending = after.writes.length + after.deletes.length
     const partial = s.rejected > 0 || p.unreadable > 0
     await db.syncLinks.update(profileId, {

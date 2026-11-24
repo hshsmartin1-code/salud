@@ -11,6 +11,13 @@ import { ageFromBirthDate, type Sex } from './energy';
 export const AGE_GROUPS = ['14-18', '19-30', '31-50', '51-70', '>70'] as const;
 export type AgeGroup = (typeof AGE_GROUPS)[number];
 
+/**
+ * Which published table the values come from. Only NASEM/IOM is implemented; the Colombian RIEN (Resolución 3803 de 2016,
+ * MinSalud) can be added as another set by supplying its own `DEFS` without touching the evaluation code.
+ */
+export type ReferenceSet = 'nasem';
+export const REFERENCE_SETS: Record<ReferenceSet, string> = { nasem: 'NASEM/IOM (EE. UU.)' };
+
 export type RefKind = 'RDA' | 'AI' | 'CDRR' | 'limit-energy' | 'none';
 
 export interface Reference {
@@ -42,6 +49,7 @@ export interface Amdr {
 }
 
 export interface DriSet {
+  referenceSet: ReferenceSet;
   sex: Sex | null;
   age: number | null;
   ageGroup: AgeGroup | null;
@@ -117,7 +125,7 @@ const DEFS: Partial<Record<NutrientCode, Def>> = {
   },
   sodium: {
     kind: 'CDRR', unit: 'mg', M: same(2300), F: same(2300), source: 'NASEM, DRI sodio y potasio (2019)',
-    note: 'CDRR: umbral sobre el cual reducir el sodio disminuye el riesgo crónico. La AI es 1500 mg.',
+    note: 'CDRR: umbral sobre el cual reducir el sodio disminuye el riesgo crónico. La AI es 1500 mg. La OMS (2012) recomienda menos de 2000 mg al día para adultos.',
   },
   water: {
     kind: 'AI', unit: 'g', M: [3300, 3700, 3700, 3700, 3700], F: [2300, 2700, 2700, 2700, 2700], informational: true, source: 'NASEM, DRI agua (2005)',
@@ -153,6 +161,8 @@ function blank(code: NutrientCode, source = '', note?: string): Reference {
 }
 
 export interface DriOptions {
+  /** Reference table to use (default 'nasem'). */
+  referenceSet?: ReferenceSet;
   sex: Sex | null | undefined;
   /** Birth date 'YYYY-MM-DD' (local). */
   birthDate: string | null | undefined;
@@ -183,13 +193,14 @@ export function getDri(o: DriOptions): DriSet {
     }
   }
   const ageAssumed = age === null;
-  const group: AgeGroup | null = ageAssumed ? '31-50' : ageGroupFor(age);
+  const referenceSet: ReferenceSet = o.referenceSet ?? 'nasem';
+  const group: AgeGroup | null = age === null ? '31-50' : ageGroupFor(age);
   const notes: string[] = [];
   const refs = {} as Record<NutrientCode, Reference>;
   for (const c of ALL_CODES) refs[c] = blank(c);
   if (group === null) {
     notes.push('Los valores de referencia cubren desde los 14 años; con la edad del perfil no se muestran.');
-    return { sex, age, ageGroup: null, ageAssumed: false, outOfScope: true, amdr: null, refs, notes };
+    return { referenceSet, sex, age, ageGroup: null, ageAssumed: false, outOfScope: true, amdr: null, refs, notes };
   }
   const idx = AGE_GROUPS.indexOf(group);
   if (sex === null) notes.push('Completa el sexo en el perfil para ver un valor único; mientras tanto se muestran rangos y no se evalúa.');
@@ -223,9 +234,9 @@ export function getDri(o: DriOptions): DriSet {
     range: derived === null && fAbs === null ? [Math.min(fAbsM, fAbsF), Math.max(fAbsM, fAbsF)] : null,
     alt: derived !== null && fAbs !== null ? { label: 'AI absoluta', value: fAbs } : null,
   };
-  refs.satFat = { ...blank('satFat', 'Guías Alimentarias de EE. UU. 2020-2025; OMS', 'Menos del 10 % de la energía.'), kind: 'limit-energy', pctEnergyMax: 10 };
+  refs.satFat = { ...blank('satFat', 'Guías Alimentarias de EE. UU. 2020-2025; OMS 2023', 'Menos del 10 % de la energía (OMS 2023, DGA 2020-2025).'), kind: 'limit-energy', pctEnergyMax: 10 };
   refs.addedSugars = {
-    ...blank('addedSugars', 'Guías Alimentarias de EE. UU. 2020-2025; OMS', 'Menos del 10 % de la energía; la OMS sugiere idealmente menos del 5 %.'),
+    ...blank('addedSugars', 'Guías Alimentarias de EE. UU. 2020-2025; OMS 2015', 'Menos del 10 % de la energía (OMS 2015, DGA 2020-2025); la OMS sugiere idealmente menos del 5 %.'),
     kind: 'limit-energy',
     pctEnergyMax: 10,
   };
@@ -233,7 +244,7 @@ export function getDri(o: DriOptions): DriSet {
   refs.cholesterol = blank('cholesterol', 'Guías Alimentarias de EE. UU. 2015-2020', 'Sin valor de referencia numérico: las DRI no fijaron UL y las guías de 2015 retiraron el límite de 300 mg.');
   refs.sugars = blank('sugars', '', 'Sin valor de referencia para azúcares totales; el límite aplica a azúcares añadidos.');
   refs.kcal = blank('kcal', '', 'La necesidad de energía es individual: se compara con tu meta, no con una DRI.');
-  return { sex, age, ageGroup: group, ageAssumed, outOfScope: false, amdr: amdrFor(group), refs, notes };
+  return { referenceSet, sex, age, ageGroup: group, ageAssumed, outOfScope: false, amdr: amdrFor(group), refs, notes };
 }
 
 // ───────────── Evaluation ─────────────

@@ -47,6 +47,7 @@ describe('sex and age differences', () => {
     const f = female('1990-01-01');
     expect(f.refs.sodium.kind).toBe('CDRR');
     expect(f.refs.sodium.value).toBe(2300);
+    expect(f.referenceSet).toBe('nasem');
     expect(f.refs.sodium.alt).toEqual({ label: 'AI', value: 1500 });
     expect(f.refs.potassium.value).toBe(2600);
     expect(male('1990-01-01').refs.potassium.value).toBe(3400);

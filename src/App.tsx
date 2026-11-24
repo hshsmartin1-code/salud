@@ -39,6 +39,7 @@ const FoodSearchPage = lazy(() => import('./features/nutrition/FoodSearchPage').
 const RecipesPage = lazy(() => import('./features/nutrition/RecipesPage').then((m) => ({ default: m.RecipesPage })))
 const RecipeEditor = lazy(() => import('./features/nutrition/RecipesPage').then((m) => ({ default: m.RecipeEditor })))
 const TemplatesPage = lazy(() => import('./features/nutrition/RecipesPage').then((m) => ({ default: m.TemplatesPage })))
+const NutrientsPage = lazy(() => import('./features/nutrition/NutrientsPage').then((m) => ({ default: m.NutrientsPage })))
 const LabelPage = lazy(() => import('./features/nutrition/LabelPage').then((m) => ({ default: m.LabelPage })))
 const AccountPage = lazy(() => import('./features/account/AccountPage').then((m) => ({ default: m.AccountPage })))
 // Salud screens (overview, detail pages and their charts) are lazy chunks.
@@ -124,6 +125,7 @@ function Gate() {
         <Route path="/perfiles/nuevo" element={<Onboarding embedded />} />
         <Route path="/comida" element={<NutritionPage />} />
         <Route path="/comida/buscar" element={<FoodSearchPage />} />
+        <Route path="/comida/nutrientes" element={<NutrientsPage />} />
         <Route path="/comida/etiqueta" element={<LabelPage />} />
         <Route path="/comida/recetas" element={<RecipesPage />} />
         <Route path="/comida/recetas/:id" element={<RecipeEditor />} />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ExerciseSet } from '../../../db/types'
-import { currentExerciseId, exerciseProgress, forgetToggles, formatPrevious, isExerciseOpen, lastTimeLine, sessionStats, setSignature, shortDate, spokenPrevious, targetLabel, workOrdinals } from './model'
+import { currentExerciseId, exerciseProgress, forgetToggles, formatPrevious, isExerciseOpen, lastTimeLine, sessionE1rm, sessionStats, setSignature, shortDate, spokenPrevious, targetLabel, workOrdinals } from './model'
 
 // Synthetic data only.
 let seq = 0
@@ -85,5 +85,16 @@ describe('session model', () => {
     expect(setSignature(a)).not.toBe(setSignature({ ...a, reps: 11 }))
     expect(setSignature(a)).not.toBe(setSignature({ ...a, done: true }))
     expect(setSignature(a)).not.toBe(setSignature({ ...a, notes: 'n' }))
+  })
+})
+
+describe('sessionE1rm', () => {
+  it('uses done work sets of 1 to 12 reps only; warm-ups, pending rows and longer sets give none', () => {
+    expect(sessionE1rm([set({ done: true, weight: 100, reps: 5 })])).toBeCloseTo(100 * (1 + 5 / 30), 6)
+    expect(sessionE1rm([set({ done: true, weight: 100, reps: 5 }), set({ done: true, weight: 90, reps: 12 })])).toBeCloseTo(126, 6)
+    expect(sessionE1rm([set({ done: true, weight: 100, reps: 13 })])).toBeNull()
+    expect(sessionE1rm([set({ done: true, weight: 200, reps: 3, isWarmup: true, kind: 'warmup' })])).toBeNull()
+    expect(sessionE1rm([set({ done: false, weight: 100, reps: 5 })])).toBeNull()
+    expect(sessionE1rm([set({ done: true, weight: null, reps: 5 })])).toBeNull()
   })
 })

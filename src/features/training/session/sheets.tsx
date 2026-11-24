@@ -37,6 +37,7 @@ export function SetMenuSheet({
   onKind,
   onNote,
   onDelete,
+  onPlates,
 }: {
   set: ExerciseSet | null
   title: string
@@ -44,10 +45,13 @@ export function SetMenuSheet({
   onKind: (kind: SetKind) => void
   onNote: () => void
   onDelete: () => void
+  /** Barbell exercises only: opens the plate calculator for this set. */
+  onPlates?: () => void
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([])
   const current = set ? setKind(set) : 'normal'
-  const count = KIND_ITEMS.length + 2
+  const count = KIND_ITEMS.length + 2 + (onPlates ? 1 : 0)
+  const at = KIND_ITEMS.length + (onPlates ? 1 : 0)
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     const from = refs.current.findIndex((el) => el === document.activeElement)
     const next = rovingIndex({ key: e.key, index: from, count, orientation: 'vertical' })
@@ -83,8 +87,11 @@ export function SetMenuSheet({
           </button>
         ))}
         <div className="my-1 border-t border-line" role="separator" />
-        <MenuRow icon="pencil" label={set?.notes ? 'Editar nota de la serie' : 'Nota de la serie'} onClick={onNote} refFn={(el) => { refs.current[KIND_ITEMS.length] = el }} className={item} />
-        <MenuRow icon="trash" label="Eliminar serie" danger onClick={onDelete} refFn={(el) => { refs.current[KIND_ITEMS.length + 1] = el }} className={item} />
+        {onPlates ? (
+          <MenuRow icon="dumbbell" label="Discos para este peso" onClick={onPlates} refFn={(el) => { refs.current[KIND_ITEMS.length] = el }} className={item} />
+        ) : null}
+        <MenuRow icon="pencil" label={set?.notes ? 'Editar nota de la serie' : 'Nota de la serie'} onClick={onNote} refFn={(el) => { refs.current[at] = el }} className={item} />
+        <MenuRow icon="trash" label="Eliminar serie" danger onClick={onDelete} refFn={(el) => { refs.current[at + 1] = el }} className={item} />
       </div>
     </Sheet>
   )

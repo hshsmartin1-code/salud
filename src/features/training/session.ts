@@ -90,7 +90,7 @@ export async function lastPerformance(r: Repo, exerciseId: string, date: string,
 
 // ───────────── Session lifecycle ─────────────
 
-function blankSet(session: TrainingSession, item: OrderItem, setIndex: number, from?: ExerciseSet): Omit<ExerciseSet, 'id' | 'profileId' | 'createdAt' | 'updatedAt'> {
+export function blankSet(session: Pick<TrainingSession, 'id' | 'date'>, item: OrderItem, setIndex: number, from?: ExerciseSet): Omit<ExerciseSet, 'id' | 'profileId' | 'createdAt' | 'updatedAt'> {
   return {
     sessionId: session.id,
     date: session.date,

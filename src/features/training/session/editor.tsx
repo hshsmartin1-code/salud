@@ -13,6 +13,7 @@ import type { SessionActions } from './actions'
 import { setSignature, workOrdinals } from './model'
 import { kindName } from './kinds'
 import { useSaveGuard } from './saveGuard'
+import { PlateSheet } from './PlateSheet'
 import { RestEditSheet, SetMenuSheet, SetNoteSheet } from './sheets'
 
 export type Catalog = ReturnType<typeof useExercises>
@@ -54,6 +55,7 @@ export function useSessionEditor(session: TrainingSession, sets: readonly Exerci
   const [subFor, setSubFor] = useState<SessionExercise | null>(null)
   const [menuSetId, setMenuSetId] = useState<string | null>(null)
   const [noteSetId, setNoteSetId] = useState<string | null>(null)
+  const [platesSetId, setPlatesSetId] = useState<string | null>(null)
   const [restEditId, setRestEditId] = useState<string | null>(null)
 
   const byExercise = useMemo(() => groupSets(sets), [sets])
@@ -100,6 +102,7 @@ export function useSessionEditor(session: TrainingSession, sets: readonly Exerci
 
   const order = session.exerciseOrder
   const menuSet = menuSetId ? (sets.find((s) => s.id === menuSetId) ?? null) : null
+  const platesSet = platesSetId ? (sets.find((s) => s.id === platesSetId) ?? null) : null
   const noteSet = noteSetId ? (sets.find((s) => s.id === noteSetId) ?? null) : null
   const setTitle = (s: ExerciseSet | null) => {
     if (!s) return ''
@@ -130,6 +133,14 @@ export function useSessionEditor(session: TrainingSession, sets: readonly Exerci
           if (menuSet) void guard(r.update('exerciseSets', menuSet.id, setKindPatch(k)))
           setMenuSetId(null)
         }}
+        onPlates={
+          menuSet && ex.byId.get(menuSet.exerciseId)?.equipment === 'barbell'
+            ? () => {
+                setMenuSetId(null)
+                setPlatesSetId(menuSet.id)
+              }
+            : undefined
+        }
         onNote={() => {
           setMenuSetId(null)
           setNoteSetId(menuSet?.id ?? null)
@@ -145,6 +156,7 @@ export function useSessionEditor(session: TrainingSession, sets: readonly Exerci
           toast.show({ message: 'Serie eliminada', actionLabel: 'Deshacer', onAction: () => void guard(r.put('exerciseSets', row)) })
         }}
       />
+      <PlateSheet set={platesSet} title={platesSet ? `Discos · ${platesSet.exerciseName}` : ''} onClose={() => setPlatesSetId(null)} />
       <SetNoteSheet set={noteSet} title={noteSet ? `Nota · ${setTitle(noteSet)}` : ''} onClose={() => setNoteSetId(null)} />
       <RestEditSheet sessionId={session.id} item={restItem} onClose={() => setRestEditId(null)} />
     </>

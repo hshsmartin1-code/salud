@@ -362,7 +362,7 @@ function ReviewRow({ row, choice, list, byId, onChange }: { row: Row; choice: Ex
         <span className="min-w-0 break-words text-sm font-medium">{row.name}</span>
         <span className="shrink-0">{badge}</span>
       </div>
-      <p className="text-xs text-faint">{row.sets} series</p>
+      <p className="text-xs text-faint">{row.sets === 1 ? '1 serie' : `${row.sets} series`}</p>
       <select
         className="field"
         aria-label={`Ejercicio para «${row.name}»`}

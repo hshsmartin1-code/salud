@@ -59,8 +59,8 @@ function before(s: ExerciseSet, h: ExerciseSet): boolean {
   return h.date < s.date || (h.date === s.date && h.createdAt < s.createdAt)
 }
 
-/** PRs for each completed set of one exercise, judged only against what came before it. */
-export function prsBySet(all: ExerciseSet[]): Map<string, PRType[]> {
+/** Reference implementation: judges every set against every earlier one (O(n²) with a heavy constant). Used as the fallback and as the oracle in tests. */
+export function prsBySetReference(all: ExerciseSet[]): Map<string, PRType[]> {
   const done = all.filter((s) => s.done && !isWarmupSet(s))
   const out = new Map<string, PRType[]>()
   for (const s of done) {
@@ -69,6 +69,109 @@ export function prsBySet(all: ExerciseSet[]): Map<string, PRType[]> {
     if (prs.length) out.set(s.id, prs)
   }
   return out
+}
+
+const num = (v: number | null | undefined): v is number => typeof v === 'number' && Number.isFinite(v)
+const keyLess = (a: ExerciseSet, b: ExerciseSet) => a.date < b.date || (a.date === b.date && a.createdAt < b.createdAt)
+
+/** Running maxima of everything done so far; `against` mirrors detectPRs (domain/training.ts) condition by condition. */
+class History {
+  count = 0
+  maxWeight = -Infinity
+  maxE1rm = -Infinity
+  maxVolume = -Infinity
+  maxDuration = -Infinity
+  maxDistance = -Infinity
+  private weights: number[] = []
+  private reps: number[] = []
+
+  add(s: ExerciseSet) {
+    this.count++
+    if (num(s.weight) && s.weight > 0 && s.weight > this.maxWeight) this.maxWeight = s.weight
+    const e = num(s.weight) && num(s.reps) ? e1rm(s.weight, s.reps) : null
+    if (e !== null && e > this.maxE1rm) this.maxE1rm = e
+    if (num(s.weight) && num(s.reps)) {
+      this.weights.push(s.weight)
+      this.reps.push(s.reps)
+      const v = s.weight * s.reps
+      if (v > 0 && v > this.maxVolume) this.maxVolume = v
+    }
+    if (num(s.durationSec) && s.durationSec > 0 && s.durationSec > this.maxDuration) this.maxDuration = s.durationSec
+    if (num(s.distanceM) && s.distanceM > 0 && s.distanceM > this.maxDistance) this.maxDistance = s.distanceM
+  }
+
+  against(c: ExerciseSet): PRType[] {
+    if (this.count === 0) return []
+    const prs: PRType[] = []
+    if (num(c.weight) && c.weight > 0 && this.maxWeight > -Infinity && c.weight > this.maxWeight) prs.push('max_weight')
+    const ce = num(c.weight) && num(c.reps) ? e1rm(c.weight, c.reps) : null
+    if (ce !== null && this.maxE1rm > -Infinity && ce > this.maxE1rm + 1e-9) prs.push('max_e1rm')
+    if (num(c.weight) && c.weight > 0 && num(c.reps) && c.reps > 0) {
+      let best = -Infinity
+      for (let i = 0; i < this.weights.length; i++) if (this.weights[i]! >= c.weight && this.reps[i]! > best) best = this.reps[i]!
+      if (best > -Infinity && c.reps > best) prs.push('max_reps_at_weight')
+    }
+    const cv = num(c.weight) && num(c.reps) ? c.weight * c.reps : 0
+    if (cv > 0 && this.maxVolume > -Infinity && cv > this.maxVolume) prs.push('max_volume_set')
+    if (num(c.durationSec) && c.durationSec > 0 && this.maxDuration > -Infinity && c.durationSec > this.maxDuration) prs.push('max_duration')
+    if (num(c.distanceM) && c.distanceM > 0 && this.maxDistance > -Infinity && c.distanceM > this.maxDistance) prs.push('max_distance')
+    return prs
+  }
+}
+
+/**
+ * Same result as the reference in one ordered pass. Valid when sessions do not overlap in time (every set of an
+ * earlier session is before every set of a later one, the normal case); returns null otherwise so the caller falls back.
+ */
+function prsOrdered(done: ExerciseSet[]): Map<string, PRType[]> | null {
+  const bySession = new Map<string, ExerciseSet[]>()
+  for (const s of done) {
+    const list = bySession.get(s.sessionId)
+    if (list) list.push(s)
+    else bySession.set(s.sessionId, [s])
+  }
+  const sessions = [...bySession.values()].map((sets) => {
+    let min = sets[0]!
+    let max = sets[0]!
+    for (const s of sets) {
+      if (keyLess(s, min)) min = s
+      if (keyLess(max, s)) max = s
+    }
+    return { sets: sets.slice().sort((a, b) => a.setIndex - b.setIndex), min, max }
+  })
+  sessions.sort((a, b) => (keyLess(a.min, b.min) ? -1 : keyLess(b.min, a.min) ? 1 : 0))
+  let latest: ExerciseSet | null = null
+  for (const ss of sessions) {
+    if (latest && !keyLess(latest, ss.min)) return null
+    if (!latest || keyLess(latest, ss.max)) latest = ss.max
+  }
+  const found = new Map<string, PRType[]>()
+  const history = new History()
+  for (const ss of sessions) {
+    const { sets } = ss
+    for (let i = 0; i < sets.length; ) {
+      let j = i
+      while (j < sets.length && sets[j]!.setIndex === sets[i]!.setIndex) j++
+      for (let k = i; k < j; k++) {
+        const prs = history.against(sets[k]!)
+        if (prs.length) found.set(sets[k]!.id, prs)
+      }
+      for (let k = i; k < j; k++) history.add(sets[k]!)
+      i = j
+    }
+  }
+  const out = new Map<string, PRType[]>()
+  for (const s of done) {
+    const prs = found.get(s.id)
+    if (prs) out.set(s.id, prs)
+  }
+  return out
+}
+
+/** PRs for each completed set of one exercise, judged only against what came before it. */
+export function prsBySet(all: ExerciseSet[]): Map<string, PRType[]> {
+  const done = all.filter((s) => s.done && !isWarmupSet(s))
+  return prsOrdered(done) ?? prsBySetReference(all)
 }
 
 export function bestE1rm(sets: ExerciseSet[]): number | null {

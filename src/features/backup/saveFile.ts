@@ -130,22 +130,27 @@ async function saveNative(text: string, fileName: string, env: SaveEnv, chunk: n
   }
 }
 
+/** Hands already-serialised text (JSON, CSV…) to the platform. `ok: true` only when a file was really written or shared. */
+export async function saveTextFile(text: string, fileName: string, mime = 'application/json', env: SaveEnv = defaultSaveEnv, chunk = CHUNK_CHARS): Promise<SaveOutcome> {
+  const native = chooseSaveMethod(env.isNative()) === 'native'
+  if (native) return saveNative(text, fileName, env, chunk)
+  try {
+    env.download(new Blob([text], { type: mime }), fileName)
+    return { ok: true, method: 'download' }
+  } catch {
+    return { ok: false, reason: 'error', message: ERROR_MESSAGE }
+  }
+}
+
 /** Serialises `data` and hands it to the platform. Resolves `ok: true` only when a file was really written or shared. */
 export async function saveJsonFile(data: unknown, fileName: string, env: SaveEnv = defaultSaveEnv, chunk = CHUNK_CHARS): Promise<SaveOutcome> {
-  const native = chooseSaveMethod(env.isNative()) === 'native'
   let text: string
   try {
     text = JSON.stringify(data)
   } catch {
     return { ok: false, reason: 'error', message: ERROR_MESSAGE }
   }
-  if (native) return saveNative(text, fileName, env, chunk)
-  try {
-    env.download(new Blob([text], { type: 'application/json' }), fileName)
-    return { ok: true, method: 'download' }
-  } catch {
-    return { ok: false, reason: 'error', message: ERROR_MESSAGE }
-  }
+  return saveTextFile(text, fileName, 'application/json', env, chunk)
 }
 
 /** Offers the file written to Documents to other apps ("Compartir"). Never automatic. */

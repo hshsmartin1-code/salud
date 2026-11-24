@@ -15,6 +15,7 @@ import { Disclosure } from '../../ui/Disclosure'
 import { Icon } from '../../ui/Icon'
 import { useConfirm } from '../../ui/Confirm'
 import { Badge, Card, PageHeader, Segmented } from '../../ui/kit'
+import { ExportCsvCard, ImportTrainingCard } from './CsvCards'
 import { IMPORT_MERGE_HELP, IMPORT_MERGE_LABEL, replaceConfirmText, replaceWithSafetyCopy } from './replaceFlow'
 import { savedMessage, saveJsonFile, shareSavedFile } from './saveFile'
 import { mapPhase0, parsePhase0, type P0File } from './phase0'
@@ -92,6 +93,8 @@ export function BackupPage() {
       <div className="space-y-5">
         {profiles && profiles.length ? <ExportCard profiles={profiles} active={active} /> : null}
         <ImportCard profiles={profiles ?? []} onCreated={(id) => !active && setActive(id)} />
+        {active ? <ExportCsvCard key={`csv-${active.id}`} /> : null}
+        {active ? <ImportTrainingCard key={`csv-in-${active.id}`} /> : null}
         <p className="flex items-start gap-2 px-1 text-label text-muted" data-testid="backup-note">
           <Icon name="shield" size={16} className="mt-0.5 shrink-0" />
           <span>{BACKUP_NOTE}</span>

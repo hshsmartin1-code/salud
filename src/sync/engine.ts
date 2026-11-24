@@ -1,7 +1,7 @@
 import type { Table } from 'dexie'
 import type { SaludDB } from '../db/schema'
 import type { ExerciseSet, SyncConflict, SyncLink, SyncShadow } from '../db/types'
-import { cloudRowId, decodeRow, docKey, encodeRow, localRowId, shadowKey } from './codec'
+import { cloudRowId, decodeRow, docKey, encodeRow, localRowId, sameContent, shadowKey } from './codec'
 import { describeFromSets, mergeSessionRows } from './sessionMerge'
 import { RemoteError, type CommitOneResult, type RemoteDoc, type RemoteStore, type RemoteWrite } from './remote'
 import { AUTO_RESOLVE_TABLES, isSyncedTable, PROFILE_TABLE, SYNC_TABLES, TABLES_VERSION, type SyncedTableName } from './syncTables'
@@ -207,6 +207,10 @@ async function applyPage(db: SaludDB, link: SyncLink, docs: RemoteDoc[], now: Da
 
       if (localHash === remoteHash) {
         // Same content on both sides (or both deleted): just record the agreed revision.
+      } else if (localDirty && local && remoteRow && sameContent(t, local, remoteRow, pid)) {
+        // Only the timestamps differ: there is nothing to choose. Take the server's copy so both agree.
+        await writeLocal(db, t, pid, rowId, remoteRow)
+        applied++
       } else if (!localDirty && remoteRow === null && local && hold(t, local)) {
         // The session was deleted elsewhere while this device has unsynced changes to it: the row is
         // kept and the person's choice on the session conflict decides the session and its sets together.
@@ -487,10 +491,18 @@ async function push(db: SaludDB, link: SyncLink, remote: RemoteStore, opts: Sync
         continue
       }
       // Someone else changed it since our base: keep both versions for review, overwrite nothing.
+      let sameRecord = false
       await db.transaction('rw', [db.syncShadow, db.syncConflicts, db.profiles, ...syncTableNames(db)], async () => {
         const t = w.t as SyncedTableName
         const local = await readLocal(db, pid, t, rowId)
         const remoteRow = cur && !cur.del && cur.d ? (decodeRow(t, cur.id, cur.d, pid) as Row) : null
+        if (cur && local && remoteRow && sameContent(t, local, remoteRow, pid)) {
+          // The other device made the same change (only the timestamps differ): adopt its copy.
+          await writeLocal(db, t, pid, rowId, remoteRow)
+          await db.syncShadow.put(shadowRow(pid, t, w.key, rowId, cur.rev, curHash))
+          sameRecord = true
+          return
+        }
         await recordConflict(db, pid, t, w.key, rowId, local, remoteRow, cur?.rev ?? 0, now)
         await db.syncShadow.put(shadowRow(pid, t, w.key, rowId, cur?.rev ?? 0, curHash))
         if (t === 'trainingSessions' && !local && remoteRow) holdSets = true
@@ -500,7 +512,7 @@ async function push(db: SaludDB, link: SyncLink, remote: RemoteStore, opts: Sync
           holdSets = true
         }
       })
-      conflicts++
+      if (!sameRecord) conflicts++
     }
     // Every row refused: an account-level denial (revoked access), not one bad row.
     if (lastRefusal && refusedInBatch === batch.length) throw lastRefusal

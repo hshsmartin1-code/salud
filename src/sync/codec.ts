@@ -73,6 +73,21 @@ export function encodeRow(table: string, row: Record<string, unknown>, profileId
   return { cloudId, key: docKey(table, cloudId), d, h: contentHash(d) }
 }
 
+/**
+ * Whether two versions of one row hold the same record and differ at most in `createdAt`/`updatedAt`
+ * (the same change made on two devices, or the same composite-id row created on both). Such a pair is
+ * not a conflict: the account screen would show a card without any visible difference.
+ */
+export function sameContent(table: string, a: Record<string, unknown>, b: Record<string, unknown>, profileId: string): boolean {
+  const body = (r: Record<string, unknown>) => {
+    const { createdAt: _c, updatedAt: _u, ...rest } = r
+    void _c
+    void _u
+    return encodeRow(table, rest, profileId).d
+  }
+  return body(a) === body(b)
+}
+
 export function decodeRow(table: string, cloudId: string, d: string, profileId: string): Record<string, unknown> {
   const parsed: unknown = JSON.parse(d)
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Registro remoto inválido')

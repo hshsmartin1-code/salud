@@ -1,4 +1,4 @@
-import { APP_VERSION } from '../db/backup'
+import { APP_VERSION } from '../appVersion'
 import { createProfile, deleteProfile } from '../db/profiles'
 import { SCHEMA_VERSION, type SaludDB } from '../db/schema'
 import type { SyncLink } from '../db/types'

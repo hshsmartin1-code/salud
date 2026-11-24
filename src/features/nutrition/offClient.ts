@@ -1,5 +1,5 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
-import { APP_VERSION } from '../../db/backup'
+import { APP_VERSION } from '../../appVersion'
 import type { RefFood } from '../../db/types'
 import { barcodeKey, foodBarcode, foodQuery } from './foodSearchIndex'
 import { offToRefFood, type OffProduct, type OffResult } from './off'

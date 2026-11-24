@@ -79,10 +79,10 @@ export function readAndroidDist(directory) {
   return files
 }
 
-/** Versions the checkout declares (package.json and APP_VERSION in src/db/backup.ts) and the public OTA configuration of the Android build. */
+/** Versions the checkout declares (package.json and APP_VERSION in src/appVersion.ts) and the public OTA configuration of the Android build. */
 export function releaseContext(root = REPOSITORY) {
   const packageVersion = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).version
-  const appVersion = /export const APP_VERSION\s*=\s*'([^']+)'/.exec(readFileSync(resolve(root, 'src/db/backup.ts'), 'utf8'))?.[1]
+  const appVersion = /export const APP_VERSION\s*=\s*'([^']+)'/.exec(readFileSync(resolve(root, 'src/appVersion.ts'), 'utf8'))?.[1]
   return { packageVersion, appVersion, env: readAndroidEnv(root) }
 }
 

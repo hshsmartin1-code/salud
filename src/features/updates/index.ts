@@ -1,4 +1,4 @@
-import { APP_VERSION } from '../../db/backup'
+import { APP_VERSION } from '../../appVersion'
 import { SCHEMA_VERSION } from '../../db/schema'
 import { OTA_BUILD } from '../../ota/config'
 import { createCapgoInstaller, nativeAppInfo } from '../../ota/installer.capgo'

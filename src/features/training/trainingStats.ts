@@ -172,7 +172,12 @@ const PR_ORDER: PRType[] = ['max_weight', 'max_e1rm', 'max_reps_at_weight', 'max
 /** Every set that set a record at the time it was done (setId → types). Warm-ups never do. */
 export function allRecords(p: Prepared): Map<string, PRType[]> {
   const byExercise = new Map<string, ExerciseSet[]>()
-  for (const list of p.setsBySession.values()) for (const s of list) byExercise.set(s.exerciseId, [...(byExercise.get(s.exerciseId) ?? []), s])
+  for (const list of p.setsBySession.values())
+    for (const s of list) {
+      const same = byExercise.get(s.exerciseId)
+      if (same) same.push(s)
+      else byExercise.set(s.exerciseId, [s])
+    }
   const out = new Map<string, PRType[]>()
   for (const sets of byExercise.values()) for (const [id, types] of prsBySet(sets)) out.set(id, types)
   return out

@@ -1,4 +1,4 @@
-import { stableId } from '../db/backup'
+import { stableId } from '../db/stableId'
 import { PROFILE_TABLE } from './syncTables'
 
 /**

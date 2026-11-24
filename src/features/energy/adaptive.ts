@@ -6,10 +6,13 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useProfile, useRepo } from '../../app/profile'
 import { pickGoalForDate } from '../../db/queries'
 import type { Repo } from '../../db/repo'
-import type { BodyMeasurement, DayMark, EnergyAdjustment, FoodLog, Goal, ImportedDaily, Profile, StoredAdaptiveSettings } from '../../db/types'
+import type { BodyMeasurement, DayMark, EnergyAdjustment, FoodLog, Goal, HealthRecord, ImportedDaily, Profile, StoredAdaptiveSettings } from '../../db/types'
 import {
   adaptiveSettingsForGoal,
+  BODY_FAT_MAX_AGE_DAYS,
+  chooseEnergyDensity,
   DEFAULT_ADAPTIVE_SETTINGS,
+  type EnergyDensityChoice,
   estimateObservedTdee,
   proposeAdjustment,
   sanitizeAdaptiveSettings,
@@ -23,7 +26,7 @@ import {
 } from '../../domain/adaptiveEnergy'
 import { addDays, dateRange, formatDateEs, todayLocal } from '../../domain/dates'
 import { activeKcalByDay, sourcesLabel } from '../dashboard/controlCenter'
-import { ACTIVITY_LEVELS, ageFromBirthDate, mifflinStJeor } from '../../domain/energy'
+import { ACTIVITY_LEVELS, ageFromBirthDate, energyRestriction, mifflinStJeor, PAL_BANDS, schofieldBmr, type EnergyMethod } from '../../domain/energy'
 import { sumNutrients } from '../../domain/nutrients'
 import { formatNumber } from '../../domain/units'
 
@@ -31,8 +34,11 @@ export interface FormulaEstimate {
   bmr: number
   tdee: number
   activityEs: string
+  /** Activity factor (Mifflin) or PAL (RIEN). */
   factor: number
   weightKg: number
+  /** Equation of the current goal ('mifflin' when the goal has none). */
+  method: EnergyMethod
 }
 
 export interface AdaptiveState {
@@ -53,6 +59,13 @@ export interface AdaptiveState {
   weekly: WeeklyTdeePoint[]
   /** Recorded activity in the window — context only, never added to the estimate (it is already inside it). */
   activity: { meanKcal: number | null; days: number; sources: string }
+  /** kcal per kg of weight change used: Forbes/Hall from a recent body-fat estimate, else 7700. */
+  energyDensity: EnergyDensityChoice
+  /**
+   * Under 18, pregnancy or lactation: adaptive changes are off whatever the stored mode (the stored setting
+   * is kept untouched) and the estimate is informational only. null otherwise.
+   */
+  restriction: { key: 'minor' | 'pregnant' | 'lactating'; text: string } | null
 }
 
 export interface WeeklyTdeePoint {
@@ -102,10 +115,19 @@ export function buildWeighIns(rows: BodyMeasurement[]): WeighIn[] {
     .map((m) => ({ date: m.date, weightKg: m.weightKg as number, approx: !!m.approx, excluded: !!m.excludeFromStats }))
 }
 
+/**
+ * Formula prior of the adaptive estimate: the SAME equation as the current goal. A goal calculated with the
+ * RIEN method uses Schofield × its PAL (adults); everything else uses Mifflin-St Jeor × activity factor.
+ */
 export function formulaEstimate(profile: Profile, goal: Goal | null, weight: { kg: number } | null, today: string): { formula: FormulaEstimate | null; missing: string[] } {
   const missing: string[] = []
   const heightCm = profile.heightCm ?? goal?.inputs?.heightCm ?? null
   const ageYears = profile.birthDate ? ageFromBirthDate(profile.birthDate, today) : (goal?.inputs?.ageYears ?? null)
+  const band = goal?.inputs?.method === 'rien' ? PAL_BANDS.find((b) => b.key === goal.inputs?.palBand) : undefined
+  if (band && weight && ageYears !== null && ageYears >= 18) {
+    const bmr = schofieldBmr({ weightKg: weight.kg, ageYears, sex: profile.sex })
+    return { formula: { bmr, tdee: bmr * band.pal, activityEs: `PAL ${band.es.toLowerCase()}`, factor: band.pal, weightKg: weight.kg, method: 'rien' }, missing }
+  }
   const activity = ACTIVITY_LEVELS.find((l) => l.key === (goal?.inputs?.activity ?? profile.activity))
   if (!weight) missing.push('un peso registrado')
   if (!heightCm) missing.push('la estatura')
@@ -113,7 +135,18 @@ export function formulaEstimate(profile: Profile, goal: Goal | null, weight: { k
   if (!activity) missing.push('el nivel de actividad')
   if (!weight || !heightCm || ageYears === null || !activity) return { formula: null, missing }
   const bmr = mifflinStJeor({ weightKg: weight.kg, heightCm, ageYears, sex: profile.sex })
-  return { formula: { bmr, tdee: bmr * activity.factor, activityEs: activity.es, factor: activity.factor, weightKg: weight.kg }, missing }
+  return { formula: { bmr, tdee: bmr * activity.factor, activityEs: activity.es, factor: activity.factor, weightKg: weight.kg, method: 'mifflin' }, missing }
+}
+
+/** Body-fat estimates of the profile: skinfold calculations and Health Connect records (excluded rows left out). */
+export function bodyFatPoints(body: BodyMeasurement[], health: HealthRecord[]): { date: string; pct: number }[] {
+  const out: { date: string; pct: number }[] = []
+  for (const m of body) {
+    const pct = m.derived?.bodyFatPct
+    if (!m.excludeFromStats && typeof pct === 'number' && Number.isFinite(pct)) out.push({ date: m.date, pct })
+  }
+  for (const h of health) if (h.provider === 'health-connect' && h.metric === 'bodyFat' && !h.excluded && h.value !== null) out.push({ date: h.date, pct: h.value })
+  return out
 }
 
 export function resolveSettings(goal: Goal | null, stored: StoredAdaptiveSettings | undefined): AdaptiveSettings {
@@ -149,6 +182,8 @@ export async function loadAdaptiveState(r: Repo, profile: Profile, today: string
   // History before the window: tells the module whether the record reaches back far enough, and
   // feeds the weekly evolution (8 windows ending one week apart).
   const lookback = addDays(from, -60)
+  // Health Connect rows: the window (activity context) and the last 90 days (body fat for the energy density).
+  const fatFrom = addDays(to, -(BODY_FAT_MAX_AGE_DAYS - 1))
   const [logs, imported, marks, body, history, acts, health] = await Promise.all([
     r.range('foodLogs', lookback, to),
     r.range('importedDaily', lookback, to),
@@ -156,7 +191,7 @@ export async function loadAdaptiveState(r: Repo, profile: Profile, today: string
     r.all('bodyMeasurements'),
     r.all('energyAdjustments'),
     r.range('activityLogs', from, to),
-    r.range('healthRecords', from, to),
+    r.range('healthRecords', fatFrom < from ? fatFrom : from, to),
   ])
   history.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
   const weight = latestWeighIn(body.filter((m) => m.date <= today))
@@ -164,7 +199,13 @@ export async function loadAdaptiveState(r: Repo, profile: Profile, today: string
   const actDays = activeKcalByDay(acts, health, dateRange(from, to))
   const actVals = actDays.filter((d) => d.value !== null).map((d) => d.value as number)
   const activity = { meanKcal: actVals.length ? actVals.reduce((a, b) => a + b, 0) / actVals.length : null, days: actVals.length, sources: sourcesLabel(actDays) }
-  const state: AdaptiveState = { today, to, goal, settings, stored, weight, formula, missing, observed: null, proposal: null, history, weekly: [], activity }
+  const energyDensity = chooseEnergyDensity({ weightKg: weight?.kg ?? null, bodyFat: bodyFatPoints(body, health), to })
+  settings.energyPerKgKcal = energyDensity.kcalPerKg
+  const ageYears = profile.birthDate ? safeAge(profile.birthDate, today) : (goal?.inputs?.ageYears ?? null)
+  const restriction = energyRestriction({ ageYears, physiologicalState: profile.physiologicalState })
+  // Restricted profiles: the estimate stays visible as information, but nothing is ever proposed or applied.
+  if (restriction) settings.mode = 'off'
+  const state: AdaptiveState = { today, to, goal, settings, stored, weight, formula, missing, observed: null, proposal: null, history, weekly: [], activity, energyDensity, restriction }
   if (!formula) return state
 
   const intake = buildIntakeDays(logs, imported, marks)
@@ -191,6 +232,14 @@ export async function loadAdaptiveState(r: Repo, profile: Profile, today: string
     today,
   })
   return state
+}
+
+function safeAge(birth: string, today: string): number | null {
+  try {
+    return ageFromBirthDate(birth, today)
+  } catch {
+    return null
+  }
 }
 
 export function useAdaptiveEnergy(today = todayLocal()): AdaptiveState | undefined {

@@ -227,3 +227,52 @@ describe('V2: weekly evolution and activity context', () => {
     expect(s.observed!.observedTdee).toBe(before)
   })
 })
+
+describe('3.3: equation of the goal, energy density and restricted profiles', () => {
+  it('a goal calculated with RIEN uses Schofield × its PAL as the formula prior', () => {
+    const p = { sex: 'male', birthDate: '2001-01-01', heightCm: 175, activity: 'moderate' } as unknown as Profile
+    const inputs = { weightKg: 70, heightCm: 175, ageYears: 25, sex: 'male', activity: 'moderate', goal: 'maintain', deficitKcal: 400, surplusKcal: 250, proteinGPerKg: 1.8, fatPct: 0.27, fiberPer1000: 14, method: 'rien', palBand: 'light', pal: 1.55 } as const
+    const g = { ...goalRow(2700, { inputs: { ...inputs } }), id: 'g', profileId: 'p', createdAt: '', updatedAt: '' } as Goal
+    const { formula } = formulaEstimate(p, g, { kg: 70 }, TODAY)
+    expect(formula?.method).toBe('rien')
+    expect(formula!.bmr).toBeCloseTo(15.057 * 70 + 692.2, 6)
+    expect(formula!.tdee).toBeCloseTo((15.057 * 70 + 692.2) * 1.55, 6)
+    // Goals without a method keep Mifflin-St Jeor × factor.
+    const old = { ...g, inputs: { ...inputs, method: undefined, palBand: undefined } } as Goal
+    expect(formulaEstimate(p, old, { kg: 70 }, TODAY).formula?.method).toBe('mifflin')
+  })
+
+  it('uses a recent body-fat % for the energy density, and says 7700 otherwise', async () => {
+    const [p, r] = await mkProfile('Perfil Uno', { mode: 'suggest', phase: 'deficit', targetRatePctPerWeek: -0.5 })
+    await seedSteadyLoss(r)
+    await r.add('goals', goalRow(2300))
+    const plain = await loadAdaptiveState(r, p, TODAY)
+    expect(plain.energyDensity).toMatchObject({ source: 'default', kcalPerKg: 7700 })
+    await r.add('bodyMeasurements', { date: addDays(TODAY, -10), weightKg: null, circumferences: {}, skinfolds: {}, protocol: 'jp3_male', derived: { sum: 40, bodyFatPct: 12 } } as never)
+    const lean = await loadAdaptiveState(r, p, TODAY)
+    expect(lean.energyDensity.source).toBe('body-fat')
+    expect(lean.energyDensity.bodyFatPct).toBe(12)
+    expect(lean.settings.energyPerKgKcal).toBeLessThan(7000)
+    // Same intake and weight trend, lower density → lower observed expenditure.
+    expect(lean.observed!.observedTdee!).toBeLessThan(plain.observed!.observedTdee!)
+  })
+
+  it('pregnancy, lactation or age under 18: the estimate stays informational and nothing is proposed', async () => {
+    const [p, r] = await mkProfile('Perfil Uno', { mode: 'auto', phase: 'deficit', targetRatePctPerWeek: -0.5 })
+    await seedSteadyLoss(r)
+    await r.add('goals', goalRow(2000))
+    const preg = { ...p, physiologicalState: 'pregnant' as const }
+    const s = await loadAdaptiveState(r, preg, TODAY)
+    expect(s.restriction?.key).toBe('pregnant')
+    expect(s.settings.mode).toBe('off')
+    expect(s.stored?.mode).toBe('auto') // the stored choice is never rewritten
+    expect(s.observed?.status).toBe('ok')
+    expect(s.proposal?.status).toBe('disabled')
+    expect(await applyProposal(r, s, 'auto')).toBeNull()
+    const teen = await loadAdaptiveState(r, { ...p, birthDate: '2010-01-01' }, TODAY)
+    expect(teen.restriction?.key).toBe('minor')
+    expect(teen.proposal?.status).toBe('disabled')
+    const free = await loadAdaptiveState(r, p, TODAY)
+    expect(free.restriction).toBeNull()
+  })
+})

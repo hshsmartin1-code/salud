@@ -23,7 +23,7 @@
  *    spikes are removed, multi-day plateaus are averaged out by the 28-day window.
  */
 import { addDays, dateRange, dayNumber, daysBetween, formatDateEs } from './dates';
-import type { GoalType, Sex } from './energy';
+import { ABSOLUTE_MIN_KCAL, safetyFloorKcal, type GoalType, type Sex } from './energy';
 import { dailyMean, linearTrendPerWeek } from './stats';
 import type { DatedPoint } from './stats';
 import { formatNumber } from './units';
@@ -82,7 +82,7 @@ export const DEFAULT_ADAPTIVE_SETTINGS: AdaptiveSettings = Object.freeze({
   minWeighIns: 8,
   maxStepKcal: 150,
   cooldownDays: 14,
-  energyPerKgKcal: 7700, // approximation for mixed fat + lean tissue, not a constant of nature
+  energyPerKgKcal: 7700, // approximation for mixed fat + lean tissue, not a constant of nature (see chooseEnergyDensity)
   minKcalFloor: null,
 });
 
@@ -103,8 +103,61 @@ export const OUTLIER_MIN_POINTS = 5;
 export const MIN_WEIGHT_SCALE_KG = 0.3;
 /** Changes smaller than this are ignored. */
 export const NO_CHANGE_THRESHOLD_KCAL = 50;
-/** No floor (custom or computed) can go below this. */
-export const ABSOLUTE_MIN_KCAL = 1000;
+/** No floor (custom or computed) can go below this (defined with the shared floor in ./energy). */
+export { ABSOLUTE_MIN_KCAL };
+
+// ───────────────────────── energy density of weight change ─────────────────────────
+
+/** Rule-of-thumb density of a kg of body-weight change (mixed fat + lean tissue). */
+export const DEFAULT_ENERGY_PER_KG_KCAL = 7700;
+/** Hall 2008 (IJO 32:573): fat tissue 39,5 MJ/kg and lean tissue 7,6 MJ/kg, in kcal (÷ 4,184). */
+export const FAT_TISSUE_KCAL_PER_KG = 39500 / 4.184; // ≈ 9441
+export const LEAN_TISSUE_KCAL_PER_KG = 7600 / 4.184; // ≈ 1816
+/** Forbes (1987): dLean/dWeight = C / (C + fat mass), C = 10,4 kg. */
+export const FORBES_C_KG = 10.4;
+/** A body-fat estimate older than this (days before the window end) is not used. */
+export const BODY_FAT_MAX_AGE_DAYS = 90;
+
+/**
+ * Energy density (kcal/kg) of a small change of body weight for a person with `bodyFatPct` % fat, by the
+ * Forbes partition and Hall's tissue densities: p = 10,4/(10,4 + G); ρ = p·1816 + (1 − p)·9440, with G the
+ * fat mass in kg. About 5550 kcal/kg at 10 kg of fat, 6830 at 20 kg, 7480 at 30 kg: 7700 only fits people
+ * with more than ~30 kg of fat. Clamped to the sanitised range 5000–9500.
+ */
+export function energyDensityForbesHall(weightKg: number, bodyFatPct: number): number {
+  assertPositive('El peso (kg)', weightKg);
+  if (!Number.isFinite(bodyFatPct) || bodyFatPct <= 0 || bodyFatPct >= 100) throw new Error('El % de grasa debe estar entre 0 y 100');
+  const fatKg = (weightKg * bodyFatPct) / 100;
+  const leanShare = FORBES_C_KG / (FORBES_C_KG + fatKg);
+  return clamp(leanShare * LEAN_TISSUE_KCAL_PER_KG + (1 - leanShare) * FAT_TISSUE_KCAL_PER_KG, 5000, 9500);
+}
+
+export interface EnergyDensityChoice {
+  kcalPerKg: number;
+  /** 'body-fat' = Forbes/Hall from a recent body-fat estimate; 'default' = 7700 (no usable estimate). */
+  source: 'body-fat' | 'default';
+  bodyFatPct: number | null;
+  fatMassKg: number | null;
+  date: string | null;
+}
+
+/**
+ * Picks the energy density for the adaptive estimate: Forbes/Hall from the most recent plausible body-fat
+ * estimate (3–70 %) dated within BODY_FAT_MAX_AGE_DAYS before `to`, when the weight is known; otherwise 7700.
+ */
+export function chooseEnergyDensity(args: { weightKg: number | null; bodyFat: { date: string; pct: number }[]; to: string }): EnergyDensityChoice {
+  const fallback: EnergyDensityChoice = { kcalPerKg: DEFAULT_ENERGY_PER_KG_KCAL, source: 'default', bodyFatPct: null, fatMassKg: null, date: null };
+  const w = args.weightKg;
+  if (w === null || !Number.isFinite(w) || w < 20 || w > 400) return fallback;
+  const from = addDays(args.to, -(BODY_FAT_MAX_AGE_DAYS - 1));
+  let pick: { date: string; pct: number } | null = null;
+  for (const b of args.bodyFat) {
+    if (!Number.isFinite(b.pct) || b.pct < 3 || b.pct > 70 || b.date < from || b.date > args.to) continue;
+    if (!pick || b.date > pick.date) pick = b;
+  }
+  if (!pick) return fallback;
+  return { kcalPerKg: energyDensityForbesHall(w, pick.pct), source: 'body-fat', bodyFatPct: pick.pct, fatMassKg: (w * pick.pct) / 100, date: pick.date };
+}
 /**
  * Confidence of an 'ok' estimate (anything not high/medium is low):
  * high: observation SE ≤ 120 kcal and ≥ 85 % of window days with valid intake;
@@ -605,7 +658,8 @@ export function proposeAdjustment(args: {
   assertPositive('La TMB (kcal)', bmr);
   const s = sanitizeAdaptiveSettings(args.settings);
   const rateClamped = args.settings.targetRatePctPerWeek !== s.targetRatePctPerWeek;
-  const floorRaw = s.minKcalFloor ?? Math.max(bmr, sex === 'female' ? 1200 : 1500, ABSOLUTE_MIN_KCAL);
+  // Same orientative floor as the goal calculation (safetyFloorKcal in ./energy), unless set by the person.
+  const floorRaw = s.minKcalFloor ?? safetyFloorKcal(sex, bmr);
   const floorKcal = Math.ceil(floorRaw / 10) * 10;
   const cur = f0(currentKcal);
 

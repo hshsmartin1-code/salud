@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   ABSOLUTE_MIN_KCAL,
+  DEFAULT_ENERGY_PER_KG_KCAL,
+  FAT_TISSUE_KCAL_PER_KG,
+  LEAN_TISSUE_KCAL_PER_KG,
+  chooseEnergyDensity,
+  energyDensityForbesHall,
   DEFAULT_ADAPTIVE_SETTINGS,
   PHASE_RATE_LIMITS,
   adaptiveSettingsForGoal,
@@ -23,7 +28,7 @@ import type {
   WeighIn,
 } from './adaptiveEnergy';
 import { addDays } from './dates';
-import type { Sex } from './energy';
+import { safetyFloorKcal, type Sex } from './energy';
 import { dailyMean, linearTrendPerWeek } from './stats';
 
 const TO = '2026-11-15';
@@ -838,5 +843,47 @@ describe('end to end', () => {
     const again = proposeAdjustment({ ...args, currentKcal: record.toKcal, history: [record], today: addDays(TO, 3) });
     expect(again.status).toBe('cooldown');
     expect(again.nextEligibleDate).toBe(addDays(TO, 14));
+  });
+});
+
+describe('energy density of weight change (Forbes/Hall)', () => {
+  it('matches the Hall 2008 / Forbes values by fat mass', () => {
+    // 100 kg body weight so that % = kg of fat.
+    expect(energyDensityForbesHall(100, 10)).toBeCloseTo(5552, -1);
+    expect(energyDensityForbesHall(100, 15)).toBeCloseTo(6320, -1);
+    expect(energyDensityForbesHall(100, 20)).toBeCloseTo(6830, -1);
+    expect(energyDensityForbesHall(100, 30)).toBeCloseTo(7480, -1);
+    expect(energyDensityForbesHall(100, 40)).toBeCloseTo(7870, -1);
+    expect(FAT_TISSUE_KCAL_PER_KG).toBeCloseTo(9440.7, 1);
+    expect(LEAN_TISSUE_KCAL_PER_KG).toBeCloseTo(1816.4, 1);
+    // Clamped to the sanitised range.
+    expect(energyDensityForbesHall(40, 3)).toBe(5000);
+    expect(() => energyDensityForbesHall(70, 0)).toThrow();
+  });
+  it('uses a recent body-fat estimate, else 7700', () => {
+    const recent = chooseEnergyDensity({ weightKg: 75, bodyFat: [{ date: '2026-10-01', pct: 30 }, { date: '2026-11-01', pct: 20 }], to: TO });
+    expect(recent).toMatchObject({ source: 'body-fat', bodyFatPct: 20, date: '2026-11-01', fatMassKg: 15 });
+    expect(recent.kcalPerKg).toBeCloseTo(energyDensityForbesHall(75, 20), 6);
+    expect(recent.kcalPerKg).toBeLessThan(DEFAULT_ENERGY_PER_KG_KCAL);
+    // Older than 90 days, implausible, after the window end, or no weight → the 7700 assumption.
+    expect(chooseEnergyDensity({ weightKg: 75, bodyFat: [{ date: '2026-08-01', pct: 20 }], to: TO }).source).toBe('default');
+    expect(chooseEnergyDensity({ weightKg: 75, bodyFat: [{ date: '2026-11-01', pct: 85 }], to: TO }).source).toBe('default');
+    expect(chooseEnergyDensity({ weightKg: 75, bodyFat: [{ date: '2026-11-20', pct: 20 }], to: TO }).source).toBe('default');
+    expect(chooseEnergyDensity({ weightKg: null, bodyFat: [{ date: '2026-11-01', pct: 20 }], to: TO })).toMatchObject({ source: 'default', kcalPerKg: 7700 });
+  });
+  it('a lean person gets a lower observed TDEE for the same weight loss', () => {
+    const data = buildProfile({ seed: 11, intakeKcal: 2000, startKg: 70, kgPerWeek: -0.5 });
+    const rho = energyDensityForbesHall(70, 18);
+    const at7700 = run(data, { formulaTdee: 2500 });
+    const lean = run(data, { formulaTdee: 2500, settings: { energyPerKgKcal: rho } });
+    expect(at7700.status).toBe('ok');
+    expect(lean.status).toBe('ok');
+    // observed = mean intake − trend·ρ/7, so the difference is −trend/7 × (7700 − ρ) (≈ 100 kcal here).
+    expect(at7700.observedTdee! - lean.observedTdee!).toBeCloseTo((-at7700.trendKgPerWeek! / 7) * (7700 - rho), 6);
+    expect(at7700.observedTdee! - lean.observedTdee!).toBeGreaterThan(50);
+  });
+  it('the adaptive floor is the shared safety floor of the goal calculation', () => {
+    expect(safetyFloorKcal('female', 1100)).toBe(1200);
+    expect(safetyFloorKcal('male', 1650)).toBe(1650);
   });
 });

@@ -611,8 +611,17 @@ export interface SyncLink {
   displayName: string | null
   linkedAt: string
   state: SyncLinkState
-  /** Server time (ms) of the newest remote change already applied. null = never pulled. */
+  /** Server time (µs) of the newest remote change already applied. null = never pulled. */
   cursor: number | null
+  /** Document key of that change (one push batch shares one server time). Absent on older links. */
+  cursorKey?: string | null
+  /** Device time (ms) when the current cursor was first seen. */
+  cursorSeenAt?: number | null
+  /**
+   * The overlap window behind the cursor was re-read late enough that no older write can still appear
+   * (see PULL_OVERLAP_US in sync/engine.ts): pulls start right after the cursor until it moves.
+   */
+  cursorSettled?: boolean
   /** Sync table list the cursor was built with; a new synced table forces one full pull. */
   tablesVersion: string
   lastSyncAt: string | null

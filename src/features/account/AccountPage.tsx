@@ -14,7 +14,7 @@ import { CONFLICT_TEXT, SYNC_ERROR_TEXT } from '../../sync/copy'
 import { resolveSlots } from '../nutrition/mealSlots'
 import { choiceHelp, choiceLabel, conflictFields, conflictTitle, discardSentence, removalSentence, type MealNames } from '../../sync/fieldLabels'
 import { canKeepBoth, canMerge, conflictGroups, isSessionDeletedElsewhere, isSessionDeletedHere, resolveConflict, restoreDeletedFromCloud, type ConflictChoice } from '../../sync/engine'
-import type { Account, LinkPreview } from '../../sync/link'
+import type { Account, DuplicateSummary, LinkPreview } from '../../sync/link'
 import { refreshScheduler, remoteFor, runSync } from '../../sync/service'
 import { deriveStatus, STATUS_LABEL, STATUS_TONE, type SyncStatus } from '../../sync/status'
 import { NOT_SYNCED, PROFILE_TABLE } from '../../sync/syncTables'
@@ -149,6 +149,36 @@ function Counts({ title, counts, total }: { title: string; counts: Record<string
 
 type Strategy = 'merge' | 'new-profile'
 
+/** Probable duplicates found before "Unir", with the option to leave them out (on by default). */
+function LinkDuplicates({ summary, failed, skip, onSkip }: { summary: DuplicateSummary | null; failed: boolean; skip: boolean; onSkip: (v: boolean) => void }) {
+  if (failed) return <Notice tone="warn">No se pudo revisar si hay registros repetidos en los dos lados. Si unes, se conservan todos.</Notice>
+  if (!summary?.pairs.length) return null
+  const parts = Object.entries(summary.byTable).map(([t, n]) => `${formatNumber(n, 0)} en ${tableLabel(t).toLowerCase()}`)
+  return (
+    <div className="space-y-2" data-testid="link-duplicates">
+      <Notice tone="warn">
+        Posibles duplicados: {parts.join(', ')}. Son registros iguales guardados por separado aquí y en la cuenta (por ejemplo, la misma comida, el mismo día y la misma cantidad). Si se unen
+        los dos, se cuentan dos veces.
+      </Notice>
+      {summary.skippable > 0 ? (
+        <label className="flex items-start gap-2.5 text-sm">
+          <input type="checkbox" className="mt-0.5 h-4 w-4" checked={skip} onChange={(e) => onSkip(e.target.checked)} data-testid="skip-duplicates" />
+          <span>
+            <strong>Omitir duplicados probables</strong>
+            <span className="block text-xs text-muted">
+              No se sube la copia de este dispositivo ni se descarga la de la cuenta: cada lado conserva la suya y no se borra nada. Si después cambias una de las dos, ese cambio se
+              sincroniza como cualquier otro.
+            </span>
+          </span>
+        </label>
+      ) : null}
+      {summary.byTable.trainingSessions ? (
+        <p className="text-xs text-muted">Las sesiones de entrenamiento se unen igual, porque cada una lleva sus series. Si sobra una, bórrala después en Entreno.</p>
+      ) : null}
+    </div>
+  )
+}
+
 function LinkWizard({ profile, account, onStart, onFinish }: { profile: Profile; account: Account; onStart: () => void; onFinish: () => void }) {
   const { setActive } = useProfiles()
   const [preview, setPreview] = useState<LinkPreview | null>(null)
@@ -156,6 +186,7 @@ function LinkWizard({ profile, account, onStart, onFinish }: { profile: Profile;
   const [strategy, setStrategy] = useState<Strategy>('merge')
   const [owner, setOwner] = useState(false)
   const [sameName, setSameName] = useState(false)
+  const [skipDuplicates, setSkipDuplicates] = useState(true)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [savedNote, setSavedNote] = useState<string | null>(null)
@@ -166,7 +197,7 @@ function LinkWizard({ profile, account, onStart, onFinish }: { profile: Profile;
     void (async () => {
       try {
         const { previewLink } = await import('../../sync/link')
-        const p = await previewLink(db, profile.id, await remoteFor(profile.id))
+        const p = await previewLink(db, profile.id, await remoteFor(profile.id), { duplicates: true })
         if (!alive) return
         setPreview(p)
         if (p.nameMismatch) setStrategy('new-profile')
@@ -199,14 +230,20 @@ function LinkWizard({ profile, account, onStart, onFinish }: { profile: Profile;
       const link = await import('../../sync/link')
       const remote = await remoteFor(profile.id)
       if (strategy === 'merge') {
-        const r = await link.linkProfile(db, profile.id, remote, account, { confirmNameMismatch: sameName })
+        const r = await link.linkProfile(db, profile.id, remote, account, {
+          confirmNameMismatch: sameName,
+          skipDuplicates: skipDuplicates ? preview?.duplicates?.pairs : undefined,
+        })
+        const n = r.skippedDuplicates
+        const skipped = !n ? '' : n === 1 ? ' Se omitió 1 duplicado probable: cada lado conserva su copia.' : ` Se omitieron ${n} duplicados probables: cada lado conserva su copia.`
         setDone({
           ok: r.verify.ok,
-          detail: r.verify.ok
-            ? `Vinculado y verificado: ${r.sync.pushed} registros subidos, ${r.sync.applied} recibidos.`
-            : r.verify.conflicts
-              ? `Vinculado. Hay ${r.verify.conflicts} registros distintos en ambos lados: revísalos abajo; no se sobrescribió nada.`
-              : 'Vinculado, pero la verificación aún no cuadra. Se completa sola en la próxima sincronización.',
+          detail:
+            (r.verify.ok
+              ? `Vinculado y verificado: ${r.sync.pushed} registros subidos, ${r.sync.applied} recibidos.`
+              : r.verify.conflicts
+                ? `Vinculado. Hay ${r.verify.conflicts} registros distintos en ambos lados: revísalos abajo; no se sobrescribió nada.`
+                : 'Vinculado, pero la verificación aún no cuadra. Se completa sola en la próxima sincronización.') + skipped,
         })
       } else {
         const r = await link.createProfileFromAccount(db, remote, account)
@@ -297,6 +334,9 @@ function LinkWizard({ profile, account, onStart, onFinish }: { profile: Profile;
                 <span className="block text-xs text-muted">Crea otro perfil con los datos de la cuenta. «{profile.name}» queda igual y sin vincular.</span>
               </span>
             </label>
+          ) : null}
+          {strategy === 'merge' ? (
+            <LinkDuplicates summary={preview.duplicates} failed={preview.duplicatesFailed} skip={skipDuplicates} onSkip={setSkipDuplicates} />
           ) : null}
           <Notice>
             Recomendado: guarda un respaldo antes.{' '}

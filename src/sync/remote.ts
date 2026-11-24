@@ -49,6 +49,8 @@ export interface RemoteStore {
   commitOne(write: RemoteWrite): Promise<CommitOneResult>
   /** Non-deleted rows per table. */
   liveCounts(): Promise<Record<string, number>>
+  /** Non-deleted documents of one table ordered by key, after `afterKey` (one read per document). */
+  listLive(table: string, afterKey: string | null, limit: number): Promise<RemoteDoc[]>
   getMeta(): Promise<RemoteMeta | null>
   setMeta(meta: RemoteMeta): Promise<void>
   /** Erase every document of this account (data deletion). Returns the number removed. */

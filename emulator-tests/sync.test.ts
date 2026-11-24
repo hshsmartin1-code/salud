@@ -7,7 +7,7 @@ import { repo } from '../src/db/repo'
 import { createDB, type SaludDB } from '../src/db/schema'
 import { resolveConflict, syncProfile } from '../src/sync/engine'
 import { FirestoreRemote } from '../src/sync/firestoreRemote'
-import { createProfileFromAccount, deleteCloudData, linkProfile } from '../src/sync/link'
+import { createProfileFromAccount, deleteCloudData, linkProfile, previewLink } from '../src/sync/link'
 import { RemoteError } from '../src/sync/remote'
 
 // The real sync engine against the Firestore emulator and the real security rules. Synthetic data.
@@ -139,5 +139,73 @@ describe('sync over Firestore', () => {
     await food(b, pb, 'Nuevo en B')
     await expect(syncProfile(b, pb, remote(ANA.uid))).rejects.toMatchObject({ code: 'cloud-reset' })
     expect((await remote(ANA.uid).liveCounts()).foodLogs).toBe(1)
+  })
+})
+
+describe('read cost and "Unir" duplicates over Firestore', () => {
+  it('idle pulls settle the overlap window, then resume strictly after the last document', async () => {
+    const a = await device()
+    const pa = (await mkProfile(a, 'Ana')).id
+    for (let i = 0; i < 30; i++) await food(a, pa, `C${i}`, i + 1)
+    await linkProfile(a, pa, remote(ANA.uid), ANA)
+    const b = await device()
+    const { profileId: pb } = await createProfileFromAccount(b, remote(ANA.uid), ANA)
+    let offset = 0
+    const now = () => new Date(Date.now() + offset)
+    expect((await syncProfile(b, pb, remote(ANA.uid), { now })).pulled).toBe(31) // window re-read
+    offset += 5 * 60_000 // device time only: the settle rule never trusts the server clock
+    expect((await syncProfile(b, pb, remote(ANA.uid), { now })).pulled).toBe(31) // last re-read
+    expect((await b.syncLinks.get(pb))?.cursorSettled).toBe(true)
+    expect((await syncProfile(b, pb, remote(ANA.uid), { now })).pulled).toBe(0)
+    await food(a, pa, 'Nueva')
+    await syncProfile(a, pa, remote(ANA.uid))
+    const r = await syncProfile(b, pb, remote(ANA.uid), { now })
+    expect([r.pulled, r.applied]).toEqual([1, 1])
+    expect(await repo(pb, b).count('foodLogs')).toBe(31)
+  })
+
+  it('a link stored by the previous version (no cursor key) learns it and settles without an invalid cursor', async () => {
+    const a = await device()
+    const pa = (await mkProfile(a, 'Ana')).id
+    await food(a, pa, 'Arroz')
+    await linkProfile(a, pa, remote(ANA.uid), ANA)
+    const b = await device()
+    const { profileId: pb } = await createProfileFromAccount(b, remote(ANA.uid), ANA)
+    const link = (await b.syncLinks.get(pb))!
+    await b.syncLinks.put({ ...link, cursorKey: undefined, cursorSeenAt: undefined, cursorSettled: undefined })
+    let offset = 0
+    const now = () => new Date(Date.now() + offset)
+    await syncProfile(b, pb, remote(ANA.uid), { now })
+    offset += 5 * 60_000
+    await syncProfile(b, pb, remote(ANA.uid), { now })
+    expect((await syncProfile(b, pb, remote(ANA.uid), { now })).pulled).toBe(0)
+  })
+
+  it('previews probable duplicates and leaves them out under the real rules; later edits still sync', async () => {
+    const a = await device()
+    const pa = (await mkProfile(a, 'Ana')).id
+    await food(a, pa, 'arroz', 150)
+    await repo(pa, a).add('bodyMeasurements', { date: '2026-11-10', weightKg: 70.4, circumferences: {}, skinfolds: {}, protocol: null, derived: null } as never)
+    await linkProfile(a, pa, remote(ANA.uid), ANA)
+    const b = await device()
+    const pb = (await mkProfile(b, 'Ana')).id
+    const bLunch = await food(b, pb, 'arroz', 150)
+    const bWeight = await repo(pb, b).add('bodyMeasurements', { date: '2026-11-10', weightKg: 70.4, circumferences: {}, skinfolds: {}, protocol: null, derived: null } as never)
+    await food(b, pb, 'kiwi', 80)
+    const p = await previewLink(b, pb, remote(ANA.uid), { duplicates: true })
+    expect(p.duplicatesFailed).toBe(false)
+    expect(p.duplicates?.byTable).toEqual({ foodLogs: 1, bodyMeasurements: 1 })
+    const { verify, skippedDuplicates } = await linkProfile(b, pb, remote(ANA.uid), ANA, { skipDuplicates: p.duplicates!.pairs })
+    expect([verify.ok, skippedDuplicates]).toEqual([true, 2])
+    expect((await remote(ANA.uid).liveCounts()).foodLogs).toBe(2)
+    // An edit of B's own copy is uploaded as a new row (rev 1 is accepted by the rules)…
+    await repo(pb, b).update('bodyMeasurements', bWeight.id, { weightKg: 70.1 } as never)
+    // …and deleting B's own copy never deletes the account's copy.
+    await repo(pb, b).remove('foodLogs', bLunch.id)
+    const r = await syncProfile(b, pb, remote(ANA.uid))
+    expect([r.rejected, r.pending]).toEqual([0, 0])
+    await syncProfile(a, pa, remote(ANA.uid))
+    expect((await repo(pa, a).get('bodyMeasurements', bWeight.id))?.weightKg).toBe(70.1)
+    expect((await repo(pa, a).all('foodLogs')).map((x) => x.name).sort()).toEqual(['arroz', 'kiwi'])
   })
 })

@@ -1,7 +1,7 @@
 import type { Table } from 'dexie'
 import type { SaludDB } from '../db/schema'
 import type { ExerciseSet, SyncConflict, SyncLink, SyncShadow } from '../db/types'
-import { cloudRowId, decodeRow, docKey, encodeRow, localRowId, shadowKey } from './codec'
+import { cloudRowId, decodeRow, docKey, encodeRow, localRowId, sameContent, shadowKey, type EncodedRow } from './codec'
 import { describeFromSets, mergeSessionRows } from './sessionMerge'
 import { RemoteError, type CommitOneResult, type RemoteDoc, type RemoteStore, type RemoteWrite } from './remote'
 import { AUTO_RESOLVE_TABLES, isSyncedTable, PROFILE_TABLE, SYNC_TABLES, TABLES_VERSION, type SyncedTableName } from './syncTables'
@@ -23,8 +23,16 @@ export const PULL_PAGE = 300
 export const PUSH_BATCH = 200
 /** Same limit as `firestore.rules` (`d.size() <= 200000`). */
 export const MAX_ROW_CHARS = 200_000
-/** Re-read window behind the cursor: covers writes that become visible late. Applying is idempotent. */
-export const PULL_OVERLAP_US = 5 * 60 * 1_000_000
+/**
+ * Re-read window behind the cursor (µs). `at` is the commit time the server picks, so a write can become
+ * visible with a time a little older than the newest document a pull already saw. Such writes are within
+ * this window of the cursor, so pulls re-read it; applying is idempotent (a revision the shadow already
+ * has is skipped). Once a pull has re-read the window at least this long after the cursor was first seen
+ * (device clock), the window is settled and later pulls start right after the last document seen: idle
+ * syncs then cost one empty query instead of re-reading every recent document (Spark quota).
+ */
+export const PULL_OVERLAP_US = 90 * 1_000_000
+const SETTLE_MS = PULL_OVERLAP_US / 1000
 
 export type SyncErrorCode = 'not-linked' | 'account-mismatch' | 'foreign-row' | 'profile-missing' | 'cloud-reset'
 
@@ -78,8 +86,27 @@ async function readLocal(db: SaludDB, profileId: string, t: SyncedTableName, row
   return row
 }
 
+/**
+ * Encodings made during ONE sync round, keyed by table and row id. The round scans every local row twice
+ * (to upload, then to count what is still pending); the second scan reuses the encoding of a row whose
+ * stored JSON did not change in between. Rows edited meanwhile differ in JSON and are encoded again.
+ * Never kept across rounds: every upload decision starts from fresh encodings.
+ */
+export type EncodeMemo = Map<string, { json: string; enc: EncodedRow }>
+
+function encodeLocal(t: SyncedTableName, row: Row, profileId: string, memo: EncodeMemo | undefined): EncodedRow {
+  if (!memo) return encodeRow(t, row, profileId)
+  const k = `${t}\u0000${row.id}`
+  const json = JSON.stringify(row)
+  const hit = memo.get(k)
+  if (hit && hit.json === json) return hit.enc
+  const enc = encodeRow(t, row, profileId)
+  memo.set(k, { json, enc })
+  return enc
+}
+
 /** Computes local changes against the shadow. Rows with an open conflict are held back. */
-export async function localChanges(db: SaludDB, profileId: string): Promise<{ writes: LocalChange[]; deletes: LocalChange[]; liveSynced: number }> {
+export async function localChanges(db: SaludDB, profileId: string, memo?: EncodeMemo): Promise<{ writes: LocalChange[]; deletes: LocalChange[]; liveSynced: number }> {
   const writes: LocalChange[] = []
   const deletes: LocalChange[] = []
   let liveSynced = 0
@@ -103,7 +130,7 @@ export async function localChanges(db: SaludDB, profileId: string): Promise<{ wr
     const byRow = new Map(shadows.map((s) => [s.rowId, s]))
     for (const s of shadows) if (s.hash !== null) liveSynced++
     for (const row of rows) {
-      const enc = encodeRow(t, row, profileId)
+      const enc = encodeLocal(t, row, profileId, memo)
       const sh = byRow.get(row.id)
       byRow.delete(row.id)
       if (sh && sh.hash === enc.h) continue
@@ -165,12 +192,16 @@ async function hasLocallyDeletedSession(db: SaludDB, pid: string, set: Row): Pro
   return sh !== undefined && sh.hash !== null
 }
 
-async function applyPage(db: SaludDB, link: SyncLink, docs: RemoteDoc[], now: Date): Promise<{ applied: number; conflicts: number; unreadable: number }> {
+/**
+ * Applies one pulled page. `saveProgress` runs in the same transaction, so the cursor can never move
+ * past documents whose effect is not stored, and a concurrent cursor reset is seen consistently.
+ */
+async function applyPage(db: SaludDB, link: SyncLink, docs: RemoteDoc[], now: Date, saveProgress?: () => Promise<void>): Promise<{ applied: number; conflicts: number; unreadable: number }> {
   const pid = link.profileId
   let applied = 0
   let conflicts = 0
   let unreadable = 0
-  await db.transaction('rw', [db.profiles, db.syncShadow, db.syncConflicts, ...syncTableNames(db)], async () => {
+  await db.transaction('rw', [db.profiles, db.syncShadow, db.syncConflicts, db.syncLinks, ...syncTableNames(db)], async () => {
     const hold = await sessionDeletionGuard(db, pid, docs)
     for (const doc of docs) {
       if (!isSyncedTable(doc.t) || docKey(doc.t, doc.id) !== doc.key) continue // unknown/newer table or malformed key
@@ -195,6 +226,10 @@ async function applyPage(db: SaludDB, link: SyncLink, docs: RemoteDoc[], now: Da
 
       if (localHash === remoteHash) {
         // Same content on both sides (or both deleted): just record the agreed revision.
+      } else if (localDirty && local && remoteRow && sameContent(t, local, remoteRow, pid)) {
+        // Only the timestamps differ: there is nothing to choose. Take the server's copy so both agree.
+        await writeLocal(db, t, pid, rowId, remoteRow)
+        applied++
       } else if (!localDirty && remoteRow === null && local && hold(t, local)) {
         // The session was deleted elsewhere while this device has unsynced changes to it: the row is
         // kept and the person's choice on the session conflict decides the session and its sets together.
@@ -220,6 +255,7 @@ async function applyPage(db: SaludDB, link: SyncLink, docs: RemoteDoc[], now: Da
       }
       await db.syncShadow.put(shadowRow(pid, t, doc.key, rowId, doc.rev, remoteHash))
     }
+    await saveProgress?.()
   })
   return { applied, conflicts, unreadable }
 }
@@ -303,42 +339,100 @@ async function raiseSessionDeletionConflicts(db: SaludDB, link: SyncLink, remote
   return raised
 }
 
-async function pull(db: SaludDB, link: SyncLink, remote: RemoteStore, now: Date) {
-  let cursor = link.tablesVersion === TABLES_VERSION ? link.cursor : null
-  const since = cursor === null ? null : cursor - PULL_OVERLAP_US
-  let after: { at: number; key: string } | null = null
+interface Position {
+  at: number
+  key: string
+}
+const isAfter = (a: Position, b: Position | null) => !b || a.at > b.at || (a.at === b.at && a.key > b.key)
+const samePosition = (a: Position | null, b: Position | null) => (a === null ? b === null : b !== null && a.at === b.at && a.key === b.key)
+/** The position the stored cursor stands for; null = the next pull reads everything. */
+function storedPosition(link: SyncLink | undefined): Position | null {
+  if (!link || link.cursor === null || link.tablesVersion !== TABLES_VERSION) return null
+  return { at: link.cursor, key: link.cursorKey ?? '' }
+}
+
+async function pull(db: SaludDB, link: SyncLink, remote: RemoteStore, now: Date, clock: () => number) {
+  const pid = link.profileId
+  // Every cursor write is a compare-and-set against the position this pull last stored: a reset to null
+  // made meanwhile (restoring held deletions or a deleted session) or another tab's newer position is
+  // never overwritten. Once a write is refused, this pull stops moving the cursor.
+  let expected = storedPosition(link)
+  let ownsCursor = true
+  let advanced = false
+  let seen = expected
+  // A cursor without a document key (empty account, link from an older version) cannot be resumed
+  // from: Firestore refuses an empty id in a cursor. The window pull learns the key instead.
+  const settled = expected !== null && link.cursorSettled === true && expected.key !== ''
+  const startedAt = clock()
+  // Settled: start right after the last document seen. Otherwise re-read the overlap window too.
+  const since = expected === null ? null : settled ? expected.at : expected.at - PULL_OVERLAP_US
+  let fetchAfter: Position | null = settled ? expected : null
   let pulled = 0
   let applied = 0
   let conflicts = 0
   let unreadable = 0
   const headers = new Map<string, RemoteDoc>()
+  // Documents fetched but not applied yet: every document is read (and billed) once.
+  const buffer: RemoteDoc[] = []
+  let exhausted = false
+  const fetchMore = async () => {
+    const docs = await remote.pull(since, fetchAfter, PULL_PAGE)
+    if (docs.length < PULL_PAGE) exhausted = true
+    const last = docs[docs.length - 1]
+    if (last) fetchAfter = { at: last.at, key: last.key }
+    buffer.push(...docs)
+  }
   for (;;) {
-    const docs = await remote.pull(since, after, PULL_PAGE)
-    if (!docs.length) break
-    const full = docs.length === PULL_PAGE
+    if (buffer.length < PULL_PAGE && !exhausted) await fetchMore()
+    if (!buffer.length) break
     // One push batch shares one server time: keep the whole group in one page, so a session deletion
     // and the deletions of its sets are always judged together (see sessionDeletionGuard).
-    while (full) {
-      const last = docs[docs.length - 1]!
-      const more = await remote.pull(since, { at: last.at, key: last.key }, PULL_PAGE)
-      const same = more.filter((d) => d.at === last.at)
-      docs.push(...same)
-      if (same.length < PULL_PAGE) break
+    let take = Math.min(PULL_PAGE, buffer.length)
+    for (;;) {
+      while (take < buffer.length && buffer[take]!.at === buffer[take - 1]!.at) take++
+      if (take < buffer.length || exhausted) break
+      await fetchMore()
     }
-    const r = await applyPage(db, link, docs, now)
-    for (const d of docs) if (d.t === SESSIONS && docKey(d.t, d.id) === d.key) headers.set(localRowId(d.id, link.profileId), d)
+    const docs = buffer.splice(0, take)
+    const last = docs[docs.length - 1]!
+    const next: Position | null = isAfter(last, seen) ? { at: last.at, key: last.key } : null
+    if (next) seen = next
+    // Progress is durable page by page: an interrupted pull resumes near where it stopped.
+    const save = next && ownsCursor
+      ? async () => {
+          if (!samePosition(storedPosition(await db.syncLinks.get(pid)), expected)) {
+            ownsCursor = false
+            return
+          }
+          await db.syncLinks.update(pid, { cursor: next.at, cursorKey: next.key, cursorSeenAt: clock(), cursorSettled: false, tablesVersion: TABLES_VERSION })
+          expected = next
+          advanced = true
+        }
+      : undefined
+    const r = await applyPage(db, link, docs, now, save)
+    for (const d of docs) if (d.t === SESSIONS && docKey(d.t, d.id) === d.key) headers.set(localRowId(d.id, pid), d)
     pulled += docs.length
     applied += r.applied
     conflicts += r.conflicts
     unreadable += r.unreadable
-    const last = docs[docs.length - 1]!
-    after = { at: last.at, key: last.key }
-    cursor = Math.max(cursor ?? 0, last.at)
-    // Progress is durable page by page: an interrupted pull resumes near where it stopped.
-    await db.syncLinks.update(link.profileId, { cursor, tablesVersion: TABLES_VERSION })
-    if (!full) break
   }
-  if (cursor === null) await db.syncLinks.update(link.profileId, { cursor: 0, tablesVersion: TABLES_VERSION })
+  if (ownsCursor && !advanced) {
+    await db.transaction('rw', db.syncLinks, async () => {
+      const cur = await db.syncLinks.get(pid)
+      if (!cur || !samePosition(storedPosition(cur), expected)) return
+      if (expected === null) {
+        // Empty account: remember that it was read once.
+        await db.syncLinks.update(pid, { cursor: 0, cursorKey: '', cursorSeenAt: clock(), cursorSettled: false, tablesVersion: TABLES_VERSION })
+      } else if (!cur.cursorSettled && expected.key !== '') {
+        const seenAt = cur.cursorSeenAt
+        // Unknown (link from an older version) or the device clock went back: start the wait again.
+        if (seenAt == null || seenAt > startedAt) await db.syncLinks.update(pid, { cursorSeenAt: clock() })
+        // This pull began at least one window after the cursor was seen and re-read the window: any
+        // write older than the cursor was already visible to it, so nothing older can still appear.
+        else if (startedAt - seenAt >= SETTLE_MS) await db.syncLinks.update(pid, { cursorSettled: true })
+      }
+    })
+  }
   conflicts += await raiseSessionDeletionConflicts(db, link, remote, now, headers)
   return { pulled, applied, conflicts, unreadable }
 }
@@ -348,9 +442,9 @@ async function saveShadows(db: SaludDB, pid: string, rows: SyncShadow[]) {
   void pid
 }
 
-async function push(db: SaludDB, link: SyncLink, remote: RemoteStore, opts: SyncOptions, now: Date) {
+async function push(db: SaludDB, link: SyncLink, remote: RemoteStore, opts: SyncOptions, now: Date, memo?: EncodeMemo) {
   const pid = link.profileId
-  const { writes, deletes, liveSynced } = await localChanges(db, pid)
+  const { writes, deletes, liveSynced } = await localChanges(db, pid, memo)
   const heldDeletes = !opts.confirmDeletes && deletes.length > deleteThreshold(liveSynced) ? deletes.length : 0
   // A row bigger than the server accepts would be refused forever: keep it local and report it.
   const oversize = new Set(writes.filter((w) => w.d !== null && w.d.length > MAX_ROW_CHARS))
@@ -418,10 +512,18 @@ async function push(db: SaludDB, link: SyncLink, remote: RemoteStore, opts: Sync
         continue
       }
       // Someone else changed it since our base: keep both versions for review, overwrite nothing.
+      let sameRecord = false
       await db.transaction('rw', [db.syncShadow, db.syncConflicts, db.profiles, ...syncTableNames(db)], async () => {
         const t = w.t as SyncedTableName
         const local = await readLocal(db, pid, t, rowId)
         const remoteRow = cur && !cur.del && cur.d ? (decodeRow(t, cur.id, cur.d, pid) as Row) : null
+        if (cur && local && remoteRow && sameContent(t, local, remoteRow, pid)) {
+          // The other device made the same change (only the timestamps differ): adopt its copy.
+          await writeLocal(db, t, pid, rowId, remoteRow)
+          await db.syncShadow.put(shadowRow(pid, t, w.key, rowId, cur.rev, curHash))
+          sameRecord = true
+          return
+        }
         await recordConflict(db, pid, t, w.key, rowId, local, remoteRow, cur?.rev ?? 0, now)
         await db.syncShadow.put(shadowRow(pid, t, w.key, rowId, cur?.rev ?? 0, curHash))
         if (t === 'trainingSessions' && !local && remoteRow) holdSets = true
@@ -431,7 +533,7 @@ async function push(db: SaludDB, link: SyncLink, remote: RemoteStore, opts: Sync
           holdSets = true
         }
       })
-      conflicts++
+      if (!sameRecord) conflicts++
     }
     // Every row refused: an account-level denial (revoked access), not one bad row.
     if (lastRefusal && refusedInBatch === batch.length) throw lastRefusal
@@ -451,6 +553,7 @@ function partialMessage(rejected: number, unreadable: number): string {
 /** One full sync round: pull, then push, then record the outcome on the link. */
 export async function syncProfile(db: SaludDB, profileId: string, remote: RemoteStore, opts: SyncOptions = {}): Promise<SyncResult> {
   const now = opts.now?.() ?? new Date()
+  const clock = () => (opts.now?.() ?? new Date()).getTime()
   const link = await db.syncLinks.get(profileId)
   if (!link) throw new SyncError('not-linked', 'Este perfil no está vinculado a una cuenta.')
   if (link.uid !== remote.uid) throw new SyncError('account-mismatch', 'La sesión abierta es de otra cuenta. No se sincroniza nada.')
@@ -467,11 +570,12 @@ export async function syncProfile(db: SaludDB, profileId: string, remote: Remote
         throw new SyncError('cloud-reset', 'Los datos de esta cuenta se borraron de la nube. Desvincula el perfil y vuelve a vincularlo si quieres subirlos otra vez.')
       if (link.cloudEpoch == null && meta.createdAt != null) await db.syncLinks.update(profileId, { cloudEpoch: meta.createdAt })
     }
-    const p = await pull(db, link, remote, now)
+    const p = await pull(db, link, remote, now, clock)
     await finishSetRestore(db, profileId)
     const fresh = (await db.syncLinks.get(profileId))!
-    const s = await push(db, fresh, remote, opts, now)
-    const after = await localChanges(db, profileId)
+    const memo: EncodeMemo = new Map()
+    const s = await push(db, fresh, remote, opts, now, memo)
+    const after = await localChanges(db, profileId, memo)
     const pending = after.writes.length + after.deletes.length
     const partial = s.rejected > 0 || p.unreadable > 0
     await db.syncLinks.update(profileId, {

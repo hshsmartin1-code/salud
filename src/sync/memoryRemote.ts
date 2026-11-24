@@ -17,12 +17,26 @@ export class MemoryServer {
   backdateNext = 0
   /** Document keys the "rules" refuse (permission denied), like an invalid or oversized row. */
   refuseKeys = new Set<string>()
-  readonly calls = { pull: 0, commit: 0, commitOne: 0, written: 0 }
+  /**
+   * Call counters. `reads` follows Firestore billing for the calls the engine makes on every sync: one
+   * read per returned document and one for a query that returns nothing; one per metadata get.
+   */
+  readonly calls = { pull: 0, commit: 0, commitOne: 0, written: 0, reads: 0 }
 
   docs(uid: string): Map<string, RemoteDoc> {
     let m = this.accounts.get(uid)
     if (!m) this.accounts.set(uid, (m = new Map()))
     return m
+  }
+
+  /** Current server time (µs). */
+  get now(): number {
+    return this.clock
+  }
+
+  /** Lets server time pass (µs), e.g. minutes between two syncs. */
+  advance(us: number): void {
+    this.clock += us
   }
 
   /** One server timestamp; every write of a batch shares it, as in Firestore. */
@@ -77,13 +91,17 @@ export class MemoryRemote implements RemoteStore {
 
   async pull(since: number | null, after: { at: number; key: string } | null, limit: number): Promise<RemoteDoc[]> {
     this.online()
+    // Like Firestore: a documentId() cursor value must be a real document id.
+    if (after && !after.key) throw new RemoteError('invalid', 'Cursor con id de documento vacío')
     this.server.calls.pull++
-    return [...this.server.docs(this.uid).values()]
+    const out = [...this.server.docs(this.uid).values()]
       .filter((d) => since === null || d.at >= since)
       .sort((a, b) => a.at - b.at || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
       .filter((d) => !after || d.at > after.at || (d.at === after.at && d.key > after.key))
       .slice(0, limit)
       .map((d) => ({ ...d }))
+    this.server.calls.reads += Math.max(1, out.length)
+    return out
   }
 
   async commit(writes: RemoteWrite[]): Promise<void> {
@@ -118,8 +136,20 @@ export class MemoryRemote implements RemoteStore {
     return out
   }
 
+  async listLive(table: string, afterKey: string | null, limit: number): Promise<RemoteDoc[]> {
+    this.online()
+    const out = [...this.server.docs(this.uid).values()]
+      .filter((d) => d.t === table && !d.del && (afterKey === null || d.key > afterKey))
+      .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+      .slice(0, limit)
+      .map((d) => ({ ...d }))
+    this.server.calls.reads += Math.max(1, out.length)
+    return out
+  }
+
   async getMeta() {
     this.online()
+    this.server.calls.reads++
     return this.server.getMeta(this.uid)
   }
   async setMeta(m: RemoteMeta) {

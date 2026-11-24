@@ -5,7 +5,7 @@
     var t = localStorage.getItem('pho-theme') || 'system'
     var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
-  } catch (e) {
+  } catch {
     document.documentElement.setAttribute('data-theme', 'light')
   }
 })()

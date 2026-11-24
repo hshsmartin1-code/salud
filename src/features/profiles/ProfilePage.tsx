@@ -5,7 +5,7 @@ import { Avatar, PROFILE_COLORS, useProfile, useProfiles, useRepo } from '../../
 import { deleteProfile, updateProfile } from '../../db/profiles'
 import { latestWeight, pickGoalForDate } from '../../db/queries'
 import type { Goal, ProfileColor } from '../../db/types'
-import { ageFromBirthDate, ACTIVITY_LEVELS, GOAL_LABELS, type ActivityKey, type Sex } from '../../domain/energy'
+import { ageFromBirthDate, ACTIVITY_LEVELS, GOAL_LABELS, PHYSIOLOGICAL_STATE_LABELS, type ActivityKey, type PhysiologicalState, type Sex } from '../../domain/energy'
 import { formatDateEs, todayLocal } from '../../domain/dates'
 import { formatNumber, rangeError } from '../../domain/units'
 import { validateGoalMl } from '../../domain/hydration'
@@ -48,6 +48,7 @@ export function ProfilePage() {
               {age !== null ? ` · ${age} años` : ''}
               {profile.heightCm ? ` · ${formatNumber(profile.heightCm, 1)} cm` : ''}
               {weight ? ` · ${formatNumber(weight.weightKg, 1)} kg (${formatDateEs(weight.date)})` : ''}
+              {profile.physiologicalState && profile.physiologicalState !== 'none' ? ` · ${PHYSIOLOGICAL_STATE_LABELS[profile.physiologicalState]}` : ''}
             </div>
           </div>
           <button type="button" className="btn-secondary px-3" onClick={() => setEditing(true)}>
@@ -131,6 +132,7 @@ export function ProfilePage() {
             ageYears: age,
             weightKg: weight?.weightKg ?? null,
             activity: profile.activity,
+            physiologicalState: profile.physiologicalState ?? null,
             previous: current,
           }}
           onCancel={() => setGoalOpen(false)}
@@ -229,6 +231,7 @@ function EditProfileSheet({ open, onClose }: { open: boolean; onClose: () => voi
   const [height, setHeight] = useState(numStr(p.heightCm))
   const [activity, setActivity] = useState<ActivityKey | ''>(p.activity ?? '')
   const [color, setColor] = useState<ProfileColor>(p.color)
+  const [physio, setPhysio] = useState<PhysiologicalState>(p.physiologicalState ?? 'none')
   const [busy, setBusy] = useState(false)
   const save = useSafeSave()
   const heightErr = height.trim() ? rangeError(toNum(height), 100, 250, 'cm') : null
@@ -251,6 +254,8 @@ function EditProfileSheet({ open, onClose }: { open: boolean; onClose: () => voi
                 heightCm: height.trim() ? toNum(height) : null,
                 activity: activity || null,
                 color,
+                // Only stored when it says something (absent = none); pregnancy/lactation only for women.
+                ...(sex === 'female' && physio !== 'none' ? { physiologicalState: physio } : p.physiologicalState ? { physiologicalState: 'none' as const } : {}),
               }),
             )
             setBusy(false)
@@ -276,6 +281,15 @@ function EditProfileSheet({ open, onClose }: { open: boolean; onClose: () => voi
           placeholder="Sin definir"
           options={ACTIVITY_LEVELS.map((a) => ({ value: a.key, label: `${a.es} (×${formatNumber(a.factor, 3)})` }))}
         />
+        {sex === 'female' ? (
+          <SelectField<PhysiologicalState>
+            label="Estado fisiológico"
+            value={physio}
+            onChange={setPhysio}
+            hint="Con embarazo o lactancia no se proponen déficits ni ajustes automáticos de calorías."
+            options={(['none', 'pregnant', 'lactating'] as const).map((k) => ({ value: k, label: PHYSIOLOGICAL_STATE_LABELS[k] }))}
+          />
+        ) : null}
         <div className="flex gap-3">
           {(Object.keys(PROFILE_COLORS) as ProfileColor[]).map((c) => (
             <button

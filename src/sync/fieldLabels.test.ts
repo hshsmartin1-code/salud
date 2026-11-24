@@ -28,7 +28,7 @@ const FIELDS: Record<string, string[]> = {
   energyAdjustments: ['date', 'fromKcal', 'toKcal', 'formulaTdee', 'observedTdee', 'blendedTdee', 'confidence', 'phase', 'ratePctPerWeek', 'applied', 'reason'],
   vitals: ['date', 'time', 'kind', 'systolic', 'diastolic', 'value', 'unit', 'context', 'notes'],
   hydrationLogs: ['date', 'time', 'ml', 'drink'],
-  [PROFILE_TABLE]: ['name', 'sex', 'birthDate', 'heightCm', 'activity', 'color', 'settings'],
+  [PROFILE_TABLE]: ['name', 'sex', 'birthDate', 'heightCm', 'activity', 'color', 'settings', 'physiologicalState'],
 }
 
 describe('field labels', () => {

@@ -148,3 +148,34 @@ describe('backup', () => {
     expect(row).toEqual({ id: 'new1', profileId: 'Q', ref: 'custom:new1', fav: 'Q|recipe:new1', keep: 'fedb:X' })
   })
 })
+
+describe('3.3 optional fields survive a backup', () => {
+  it('profile physiologicalState and goal inputs method/palBand/pal round-trip through parse and restore', async () => {
+    const a = await createProfile(
+      { name: 'Sintética RIEN', sex: 'female', birthDate: '1995-01-01', heightCm: 160, activity: null, color: 'violet', settings: { addActivityKcal: false }, physiologicalState: 'lactating' },
+      db,
+    )
+    const r = repo(a.id, db)
+    await r.add('goals', {
+      validFrom: '2026-01-01',
+      goal: 'maintain',
+      method: 'calculated',
+      kcal: 2100,
+      protein: 100,
+      carbs: 280,
+      fat: 63,
+      fiber: 29,
+      inputs: { weightKg: 60, heightCm: 160, ageYears: 31, sex: 'female', activity: 'moderate', goal: 'maintain', deficitKcal: 400, surplusKcal: 250, proteinGPerKg: 1.8, fatPct: 0.27, fiberPer1000: 14, method: 'rien', palBand: 'light', pal: 1.55 },
+      methodText: 'Prueba',
+      warnings: [],
+      targetWeightKg: null,
+    })
+    const parsed = parseBackup(JSON.stringify(await exportBackup({ profileId: a.id }, db)))
+    expect(parsed.profiles[0]!.physiologicalState).toBe('lactating')
+    await r.clear('goals')
+    await importBackup(parsed, { mode: 'replace', mapping: { [a.id]: a.id } }, db)
+    const g = (await r.all('goals'))[0]!
+    expect(g.inputs).toMatchObject({ method: 'rien', palBand: 'light', pal: 1.55 })
+    expect((await db.profiles.get(a.id))!.physiologicalState).toBe('lactating')
+  })
+})

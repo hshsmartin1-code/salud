@@ -360,7 +360,9 @@ async function pull(db: SaludDB, link: SyncLink, remote: RemoteStore, now: Date,
   let ownsCursor = true
   let advanced = false
   let seen = expected
-  const settled = expected !== null && link.cursorSettled === true
+  // A cursor without a document key (empty account, link from an older version) cannot be resumed
+  // from: Firestore refuses an empty id in a cursor. The window pull learns the key instead.
+  const settled = expected !== null && link.cursorSettled === true && expected.key !== ''
   const startedAt = clock()
   // Settled: start right after the last document seen. Otherwise re-read the overlap window too.
   const since = expected === null ? null : settled ? expected.at : expected.at - PULL_OVERLAP_US
@@ -421,7 +423,7 @@ async function pull(db: SaludDB, link: SyncLink, remote: RemoteStore, now: Date,
       if (expected === null) {
         // Empty account: remember that it was read once.
         await db.syncLinks.update(pid, { cursor: 0, cursorKey: '', cursorSeenAt: clock(), cursorSettled: false, tablesVersion: TABLES_VERSION })
-      } else if (!cur.cursorSettled) {
+      } else if (!cur.cursorSettled && expected.key !== '') {
         const seenAt = cur.cursorSeenAt
         // Unknown (link from an older version) or the device clock went back: start the wait again.
         if (seenAt == null || seenAt > startedAt) await db.syncLinks.update(pid, { cursorSeenAt: clock() })

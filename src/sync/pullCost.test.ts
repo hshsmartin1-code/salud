@@ -131,6 +131,44 @@ describe('pull cost: the overlap window is re-read only until it has settled', (
     expect(await repo(pb, b).count('foodLogs')).toBe(await repo(pa, a).count('foodLogs'))
   })
 
+  it('a link from an older version (cursor without key) learns the key, then settles', async () => {
+    const { server, b, pb } = await linkedPair(250)
+    const now = deviceClock(server)
+    // As stored by the previous version: only the server time of the newest change.
+    const link = (await b.syncLinks.get(pb))!
+    await b.syncLinks.put({ ...link, cursorKey: undefined, cursorSeenAt: undefined, cursorSettled: undefined })
+    const idle = async () => {
+      const before = server.calls.reads
+      await syncProfile(b, pb, server.remote(ANA.uid), { now })
+      return server.calls.reads - before
+    }
+    expect(await idle()).toBe(2 + 250)
+    expect((await b.syncLinks.get(pb))?.cursorKey).toBeTruthy()
+    server.advance(2 * 60 * S)
+    expect(await idle()).toBe(2 + 250)
+    expect([await idle(), await idle()]).toEqual([2, 2])
+  })
+
+  it('an account that stays empty never settles on a cursor without a document key', async () => {
+    const server = new MemoryServer()
+    const b = await device()
+    const pb = (await mkProfile(b, 'Ana')).id
+    const now = deviceClock(server)
+    await b.syncLinks.put({ profileId: pb, uid: ANA.uid, email: null, displayName: null, linkedAt: '', state: 'linking', cursor: null, tablesVersion: '', lastSyncAt: null, lastError: null, lastErrorCode: null, pending: 0, heldDeletes: 0, verifiedAt: null })
+    // Only pulls: the remote refuses every upload, so the account stays empty.
+    const remote = server.remote(ANA.uid)
+    remote.commit = async () => {
+      throw new Error('sin subidas en esta prueba')
+    }
+    for (let i = 0; i < 3; i++) {
+      await expect(syncProfile(b, pb, remote, { now })).rejects.toThrow('sin subidas')
+      server.advance(5 * 60 * S)
+    }
+    const l = (await b.syncLinks.get(pb))!
+    expect(l.cursor).toBe(0)
+    expect(l.cursorSettled).toBeFalsy()
+  })
+
   it('a cursor reset made during a pull (restore from the cloud) is not overwritten by that pull', async () => {
     const { server, a, b, pa, pb } = await linkedPair(1)
     const [base] = await repo(pb, b).all('foodLogs')

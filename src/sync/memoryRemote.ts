@@ -91,6 +91,8 @@ export class MemoryRemote implements RemoteStore {
 
   async pull(since: number | null, after: { at: number; key: string } | null, limit: number): Promise<RemoteDoc[]> {
     this.online()
+    // Like Firestore: a documentId() cursor value must be a real document id.
+    if (after && !after.key) throw new RemoteError('invalid', 'Cursor con id de documento vacío')
     this.server.calls.pull++
     const out = [...this.server.docs(this.uid).values()]
       .filter((d) => since === null || d.at >= since)

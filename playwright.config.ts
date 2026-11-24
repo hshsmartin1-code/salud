@@ -1,8 +1,10 @@
 import { defineConfig } from '@playwright/test'
 
 const PORT = Number(process.env.PW_PORT ?? 4173)
-// PW_EXECUTABLE=/path/to/chromium runs the suite on a local Chromium (CI/cloud containers without Edge).
+// PW_EXECUTABLE=/path/to/chromium runs the suite on a local Chromium binary (cloud containers without Edge);
+// PW_CHANNEL=chromium uses Playwright's own Chromium (CI). Default: Microsoft Edge, as on the owner's machine.
 const EXE = process.env.PW_EXECUTABLE
+const CHANNEL = process.env.PW_CHANNEL ?? 'msedge'
 
 export default defineConfig({
   testDir: './e2e',
@@ -13,7 +15,7 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: `http://localhost:${PORT}/salud/`,
-    ...(EXE ? { launchOptions: { executablePath: EXE } } : { channel: 'msedge' as const }),
+    ...(EXE ? { launchOptions: { executablePath: EXE } } : CHANNEL === 'chromium' ? {} : { channel: CHANNEL }),
     locale: 'es-CO',
     timezoneId: 'America/Bogota',
     viewport: { width: 412, height: 915 },

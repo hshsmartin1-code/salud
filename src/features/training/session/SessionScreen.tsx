@@ -31,7 +31,7 @@ export default function SessionScreen() {
     for (const [eid, hs] of history ?? []) {
       const byId = new Map(hs.map((h) => [h.id, h]))
       const tracking = session?.exerciseOrder.find((o) => o.exerciseId === eid)?.trackingType ?? 'weight_reps'
-      for (const [sid, types] of prsBySet(hs)) out.set(sid, recordTexts(types, byId.get(sid)!, tracking))
+      for (const [sid, types] of prsBySet(hs, tracking)) out.set(sid, recordTexts(types, byId.get(sid)!, tracking))
     }
     return out
   }, [history, session])

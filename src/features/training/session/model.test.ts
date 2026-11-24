@@ -89,10 +89,12 @@ describe('session model', () => {
 })
 
 describe('sessionE1rm', () => {
-  it('uses done work sets of 1 to 12 reps only; warm-ups, pending rows and longer sets give none', () => {
+  it('uses done work sets of 1 to 10 reps only (linear equations, Reynolds 2006); warm-ups, pending rows and longer sets give none', () => {
     expect(sessionE1rm([set({ done: true, weight: 100, reps: 5 })])).toBeCloseTo(100 * (1 + 5 / 30), 6)
-    expect(sessionE1rm([set({ done: true, weight: 100, reps: 5 }), set({ done: true, weight: 90, reps: 12 })])).toBeCloseTo(126, 6)
-    expect(sessionE1rm([set({ done: true, weight: 100, reps: 13 })])).toBeNull()
+    expect(sessionE1rm([set({ done: true, weight: 100, reps: 5 }), set({ done: true, weight: 95, reps: 10 })])).toBeCloseTo(95 * (1 + 10 / 30), 6)
+    // 12 reps used to give an estimate (90 × 1,4 = 126 > 116,7); beyond 10 reps there is none, so the 5-rep set wins.
+    expect(sessionE1rm([set({ done: true, weight: 100, reps: 5 }), set({ done: true, weight: 90, reps: 12 })])).toBeCloseTo(100 * (1 + 5 / 30), 6)
+    expect(sessionE1rm([set({ done: true, weight: 100, reps: 11 })])).toBeNull()
     expect(sessionE1rm([set({ done: true, weight: 200, reps: 3, isWarmup: true, kind: 'warmup' })])).toBeNull()
     expect(sessionE1rm([set({ done: false, weight: 100, reps: 5 })])).toBeNull()
     expect(sessionE1rm([set({ done: true, weight: null, reps: 5 })])).toBeNull()

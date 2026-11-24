@@ -206,12 +206,15 @@ export function SettingsPage() {
           <section className="space-y-2">
           <h2 className="font-semibold">Cómo se calcula</h2>
           <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
-            <li>Gasto basal: ecuación de Mifflin-St Jeor × factor de actividad; el método y los valores usados se muestran en cada objetivo y puedes ajustarlos a mano.</li>
+            <li>Gasto energético total estimado: metabolismo en reposo (Mifflin-St Jeor, predeterminada) × factor de actividad, o Schofield × PAL con el método RIEN Colombia (Res. 3803/2016); el método y los valores usados se muestran en cada objetivo y puedes ajustarlos a mano.</li>
             <li>Nutrientes: los valores desconocidos se muestran como «—» y nunca se cuentan como cero; los totales con datos faltantes se marcan como parciales (*).</li>
             <li>Composición corporal: Jackson & Pollock (7 y 3 pliegues) y Durnin & Womersley con la ecuación de Siri; los protocolos ISAK solo muestran la suma de pliegues. Todo valor calculado se marca como estimado.</li>
-            <li>Fuerza: 1RM estimado con la fórmula de Epley (series de 1 a 15 repeticiones); volumen = peso × repeticiones de las series hechas, sin calentamientos.</li>
+            <li>Fuerza: 1RM estimado con la fórmula de Epley solo en series de 1 a 10 repeticiones (Reynolds y cols., 2006) y nunca en ejercicios de peso corporal; volumen = peso × repeticiones de las series hechas, sin calentamientos (en peso corporal, solo el lastre añadido).</li>
             <li>Las kcal de pulseras y relojes son informativas y no se suman al objetivo salvo que lo actives en tu perfil.</li>
           </ul>
+          <a href={`${import.meta.env.BASE_URL}METODOLOGIA.txt`} target="_blank" rel="noreferrer noopener" className="btn-secondary w-full" data-testid="methodology-link">
+            Metodología completa: fórmulas, supuestos y fuentes
+          </a>
           <p className="text-xs text-faint">Esta app es una herramienta de registro personal; no es un dispositivo médico ni sustituye la orientación de un profesional de la salud.</p>
           </section>
           <section data-testid="settings-private-media">

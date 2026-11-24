@@ -4,7 +4,7 @@ import { useRepo } from '../../app/profile'
 import type { VitalKind, VitalSign } from '../../db/types'
 import { formatDateEs } from '../../domain/dates'
 import { formatNumber } from '../../domain/units'
-import { BP_SOURCE, DISCLAIMER, GLUCOSE_CONTEXTS, VITAL_LABEL, VITAL_UNIT, classifyVital, latestByKind, sortVitalsDesc } from '../../domain/vitals'
+import { BP_SOURCE, DISCLAIMER, GLUCOSE_CONTEXTS, VITAL_LABEL, VITAL_UNIT, bpAverage, classifyVital, latestByKind, sortVitalsDesc } from '../../domain/vitals'
 import { Disclosure } from '../../ui/Disclosure'
 import { Icon } from '../../ui/Icon'
 import { Badge, Segmented } from '../../ui/kit'
@@ -43,6 +43,8 @@ export function VitalsPage() {
   const latest = useMemo(() => latestByKind(sorted), [sorted])
   const v = latest[kind]
   const cls = v ? classifyVital(v) : null
+  // Home average of the last 7 days (ESH 2023: at least 3 days): what a classification should rest on.
+  const bpAvg = useMemo(() => (kind === 'bloodPressure' ? bpAverage(sorted, today) : null), [kind, sorted, today])
   const seriesOptions = useMemo<SeriesOptions | undefined>(() => (kind === 'glucose' && ctx !== 'todas' ? { context: ctx } : undefined), [kind, ctx])
   const inPeriod = useMemo(() => sorted.filter((x) => x.kind === kind && x.date >= period.range.from && x.date <= period.range.to && (kind !== 'glucose' || ctx === 'todas' || x.context === ctx)), [sorted, kind, period, ctx])
   const groups = useMemo(() => {
@@ -128,9 +130,32 @@ export function VitalsPage() {
                 <p className="mt-2 text-body text-muted">Sin registros de {VITAL_SHORT[kind].toLowerCase()}.</p>
               )}
             </section>
+            {kind === 'bloodPressure' ? (
+              <section aria-label="Promedio de 7 días" data-testid="bp-average">
+                <SectionHeader title="Promedio de 7 días" />
+                {bpAvg ? (
+                  <div className="mt-2">
+                    <Metric
+                      label={`${formatDateEs(bpAvg.from)} – ${formatDateEs(bpAvg.to)} · ${bpAvg.readings} ${bpAvg.readings === 1 ? 'toma' : 'tomas'} en ${bpAvg.days} días`}
+                      value={`${formatNumber(bpAvg.systolic, 0)}/${formatNumber(bpAvg.diastolic, 0)}`}
+                      unit="mmHg"
+                      size="lg"
+                    />
+                    <ClassificationNote c={bpAvg.classification} />
+                  </div>
+                ) : (
+                  <p className="mt-2 text-body text-muted">
+                    Se calcula con tomas en al menos 3 días de los últimos 7. Para una medición en casa, la ESH 2023 recomienda 7 días con 2 tomas por la mañana y 2 por la noche.
+                  </p>
+                )}
+              </section>
+            ) : null}
             <Disclosure summary="Cómo se calcula" testId="vital-how">
               <p className="text-label text-muted">
-                Las clasificaciones son orientativas, no un diagnóstico (presión: {BP_SOURCE}; glucosa en ayunas: ADA). {DISCLAIMER}
+                Las clasificaciones son orientativas, no un diagnóstico (presión: {BP_SOURCE}; glucosa en ayunas: ADA). Cada toma de presión se marca como «lectura aislada»: clasificar
+                requiere el promedio de varias tomas en días distintos; el promedio de 7 días usa los valores domiciliarios equivalentes (135/85 en casa ≈ 140/90 en consulta). La
+                saturación por debajo de 94 % solo se comenta y se advierte por debajo de 90 %, porque en altitud (Bogotá, 2600 m) lo normal es más bajo que a nivel del mar
+                (MinSalud). {DISCLAIMER}
               </p>
             </Disclosure>
           </>

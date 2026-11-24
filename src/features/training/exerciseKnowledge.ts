@@ -6,7 +6,7 @@
 import type { Repo } from '../../db/repo'
 import type { ExerciseSet } from '../../db/types'
 import { isWarmupSet } from '../../domain/setKind'
-import { e1rm, setVolume } from '../../domain/training'
+import { e1rm, e1rmApplies, setStrengthScore, setVolume } from '../../domain/training'
 import { normalize } from '../../domain/search'
 
 type Tracking = 'weight_reps' | 'bodyweight_reps' | 'time' | 'distance'
@@ -302,17 +302,29 @@ export interface SessionSummary {
   metric: number | null
 }
 
-function metricOf(s: SetRow, t: Tracking): number | null {
+/**
+ * Ordering of the sets of one session (which one is "the best"). Loaded lifts use the Epley strength score
+ * (1–15 reps, see setStrengthScore); body-weight exercises use reps, because their `weight` is only the
+ * added load and an e1RM from it would not be the lifter's strength (and would not be in reps, the unit of
+ * their headline metric).
+ */
+function rankOf(s: SetRow, t: Tracking): number | null {
   switch (t) {
     case 'weight_reps':
-      return s.weight !== null && s.reps !== null ? e1rm(s.weight, s.reps) : null
+      return setStrengthScore(s.weight, s.reps)
     case 'bodyweight_reps':
-      return s.weight && s.reps !== null ? e1rm(s.weight, s.reps) : s.reps
+      return s.reps
     case 'time':
       return s.durationSec
     case 'distance':
       return s.distanceM
   }
+}
+
+/** Headline metric of the best set: e1RM for loaded lifts (null above 10 reps), otherwise its rank value. */
+function metricOf(s: SetRow, t: Tracking): number | null {
+  if (t === 'weight_reps') return s.weight !== null && s.reps !== null ? e1rm(s.weight, s.reps) : null
+  return rankOf(s, t)
 }
 
 export const METRIC_LABEL: Record<Tracking, { name: string; unit: string }> = {
@@ -333,16 +345,18 @@ export function summarizeSessions(sets: readonly SetRow[], t: Tracking): Session
     let best: SetRow | null = null
     let bestM = -Infinity
     for (const s of work) {
-      const m = metricOf(s, t)
+      const m = rankOf(s, t)
       if (m !== null && m > bestM) {
         bestM = m
         best = s
       }
     }
-    const e = work.reduce<number | null>((acc, s) => {
-      const v = s.weight !== null && s.reps !== null ? e1rm(s.weight, s.reps) : null
-      return v !== null && (acc === null || v > acc) ? v : acc
-    }, null)
+    const e = !e1rmApplies(t)
+      ? null
+      : work.reduce<number | null>((acc, s) => {
+          const v = s.weight !== null && s.reps !== null ? e1rm(s.weight, s.reps) : null
+          return v !== null && (acc === null || v > acc) ? v : acc
+        }, null)
     out.push({
       sessionId,
       date: rows[0]!.date,
@@ -350,7 +364,7 @@ export function summarizeSessions(sets: readonly SetRow[], t: Tracking): Session
       best,
       volume: work.reduce((a, s) => a + setVolume(s), 0),
       e1rm: e,
-      metric: best ? bestM : null,
+      metric: best ? metricOf(best, t) : null,
     })
   }
   out.sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? 1 : -1))

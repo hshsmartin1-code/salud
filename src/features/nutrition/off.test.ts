@@ -41,6 +41,21 @@ describe('offToRefFood', () => {
     expect(r.food.flags).toContain('kcal_from_kj')
     expect(r.food.basis).toBe('100ml')
   })
+  it('energy check: high-fibre foods pass; beer passes only through its stated alcohol', () => {
+    const bran = offToRefFood({ code: '7700000000101', product_name: 'Salvado de trigo', nutriments: { 'energy-kcal_100g': 216, proteins_100g: 15.55, carbohydrates_100g: 64.51, fat_100g: 4.25, fiber_100g: 42.8 } })
+    if (!('food' in bran)) throw new Error('expected food')
+    expect(bran.food.flags).not.toContain('atwater_mismatch')
+    const beer = { code: '7700000000102', product_name: 'Cerveza', quantity: '330 ml', nutriments: { 'energy-kcal_100g': 43, proteins_100g: 0.46, carbohydrates_100g: 3.55, fat_100g: 0 } }
+    const noAlcohol = offToRefFood(beer)
+    if (!('food' in noAlcohol)) throw new Error('expected food')
+    expect(noAlcohol.food.flags).toContain('atwater_mismatch')
+    // Open Food Facts gives alcohol in % vol: 4,9 % vol → 3,87 g/100 ml → 27 kcal.
+    const withAlcohol = offToRefFood({ ...beer, nutriments: { ...beer.nutriments, alcohol_100g: 4.9 } })
+    if (!('food' in withAlcohol)) throw new Error('expected food')
+    expect(withAlcohol.food.basis).toBe('100ml')
+    expect(withAlcohol.food.flags).not.toContain('atwater_mismatch')
+    expect('alcohol' in withAlcohol.food.nutrients).toBe(false) // used for the check only, never stored
+  })
   it('refuses products without energy or without name', () => {
     expect('error' in offToRefFood({ code: '7700000000003', product_name: 'X', nutriments: {} })).toBe(true)
     expect('error' in offToRefFood({ code: '7700000000004', nutriments: { 'energy-kcal_100g': 10 } })).toBe(true)

@@ -142,6 +142,16 @@ describe('checkLabelDraft', () => {
     const w = checkLabelDraft(d({ nutrients: { kcal: 100, fat: 2, transFat: 50 } })).warnings;
     expect(w.join(' ')).toMatch(/estaba en mg/);
   });
+  it('kcal check uses available carbohydrate and fibre (no false warning on a high-fibre label)', () => {
+    // Wheat-bran-like label per 100 g: the old 4·C(total) rule expected 358 kcal (−40 %).
+    const bran = checkLabelDraft(d({ nutrients: { kcal: 216, protein: 15.55, fat: 4.25, carbs: 64.51, fiber: 42.8 } })).warnings;
+    expect(bran.join(' ')).not.toMatch(/no coinciden con los macronutrientes/);
+    const wrong = checkLabelDraft(d({ nutrients: { kcal: 500, protein: 15.55, fat: 4.25, carbs: 64.51, fiber: 42.8 } })).warnings;
+    expect(wrong.join(' ')).toMatch(/esperadas ≈ 273 kcal/);
+    // Missing macros still count as 0 on a label (existing rule), and tiny energies are not checked.
+    expect(checkLabelDraft(d({ nutrients: { kcal: 300, protein: 10 } })).warnings.join(' ')).toMatch(/esperadas ≈ 40 kcal/);
+    expect(checkLabelDraft(d({ nutrients: { kcal: 40, protein: 2 } })).warnings.join(' ')).not.toMatch(/no coinciden con los macronutrientes/);
+  });
   it('flags available carbs above total carbs', () => {
     const w = checkLabelDraft(d({ nutrients: { kcal: 100, carbs: 10, carbsAvail: 12 } })).warnings;
     expect(w.join(' ')).toMatch(/disponibles superan/);

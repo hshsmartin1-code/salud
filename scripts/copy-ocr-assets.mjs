@@ -38,3 +38,5 @@ console.log(`[assets] OCR experimental ${total ? 'incluido' : 'no incluido'} (${
 
 // Ship the same third-party notices with the website and the APK, including offline use.
 copyFileSync(join(root, 'THIRD_PARTY_NOTICES.md'), join(root, 'public', 'THIRD_PARTY_NOTICES.txt'))
+// The scientific methodology (formulas, assumptions, sources), linked from Ajustes → Cómo se calcula.
+copyFileSync(join(root, 'docs', 'METODOLOGIA.md'), join(root, 'public', 'METODOLOGIA.txt'))

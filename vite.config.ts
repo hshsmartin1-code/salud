@@ -63,7 +63,7 @@ export default defineConfig(({ mode }) => ({
       disable: mode === 'android',
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['favicon.svg', 'icons/*.png', 'THIRD_PARTY_NOTICES.txt'],
+      includeAssets: ['favicon.svg', 'icons/*.png', 'THIRD_PARTY_NOTICES.txt', 'METODOLOGIA.txt'],
       manifest: {
         id: '/salud/',
         name: 'Salud — Personal Health OS',

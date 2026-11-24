@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   bestVolumeSession,
   defaultPeriod,
+  E1RM_NOTE,
   isWorkSet,
   MAX_GAP_DAYS,
   metricSeries,
@@ -27,7 +28,7 @@ const sets: ProgressSet[] = [
   set('a', '2026-10-05', { weight: 60, reps: 8 }),
   set('a', '2026-10-05', { weight: 60, reps: 6 }),
   set('b', '2026-10-12', { weight: 62.5, reps: 8 }),
-  set('b', '2026-10-12', { weight: 62.5, reps: 20 }), // reps > 15: no e1RM
+  set('b', '2026-10-12', { weight: 62.5, reps: 20 }), // reps > 10: no e1RM
   set('b', '2026-10-12', { weight: 100, reps: 3, done: false }), // not done: ignored everywhere
   set('c', '2026-11-09', { weight: 65, reps: 5 }),
   set('c', '2026-11-09', { weight: 200, reps: 1, excludeFromStats: true }), // flagged: ignored
@@ -151,6 +152,16 @@ describe('records', () => {
     expect(recs.some((r) => r.value === 200 || r.value === 100)).toBe(false)
     const tie = recordList([set('p', '2026-02-01', { weight: 50, reps: 5 }), set('q', '2026-01-01', { weight: 50, reps: 5 })])
     expect(tie.find((r) => r.id === 'maxWeight')!.date).toBe('2026-01-01')
+  })
+  it('no e1RM from sets above 10 reps (Reynolds 2006), and never for body-weight exercises', () => {
+    const twelve = recordList([set('h', '2026-04-01', { weight: 80, reps: 12 })], 'weight_reps')
+    expect(twelve.find((r) => r.id === 'e1rm')).toBeUndefined()
+    expect(twelve.find((r) => r.id === 'maxWeight')!.value).toBe(80)
+    // Weighted pull-ups: +10 kg × 8. An "e1RM" of 12,7 kg would ignore the body mass.
+    const bw = recordList([set('w', '2026-04-01', { weight: 10, reps: 8 })], 'bodyweight_reps')
+    expect(bw.find((r) => r.id === 'e1rm')).toBeUndefined()
+    expect(bw.map((r) => r.id)).toEqual(expect.arrayContaining(['maxWeight', 'volumeSet', 'maxReps']))
+    expect(E1RM_NOTE).toMatch(/1 a 10 repeticiones/)
   })
   it('time and distance records', () => {
     const r = recordList([set('t', '2026-03-01', { durationSec: 60 }), set('t2', '2026-03-08', { durationSec: 75, distanceM: 400 })])

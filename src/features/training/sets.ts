@@ -1,7 +1,7 @@
 import type { TrackingType } from '../../db/catalogTypes'
 import type { ExerciseSet } from '../../db/types'
 import { isWarmupSet } from '../../domain/setKind'
-import { detectPRs, e1rm, type PRType } from '../../domain/training'
+import { detectPRs, e1rm, e1rmApplies, type PRType } from '../../domain/training'
 import { formatNumber } from '../../domain/units'
 
 export const PR_LABEL: Record<PRType, string> = {
@@ -59,13 +59,18 @@ function before(s: ExerciseSet, h: ExerciseSet): boolean {
   return h.date < s.date || (h.date === s.date && h.createdAt < s.createdAt)
 }
 
-/** Reference implementation: judges every set against every earlier one (O(n²) with a heavy constant). Used as the fallback and as the oracle in tests. */
-export function prsBySetReference(all: ExerciseSet[]): Map<string, PRType[]> {
+/**
+ * Reference implementation: judges every set against every earlier one (O(n²) with a heavy constant). Used as the
+ * fallback and as the oracle in tests. With the exercise's tracking type, body-weight exercises never get an e1RM
+ * record from their added load (see e1rmApplies); without it (older callers) every record type is considered.
+ */
+export function prsBySetReference(all: ExerciseSet[], tracking?: TrackingType): Map<string, PRType[]> {
   const done = all.filter((s) => s.done && !isWarmupSet(s))
   const out = new Map<string, PRType[]>()
+  const opts = { e1rm: e1rmApplies(tracking) }
   for (const s of done) {
     const prior = done.filter((h) => before(s, h))
-    const prs = detectPRs(prior, s)
+    const prs = detectPRs(prior, s, opts)
     if (prs.length) out.set(s.id, prs)
   }
   return out
@@ -100,11 +105,11 @@ class History {
     if (num(s.distanceM) && s.distanceM > 0 && s.distanceM > this.maxDistance) this.maxDistance = s.distanceM
   }
 
-  against(c: ExerciseSet): PRType[] {
+  against(c: ExerciseSet, withE1rm: boolean): PRType[] {
     if (this.count === 0) return []
     const prs: PRType[] = []
     if (num(c.weight) && c.weight > 0 && this.maxWeight > -Infinity && c.weight > this.maxWeight) prs.push('max_weight')
-    const ce = num(c.weight) && num(c.reps) ? e1rm(c.weight, c.reps) : null
+    const ce = withE1rm && num(c.weight) && num(c.reps) ? e1rm(c.weight, c.reps) : null
     if (ce !== null && this.maxE1rm > -Infinity && ce > this.maxE1rm + 1e-9) prs.push('max_e1rm')
     if (num(c.weight) && c.weight > 0 && num(c.reps) && c.reps > 0) {
       let best = -Infinity
@@ -123,7 +128,7 @@ class History {
  * Same result as the reference in one ordered pass. Valid when sessions do not overlap in time (every set of an
  * earlier session is before every set of a later one, the normal case); returns null otherwise so the caller falls back.
  */
-function prsOrdered(done: ExerciseSet[]): Map<string, PRType[]> | null {
+function prsOrdered(done: ExerciseSet[], withE1rm = true): Map<string, PRType[]> | null {
   const bySession = new Map<string, ExerciseSet[]>()
   for (const s of done) {
     const list = bySession.get(s.sessionId)
@@ -153,7 +158,7 @@ function prsOrdered(done: ExerciseSet[]): Map<string, PRType[]> | null {
       let j = i
       while (j < sets.length && sets[j]!.setIndex === sets[i]!.setIndex) j++
       for (let k = i; k < j; k++) {
-        const prs = history.against(sets[k]!)
+        const prs = history.against(sets[k]!, withE1rm)
         if (prs.length) found.set(sets[k]!.id, prs)
       }
       for (let k = i; k < j; k++) history.add(sets[k]!)
@@ -168,13 +173,17 @@ function prsOrdered(done: ExerciseSet[]): Map<string, PRType[]> | null {
   return out
 }
 
-/** PRs for each completed set of one exercise, judged only against what came before it. */
-export function prsBySet(all: ExerciseSet[]): Map<string, PRType[]> {
+/**
+ * PRs for each completed set of one exercise, judged only against what came before it. With the exercise's
+ * tracking type, body-weight exercises never get an e1RM record from their added load (see e1rmApplies).
+ */
+export function prsBySet(all: ExerciseSet[], tracking?: TrackingType): Map<string, PRType[]> {
   const done = all.filter((s) => s.done && !isWarmupSet(s))
-  return prsOrdered(done) ?? prsBySetReference(all)
+  return prsOrdered(done, e1rmApplies(tracking)) ?? prsBySetReference(all, tracking)
 }
 
-export function bestE1rm(sets: ExerciseSet[]): number | null {
+export function bestE1rm(sets: ExerciseSet[], tracking?: TrackingType): number | null {
+  if (!e1rmApplies(tracking)) return null
   let best: number | null = null
   for (const s of sets) {
     if (!s.done || isWarmupSet(s) || s.weight === null || s.reps === null) continue

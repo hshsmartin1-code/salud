@@ -6,7 +6,7 @@ import type { TrackingType } from '../../../db/catalogTypes'
 import type { ExerciseSet, SessionExercise } from '../../../db/types'
 import { formatDateEs } from '../../../domain/dates'
 import { isWorkSet } from '../../../domain/setKind'
-import { bestSet, e1rm, sessionVolume } from '../../../domain/training'
+import { bestSet, E1RM_MAX_REPS, e1rm, sessionVolume } from '../../../domain/training'
 import { formatNumber } from '../../../domain/units'
 import { formatDuration } from '../sets'
 
@@ -141,7 +141,7 @@ export const REST_PRESETS = [60, 90, 120, 180, 240] as const
 export function sessionE1rm(sets: readonly ExerciseSet[]): number | null {
   let best: number | null = null
   for (const s of sets) {
-    if (!s.done || !isWorkSet(s) || s.weight === null || s.reps === null || s.reps > 12) continue
+    if (!s.done || !isWorkSet(s) || s.weight === null || s.reps === null || s.reps > E1RM_MAX_REPS) continue
     const v = e1rm(s.weight, s.reps)
     if (v !== null && (best === null || v > best)) best = v
   }

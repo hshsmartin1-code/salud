@@ -28,6 +28,7 @@ const MEAL: Record<string, string> = { desayuno: 'Desayuno', media_manana: 'Medi
 const SEX: Record<string, string> = { male: 'Hombre', female: 'Mujer' }
 const ACTIVITY: Record<string, string> = { sedentary: 'Sedentaria', light: 'Ligera', moderate: 'Moderada', active: 'Alta', very_active: 'Muy alta' }
 const GOAL: Record<string, string> = { lose: 'Perder grasa', maintain: 'Mantener', gain: 'Ganar masa', recomp: 'Recomposición' }
+const PHYSIO: Record<string, string> = { none: 'Ninguno', pregnant: 'Embarazo', lactating: 'Lactancia' }
 const VITAL: Record<string, string> = { bloodPressure: 'Presión arterial', restingHr: 'Pulso en reposo', spo2: 'Saturación de oxígeno', glucose: 'Glucosa', temperature: 'Temperatura' }
 const TRACKING: Record<string, string> = { weight_reps: 'Peso × repeticiones', bodyweight_reps: 'Peso corporal × repeticiones', time: 'Tiempo', distance: 'Distancia' }
 const SET_KIND: Record<string, string> = { warmup: 'Calentamiento', drop: 'Serie descendente', failure: 'Al fallo' }
@@ -278,6 +279,7 @@ const COMMON: Record<string, FieldSpec> = {
   activity: { label: 'Nivel de actividad', fmt: enumOf(ACTIVITY) },
   color: { label: 'Color', fmt: enumOf(COLOR) },
   settings: { label: 'Preferencias', fmt: settingsText },
+  physiologicalState: { label: 'Estado fisiológico', fmt: enumOf(PHYSIO) },
 }
 
 function withRowUnitKey(unitKey: string): Fmt {

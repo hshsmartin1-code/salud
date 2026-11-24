@@ -3,7 +3,10 @@ import {
   bestSet,
   brzycki,
   detectPRs,
+  E1RM_MAX_REPS,
   e1rm,
+  e1rmApplies,
+  setStrengthScore,
   epley,
   previousPerformance,
   sessionVolume,
@@ -31,8 +34,12 @@ describe('1RM formulas', () => {
     expect(e1rm(100, 5, 'brzycki')).toBeCloseTo(112.5, 6);
     expect(e1rm(0, 5)).toBeNull();
     expect(e1rm(100, 0)).toBeNull();
+    // Linear equations are only valid up to 10 reps (Reynolds, Gordon & Robergs 2006; Brzycki 1993).
+    expect(E1RM_MAX_REPS).toBe(10);
+    expect(e1rm(100, 10)).toBeCloseTo(133.333, 3);
+    expect(e1rm(100, 11)).toBeNull();
+    expect(e1rm(100, 15)).toBeNull();
     expect(e1rm(100, 16)).toBeNull();
-    expect(e1rm(100, 15)).not.toBeNull();
   });
 });
 
@@ -96,6 +103,20 @@ describe('detectPRs', () => {
     const cand = S(120, 5);
     expect(detectPRs([...history, cand], cand)).toContain('max_weight');
   });
+  it('no e1RM record above 10 reps (outside the validity of linear equations)', () => {
+    // 95×12 would be an Epley "e1RM" of 133 (> 116.7 of 100×5), but 12 reps is outside the valid range.
+    expect(detectPRs(history, S(95, 12))).not.toContain('max_e1rm');
+    expect(detectPRs(history, S(95, 10))).toContain('max_e1rm'); // 126.7 > 116.7
+  });
+  it('e1rm: false (body-weight exercises) never yields an e1RM record from the added load', () => {
+    const h = [S(10, 8), S(10, 6)];
+    expect(detectPRs(h, S(15, 8))).toContain('max_e1rm');
+    const bw = detectPRs(h, S(15, 8), { e1rm: false });
+    expect(bw).not.toContain('max_e1rm');
+    expect(bw).toContain('max_weight'); // other records are unchanged
+    expect(e1rmApplies('bodyweight_reps')).toBe(false);
+    expect(e1rmApplies('weight_reps')).toBe(true);
+  });
   it('duration and distance', () => {
     const h: SetLike[] = [{ durationSec: 60, distanceM: 200, date: 'd', sessionId: 's' }];
     expect(detectPRs(h, { durationSec: 90, date: 'd2', sessionId: 't' })).toEqual(['max_duration']);
@@ -119,6 +140,12 @@ describe('bestSet', () => {
     const c: SetLike = { durationSec: 30, date: 'd', sessionId: 's' };
     const d: SetLike = { durationSec: 45, date: 'd', sessionId: 's' };
     expect(bestSet([c, d])).toBe(d);
+  });
+  it('still ranks sets of 11–15 reps by load (ordering score, not an e1RM)', () => {
+    expect(bestSet([S(60, 12), S(70, 12)])).toEqual(S(70, 12));
+    expect(setStrengthScore(70, 12)).toBeCloseTo(98, 6);
+    expect(setStrengthScore(70, 16)).toBeNull();
+    expect(e1rm(70, 12)).toBeNull();
   });
   it('empty → null', () => {
     expect(bestSet([])).toBeNull();

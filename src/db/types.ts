@@ -1,5 +1,5 @@
 import type { ProtocolId, SkinfoldSite } from '../domain/bodycomp'
-import type { ActivityKey, GoalType, Sex } from '../domain/energy'
+import type { ActivityKey, EnergyMethod, GoalType, PalBand, PhysiologicalState, Sex } from '../domain/energy'
 import type { QtyUnit } from '../domain/units'
 import type { HouseholdPortion, PortionVerification } from '../domain/portions'
 import type { FoodBasis, FoodKind, FoodSource, NutrientCode, NutrientMap, TrackingType } from './catalogTypes'
@@ -99,6 +99,11 @@ export interface Profile extends BaseRow {
   activity: ActivityKey | null
   color: ProfileColor
   settings: ProfileSettings
+  /**
+   * 3.3, optional (absent = 'none'). Pregnancy or lactation turns off deficits and automatic adaptive
+   * changes and asks for professional guidance (see energyRestriction).
+   */
+  physiologicalState?: PhysiologicalState
 }
 export type ProfileColor = 'emerald' | 'violet' | 'amber' | 'sky' | 'rose'
 
@@ -107,6 +112,7 @@ export interface GoalInputs {
   heightCm: number
   ageYears: number
   sex: Sex
+  /** With method 'rien', the closest legacy level (only for older app versions that ignore `method`). */
   activity: ActivityKey
   goal: GoalType
   deficitKcal: number
@@ -114,11 +120,17 @@ export interface GoalInputs {
   proteinGPerKg: number
   fatPct: number
   fiberPer1000: number
+  /** 3.3, optional: absent = 'mifflin' (Mifflin-St Jeor × activity factor). */
+  method?: EnergyMethod
+  /** 3.3, optional: PAL band of the 'rien' method (Schofield × PAL). */
+  palBand?: PalBand
+  /** 3.3, optional: multiplier used (activity factor or PAL). */
+  pal?: number
 }
 export interface Goal extends PersonalRow, Provenance {
   validFrom: LocalDate
   goal: GoalType
-  /** 'calculated' = Mifflin-St Jeor pipeline; 'manual' = user typed the numbers. */
+  /** 'calculated' = equation pipeline (inputs.method: Mifflin-St Jeor or RIEN); 'manual' = user typed the numbers. */
   method: 'calculated' | 'manual'
   kcal: number
   protein: number

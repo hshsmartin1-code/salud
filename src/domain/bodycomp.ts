@@ -62,6 +62,9 @@ export type ProtocolId =
   | 'isak8'
   | 'sum_custom';
 
+/** Ages of the Jackson & Pollock validation samples, by sex (inclusive). */
+export const JP_AGE_RANGE: Record<Sex, readonly [number, number]> = { male: [18, 61], female: [18, 55] };
+
 export const PROTOCOLS: readonly {
   id: ProtocolId;
   es: string;
@@ -76,7 +79,7 @@ export const PROTOCOLS: readonly {
     sites: ['chest', 'midaxillary', 'triceps', 'subscapular', 'abdominal', 'suprailiac', 'thigh'],
     equation: 'jp7',
     sex: null,
-    note: 'Ecuación de densidad corporal; validada en adultos de 18 a 61 años.',
+    note: 'Ecuación de densidad corporal; validada en hombres de 18 a 61 años (1978) y mujeres de 18 a 55 años (1980).',
   },
   {
     id: 'jp3_male',
@@ -84,7 +87,7 @@ export const PROTOCOLS: readonly {
     sites: ['chest', 'abdominal', 'thigh'],
     equation: 'jp3',
     sex: 'male',
-    note: 'Pectoral, abdominal y muslo. Solo para hombres de 18 a 61 años.',
+    note: 'Pectoral, abdominal y muslo. Solo para hombres; validada de 18 a 61 años.',
   },
   {
     id: 'jp3_female',
@@ -92,7 +95,7 @@ export const PROTOCOLS: readonly {
     sites: ['triceps', 'suprailiac', 'thigh'],
     equation: 'jp3',
     sex: 'female',
-    note: 'Tríceps, suprailíaco y muslo. Solo para mujeres de 18 a 61 años.',
+    note: 'Tríceps, suprailíaco y muslo. Solo para mujeres; validada de 18 a 55 años.',
   },
   {
     id: 'dw4',
@@ -261,8 +264,18 @@ export function computeBodyComp(input: BodyCompInput): BodyCompResult {
   const age = input.ageYears;
   if (proto.equation === 'dw4') {
     if (age < 17) warnings.push('Durnin & Womersley se validó desde los 17 años; el resultado es poco fiable.');
-  } else if (age < 18 || age > 61) {
-    warnings.push('Jackson & Pollock se validó en adultos de 18 a 61 años; el resultado es poco fiable.');
+  } else {
+    // Validation samples: men 18–61 y (Jackson & Pollock 1978, Br J Nutr 40:497); women 18–55 y (Jackson,
+    // Pollock & Ward 1980, Med Sci Sports Exerc 12:175, PMID 7402053), who ask for care above 40 y.
+    // Outside the range the estimate is still shown, with an explicit note (never blocked).
+    const [lo, hi] = JP_AGE_RANGE[input.sex];
+    if (age < lo || age > hi) {
+      warnings.push(
+        `Edad fuera del rango de validación: Jackson & Pollock se validó en ${input.sex === 'female' ? 'mujeres' : 'hombres'} de ${lo} a ${hi} años; el resultado es una estimación poco fiable.`,
+      );
+    } else if (input.sex === 'female' && age > 40) {
+      warnings.push('Los autores de la ecuación para mujeres piden cautela en mayores de 40 años.');
+    }
   }
 
   const density =

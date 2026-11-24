@@ -279,6 +279,7 @@ export function Onboarding({ embedded = false, onFinish }: { embedded?: boolean;
                 ageYears: age,
                 weightKg: toNum(weight),
                 activity: activity || null,
+                physiologicalState: created.physiologicalState ?? null,
               }}
               saveLabel="Guardar y continuar"
               onSave={async (g) => {

@@ -2,7 +2,22 @@ import { useMemo, useState } from 'react'
 import type { Goal, GoalInputs } from '../../db/types'
 import type { NewRow } from '../../db/repo'
 import { todayLocal } from '../../domain/dates'
-import { ACTIVITY_LEVELS, GOAL_LABELS, computeTargets, type ActivityKey, type GoalType, type Sex } from '../../domain/energy'
+import {
+  ACTIVITY_LEVELS,
+  ENERGY_METHOD_LABELS,
+  GOAL_LABELS,
+  PAL_BANDS,
+  palText,
+  computeTargets,
+  energyRestriction,
+  macroAdvisories,
+  type ActivityKey,
+  type EnergyMethod,
+  type GoalType,
+  type PalBand,
+  type PhysiologicalState,
+  type Sex,
+} from '../../domain/energy'
 import { formatNumber, rangeError, textRangeError } from '../../domain/units'
 import { useSafeSave } from '../../app/safeSave'
 import { NumField, SelectField, TextField, numStr, toNum } from '../../ui/fields'
@@ -15,13 +30,19 @@ export interface GoalSeed {
   ageYears: number | null
   weightKg: number | null
   activity: ActivityKey | null
+  /** Profile field (absent = none): pregnancy / lactation turn off deficits. */
+  physiologicalState?: PhysiologicalState | null
   previous?: Goal | null
 }
 
 type Mode = 'calculated' | 'manual'
 const GOALS: GoalType[] = ['lose', 'maintain', 'gain', 'recomp']
 
-/** Calculated (Mifflin-St Jeor) or manual targets; the method is always visible and stored. */
+/**
+ * Calculated (Mifflin-St Jeor × activity factor by default, or RIEN Colombia: Schofield × PAL) or manual
+ * targets; the method is always visible and stored. Advice (RDA, AMDR, BMI ≥ 30, under 18, pregnancy or
+ * lactation) is shown as non-blocking warnings and saved with the goal; it never changes the numbers typed.
+ */
 export function GoalEditor({
   seed,
   onSave,
@@ -35,8 +56,14 @@ export function GoalEditor({
 }) {
   const prev = seed.previous
   const [mode, setMode] = useState<Mode>(prev?.method ?? 'calculated')
-  const [goal, setGoal] = useState<GoalType | ''>(prev?.goal ?? '')
+  // A previous «Perder grasa» is not preselected when a deficit no longer applies (under 18, pregnancy, lactation).
+  const [goal, setGoal] = useState<GoalType | ''>(() =>
+    prev?.goal === 'lose' && energyRestriction({ ageYears: seed.ageYears, physiologicalState: seed.physiologicalState }) ? '' : (prev?.goal ?? ''),
+  )
   const [activity, setActivity] = useState<ActivityKey | ''>(prev?.inputs?.activity ?? seed.activity ?? '')
+  // Equation: Mifflin-St Jeor stays the default (existing goals never change); RIEN is opt-in.
+  const [method, setMethod] = useState<EnergyMethod>(prev?.inputs?.method ?? 'mifflin')
+  const [palBand, setPalBand] = useState<PalBand | ''>(prev?.inputs?.palBand ?? '')
   const [weight, setWeight] = useState(numStr(seed.weightKg))
   const [height, setHeight] = useState(numStr(seed.heightCm))
   const [age, setAge] = useState(seed.ageYears !== null ? String(seed.ageYears) : '')
@@ -76,19 +103,25 @@ export function GoalEditor({
     mFiber: textRangeError(mFiber, 0, 200, 'g'),
   }
   const calcInputErr = errs.weight ?? errs.height ?? errs.age ?? errs.deficit ?? errs.surplus ?? errs.protein ?? errs.fatPct ?? errs.fiber1000
+  const typedAge = toNum(age)
+  // Under 18, pregnancy or lactation: no deficit and no adaptive auto mode (energyRestriction).
+  const restriction = energyRestriction({ ageYears: typedAge === null ? null : Math.floor(typedAge), physiologicalState: seed.physiologicalState })
   const calc = useMemo(() => {
     if (calcInputErr) return { missing: false as const, error: 'Revisa los valores marcados.' }
     const w = toNum(weight)
     const h = toNum(height)
     const a = toNum(age)
-    if (w === null || h === null || a === null || !activity || !goal) return { missing: true as const }
+    const level = method === 'rien' ? palBand : activity
+    if (w === null || h === null || a === null || !level || !goal) return { missing: true as const }
     try {
       const r = computeTargets({
         weightKg: w,
         heightCm: h,
         ageYears: Math.floor(a),
         sex: seed.sex,
-        activity,
+        method,
+        ...(method === 'rien' ? { palBand: palBand as PalBand } : { activity: activity as ActivityKey }),
+        physiologicalState: seed.physiologicalState ?? null,
         goal,
         deficitKcal: toNum(deficit) ?? 400,
         surplusKcal: toNum(surplus) ?? 250,
@@ -100,7 +133,7 @@ export function GoalEditor({
     } catch (e) {
       return { missing: false as const, error: (e as Error).message }
     }
-  }, [calcInputErr, weight, height, age, activity, goal, deficit, surplus, protein, fatPct, fiber1000, seed.sex])
+  }, [calcInputErr, weight, height, age, activity, method, palBand, goal, deficit, surplus, protein, fatPct, fiber1000, seed.sex, seed.physiologicalState])
 
   function switchToManualFromCalc() {
     if (!calc.missing && 'r' in calc && calc.r) {
@@ -109,13 +142,18 @@ export function GoalEditor({
       setMC(numStr(calc.r.carbs))
       setMF(numStr(calc.r.fat))
       setMFiber(numStr(calc.r.fiber))
-      setManualNote('Ajustado manualmente a partir del cálculo Mifflin-St Jeor.')
+      setManualNote(`Ajustado manualmente a partir del cálculo ${method === 'rien' ? 'RIEN (Schofield × PAL)' : 'Mifflin-St Jeor'}.`)
     }
     setMode('manual')
   }
 
   const manualKcal = toNum(mKcal)
   const manualMacroKcal = (toNum(mP) ?? 0) * 4 + (toNum(mC) ?? 0) * 4 + (toNum(mF) ?? 0) * 9
+  // Same non-blocking advice as the calculation, on the typed numbers.
+  const manualAdvice =
+    mode === 'manual' && manualKcal !== null && !kcalErr && toNum(mP) !== null && toNum(mC) !== null && toNum(mF) !== null
+      ? macroAdvisories({ kcal: manualKcal, protein: toNum(mP) as number, carbs: toNum(mC) as number, fat: toNum(mF) as number, weightKg: toNum(weight), heightCm: toNum(height) })
+      : []
   const canSave =
     !!goal &&
     !!validFrom &&
@@ -143,6 +181,9 @@ export function GoalEditor({
           proteinGPerKg: r.inputs.proteinGPerKg,
           fatPct: r.inputs.fatPct,
           fiberPer1000: r.inputs.fiberPer1000,
+          method: r.inputs.method,
+          pal: r.inputs.pal,
+          ...(r.inputs.method === 'rien' && r.inputs.palBand ? { palBand: r.inputs.palBand } : {}),
         }
         await onSave({
           validFrom,
@@ -169,6 +210,8 @@ export function GoalEditor({
         const warnings: string[] = []
         if (manualKcal && Math.abs(manualMacroKcal - manualKcal) / manualKcal > 0.1)
           warnings.push('Los macronutrientes no suman la energía indicada (diferencia > 10 %).')
+        if (restriction) warnings.push(restriction.text)
+        warnings.push(...manualAdvice)
         await onSave({
           validFrom,
           goal,
@@ -201,14 +244,29 @@ export function GoalEditor({
         <NumField label="Estatura" unit="cm" value={height} onChange={setHeight} placeholder="—" error={errs.height ?? undefined} />
         <NumField label="Edad" unit="años" value={age} onChange={setAge} placeholder="—" error={errs.age ?? undefined} />
       </div>
-      <SelectField<ActivityKey>
-        label="Nivel de actividad"
-        value={activity}
-        onChange={setActivity}
-        placeholder="Selecciona…"
-        options={ACTIVITY_LEVELS.map((a) => ({ value: a.key, label: `${a.es} (×${formatNumber(a.factor, 3)}) — ${a.description}` }))}
-      />
+      {method === 'rien' ? (
+        <SelectField<PalBand>
+          label="Nivel de actividad física (PAL)"
+          value={palBand}
+          onChange={setPalBand}
+          placeholder="Selecciona…"
+          options={PAL_BANDS.map((b) => ({ value: b.key, label: `${b.es} (PAL ${palText(b.min)}–${palText(b.max)}; se usa ${palText(b.pal)}) — ${b.description}` }))}
+        />
+      ) : (
+        <SelectField<ActivityKey>
+          label="Nivel de actividad"
+          value={activity}
+          onChange={setActivity}
+          placeholder="Selecciona…"
+          options={ACTIVITY_LEVELS.map((a) => ({ value: a.key, label: `${a.es} (×${formatNumber(a.factor, 3)}) — ${a.description}` }))}
+        />
+      )}
     </div>
+  )
+  const warnLine = (w: string) => (
+    <p key={w} className="mt-2 flex items-start gap-1.5 text-xs text-warn">
+      <Icon name="alert" size={14} className="mt-0.5 shrink-0" /> {w}
+    </p>
   )
 
   return (
@@ -221,8 +279,10 @@ export function GoalEditor({
               type="button"
               key={g}
               aria-pressed={goal === g}
+              // A deficit is not offered under 18, in pregnancy or in lactation (energyRestriction).
+              disabled={g === 'lose' && !!restriction && goal !== 'lose'}
               onClick={() => setGoal(g)}
-              className={`min-h-[44px] rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+              className={`min-h-[44px] rounded-xl border px-3 py-2.5 text-sm font-medium transition disabled:opacity-50 ${
                 goal === g ? 'border-accent bg-accent/10 text-accent' : 'border-line bg-surface hover:bg-surface2'
               }`}
             >
@@ -230,6 +290,11 @@ export function GoalEditor({
             </button>
           ))}
         </div>
+        {restriction ? (
+          <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-warn/10 px-3 py-2 text-xs text-ink" data-testid="goal-restriction">
+            <Icon name="alert" size={14} className="mt-0.5 shrink-0 text-warn" /> {restriction.text}
+          </p>
+        ) : null}
       </div>
 
       {mode === 'calculated' && inputsOutside ? inputsBlock : null}
@@ -251,11 +316,7 @@ export function GoalEditor({
                 <TargetCell label="Carbos" value={calc.r.carbs} unit="g" />
                 <TargetCell label="Grasa" value={calc.r.fat} unit="g" />
               </div>
-              {calc.r.warnings.map((w) => (
-                <p key={w} className="mt-2 flex items-start gap-1.5 text-xs text-warn">
-                  <Icon name="alert" size={14} className="mt-0.5 shrink-0" /> {w}
-                </p>
-              ))}
+              {calc.r.warnings.filter((w) => w !== restriction?.text).map(warnLine)}
               <button type="button" className="btn-ghost mt-2 px-2 py-1 text-xs" onClick={switchToManualFromCalc} data-testid="goal-adjust">
                 <Icon name="edit" size={14} /> Ajustar
               </button>
@@ -264,9 +325,18 @@ export function GoalEditor({
 
           <Disclosure summary="Cómo calculamos tus objetivos" testId="goal-method">
             <div className="space-y-3">
-              <p className="text-xs leading-relaxed text-muted">
-                Gasto en reposo (TMB) con la ecuación de Mifflin-St Jeor, multiplicado por tu factor de actividad para obtener el gasto total; después se aplica tu
-                objetivo y se reparten los macronutrientes con los parámetros de abajo.
+              <SelectField<EnergyMethod>
+                label="Ecuación"
+                value={method}
+                onChange={setMethod}
+                hint="Mifflin-St Jeor es la predeterminada; RIEN es el método oficial colombiano."
+                options={(['mifflin', 'rien'] as const).map((m) => ({ value: m, label: ENERGY_METHOD_LABELS[m] }))}
+              />
+              <p className="text-xs leading-relaxed text-muted" data-testid="goal-method-text">
+                {method === 'rien'
+                  ? 'Tasa metabólica basal (TMB) con las ecuaciones de Schofield (FAO/OMS/UNU 1985 y 2004), multiplicada por el nivel de actividad física (PAL) del rango que elijas, como en las Recomendaciones de Ingesta de Energía y Nutrientes para Colombia (RIEN, Resolución 3803 de 2016). Se usa el punto medio del rango.'
+                  : 'Gasto en reposo (TMB) con la ecuación de Mifflin-St Jeor (1990), multiplicado por tu factor de actividad para obtener el gasto energético total estimado. Los factores 1,2–1,9 son multiplicadores divulgativos (textos de fisiología del ejercicio), no medidos con agua doblemente marcada; el método oficial colombiano (RIEN) usa PAL desde 1,40.'}{' '}
+                Después se aplica tu objetivo y se reparten los macronutrientes con los parámetros de abajo. Las ecuaciones tienen un error típico de ±10 % o más.
               </p>
               {!inputsOutside ? inputsBlock : null}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -299,6 +369,7 @@ export function GoalEditor({
           <p className="text-xs text-muted">
             Energía de los macros (4/4/9): <span className="num font-medium text-ink">{formatNumber(manualMacroKcal, 0)} kcal</span>
           </p>
+          {manualAdvice.length ? <div data-testid="goal-manual-advice">{manualAdvice.map(warnLine)}</div> : null}
           <button type="button" className="btn-ghost -ml-2 px-2 py-1 text-xs" onClick={() => setMode('calculated')} data-testid="goal-auto">
             <Icon name="refresh" size={14} /> Usar el cálculo automático
           </button>

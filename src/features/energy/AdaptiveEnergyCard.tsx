@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useProfile, useRepo } from '../../app/profile'
 import { updateProfile } from '../../db/profiles'
 import type { StoredAdaptiveSettings } from '../../db/types'
-import { CONFIDENCE_LABELS, MODE_LABELS, PHASE_LABELS, PHASE_RATE_LIMITS, type AdaptiveMode, type EnergyPhase } from '../../domain/adaptiveEnergy'
+import { CONFIDENCE_LABELS, MODE_LABELS, PHASE_LABELS, PHASE_RATE_LIMITS, type AdaptiveMode, type EnergyDensityChoice, type EnergyPhase } from '../../domain/adaptiveEnergy'
 import { formatDateEs } from '../../domain/dates'
 import { formatNumber } from '../../domain/units'
 import { Icon } from '../../ui/Icon'
@@ -68,7 +68,11 @@ export function AdaptiveEnergyCard() {
       </div>
       <Card className="space-y-4">
         <div className="grid grid-cols-3 gap-3">
-          <Readout label="Gasto por fórmula" value={f0(formula?.tdee)} sub={formula ? `TMB ${f0(formula.bmr)} × ${formatNumber(formula.factor, 3)}` : 'Faltan datos'} />
+          <Readout
+            label="Gasto por fórmula"
+            value={f0(formula?.tdee)}
+            sub={formula ? `TMB ${f0(formula.bmr)} × ${formula.method === 'rien' ? 'PAL ' : ''}${formatNumber(formula.factor, 3)}` : 'Faltan datos'}
+          />
           <Readout
             label="Gasto adaptativo"
             value={observed?.status === 'ok' ? f0(observed.blendedTdee) : '—'}
@@ -77,6 +81,13 @@ export function AdaptiveEnergyCard() {
           />
           <Readout label="Meta actual" value={goal ? formatNumber(goal.kcal, 0) : '—'} sub={goal ? (goal.method === 'manual' ? 'Manual' : goal.adaptive ? 'Ajustada' : 'Calculada') : 'Sin objetivo'} />
         </div>
+
+        {s.restriction ? (
+          <p className="flex items-start gap-1.5 rounded-xl bg-warn/10 px-3 py-2 text-sm text-ink" data-testid="adaptive-restriction">
+            <Icon name="alert" size={16} className="mt-0.5 shrink-0 text-warn" />
+            <span>{s.restriction.text} La estimación de esta tarjeta es solo informativa.</span>
+          </p>
+        ) : null}
 
         {s.missing.length ? (
           <p className="text-sm text-muted">Para estimar el gasto falta {s.missing.join(', ')} en tu perfil o tus medidas.</p>
@@ -166,6 +177,9 @@ export function AdaptiveEnergyCard() {
           </details>
         ) : null}
 
+        {s.restriction ? (
+          <p className="border-t border-line pt-4 text-xs text-faint">{densityText(s.energyDensity)} Es una estimación: no mide tu metabolismo.</p>
+        ) : (
         <div className="space-y-3 border-t border-line pt-4">
           <div>
             <span className="label" id="adaptive-mode">
@@ -219,10 +233,11 @@ export function AdaptiveEnergyCard() {
             <SmallChoice label="Cambio máx." value={settings.maxStepKcal} options={[100, 150, 200]} unit="kcal" onChange={(v) => void save({ maxStepKcal: v })} />
             <SmallChoice label="Espera" value={settings.cooldownDays} options={[14, 21, 28]} unit="días" onChange={(v) => void save({ cooldownDays: v })} />
           </div>
-          <p className="text-xs text-faint">
-            El gasto adaptativo combina tus promedios de comida con la tendencia del peso (≈ 7700 kcal por kg) y la fórmula. Es una estimación: no mide tu metabolismo. La actividad registrada no se suma, porque ya se refleja en el peso.
+          <p className="text-xs text-faint" data-testid="adaptive-density">
+            El gasto adaptativo combina tus promedios de comida con la tendencia del peso y la fórmula. {densityText(s.energyDensity)} Es una estimación: no mide tu metabolismo. La actividad registrada no se suma, porque ya se refleja en el peso.
           </p>
         </div>
+        )}
 
         {s.history.length ? (
           <details className="border-t border-line pt-3">
@@ -274,6 +289,13 @@ export function AdaptiveEnergyCard() {
       </Sheet>
     </section>
   )
+}
+
+/** Which energy density of weight change was used, and why (Forbes/Hall with a recent body-fat %, else 7700). */
+function densityText(d: EnergyDensityChoice): string {
+  if (d.source === 'body-fat' && d.bodyFatPct !== null && d.date)
+    return `Cada kg de cambio de peso se cuenta como ${formatNumber(Math.round(d.kcalPerKg / 10) * 10, 0)} kcal, calculado con tu grasa estimada (${formatNumber(d.bodyFatPct, 1)} % del ${formatDateEs(d.date)}) según el modelo de Forbes y Hall (2008). Al empezar un déficit, el glucógeno y el agua hacen que el peso baje más rápido de lo que indica este valor.`
+  return 'Cada kg de cambio de peso se cuenta como ≈ 7700 kcal, una regla para tejido mixto que solo se ajusta a personas con más de ~30 kg de grasa (Hall 2008): en personas delgadas sobrestima el gasto. Si registras tu % de grasa (pliegues o Health Connect), se usa un valor según tu composición.'
 }
 
 /** Counts above the requirement read as "17 de 17 o más", never "19 de 17". */

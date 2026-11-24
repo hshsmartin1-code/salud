@@ -67,3 +67,39 @@ Leyenda: ✅ implementado y verificado · 🟡 parcial (con límites declarados)
 - 🔧 `backup-offline.spec.ts:4`: era un problema de entorno. Chromium sin cabeza no entrega a un input de archivo una ruta con caracteres no ASCII («→» en el título de la prueba). Ahora se pasan los mismos bytes exportados.
 - 🔧 `v32-plan.spec.ts:224` y `v3-session.spec.ts` (8 pruebas intermitentes): el ayudante esperaba `/rutinas/[^/]+$`, que también coincide con `/rutinas/nueva`, y competía con el guardado. Se corrigió la expresión en 8 lugares y la app (ver arriba).
 - 🔧 `v3-training-persistence.spec.ts:45`: era un error real de la app (primer carácter perdido, ver arriba). La prueba ahora también verifica el valor antes del cierre brusco.
+
+## Rendimiento (detalle y método en [PERFORMANCE_REPORT.md](PERFORMANCE_REPORT.md))
+
+- ✅ **Fragmento inicial −43 %**: de 501,9 kB a 288,2 kB sin comprimir (de 162,9 a 92,8 kB gzip). El JS de la primera carga bajó de 312 a 239 kB gzip.
+  - `APP_VERSION` y `stableId` salieron de `db/backup.ts` (`src/appVersion.ts`, `src/db/stableId.ts`), así que zod ya no entra en el arranque.
+  - `SessionPage`, `ExerciseLibrary`, `TextFoodSheet` y `AdaptiveAutoRunner` se cargan bajo demanda. El service worker los precachea, de modo que siguen funcionando sin conexión.
+- ✅ **Arranque** (CPU ×4, caché fría, mediana de 11): el tiempo hasta el panel bajó de ≈ 500–544 ms a 440 ms.
+- ✅ **Récords en O(n)** (`prsBySet`): el algoritmo anterior era en la práctica cúbico. Con 9000 series, Entreno pasó de 4662 ms a 1289 ms. Una prueba aleatoria de equivalencia lo compara con la implementación de referencia, que se conserva como respaldo cuando hay sesiones solapadas.
+- ✅ **Fotos paginadas de 48 en 48**: de 1125 ms a 617 ms con 300 fotos.
+- ✅ Herramientas nuevas: `tools/perf-bundle.mjs`, `tools/perf-startup.mjs` y `tools/perf-dataset.mjs` (dataset sintético grande).
+
+## Rigor científico (todas las fórmulas, fuentes y límites en [docs/METODOLOGIA.md](docs/METODOLOGIA.md))
+
+- 🔧 **1RM estimado solo hasta 10 repeticiones** (`E1RM_MAX_REPS`, Reynolds 2006). Por encima devuelve `null`. Ajustado también en la sesión activa y en los textos.
+- 🔧 **Jackson-Pollock**: hombres de 18 a 61 años y mujeres de 18 a 55 (JPW 1980). Fuera de ese rango se muestra la nota «fuera del rango de validación», y en mujeres mayores de 40 una nota de cautela.
+- 🔧 **Verificación energía-macros única** (`atwaterKcal`): `4P + 9G + 4·(carbsAvail ?? carbs − fibra) + 2·fibra (+ 7·alcohol si OFF lo declara)`. Se usa en etiquetas, OFF y catálogo, y ya no da falsas alarmas con alimentos altos en fibra.
+- 🔧 **Terminología**: «Gasto energético total estimado (GET)» en lugar de «Gasto basal».
+- ✅ **Método RIEN Colombia (Schofield × PAL)** como opción en los objetivos, con coeficientes FAO/OMS/UNU 2004 (tabla 5.2) y bandas de PAL (tabla 5.3). Mifflin sigue siendo el valor por defecto y no se cambia el objetivo de nadie sin que lo pida.
+- ✅ **Avisos no bloqueantes en objetivos**: proteína por debajo de la RDA, grasa fuera del 20–35 %, carbohidratos por debajo de 130 g, proteína calculada sobre el peso total con IMC ≥ 30 y edad menor de 18. Hay un solo piso calórico compartido.
+- ✅ **Estado fisiológico** opcional (embarazo o lactancia): desactiva el déficit y el ajuste adaptativo automático.
+- ✅ **Densidad energética del cambio de peso** según el % de grasa (Forbes/Hall) cuando hay una medición en los últimos 90 días. Si no la hay, se usan 7700 kcal/kg y el supuesto se declara.
+- ✅ **Presión arterial**: «lectura aislada», nivel «severa» y promedio de 7 días. **SpO₂**: aviso por debajo de 90 % y, entre 90 y 93 %, una nota neutral sobre la altitud (MinSalud; Rojas-Camayo).
+- ✅ **Récords y 1RM**: los ejercicios con peso corporal ya no generan un 1RM a partir de la carga añadida (`e1rmApplies`). Ya están cubiertos en las estadísticas, el detalle y la sesión activa.
+- 🟡 **Promedios semanales sin días incompletos**: corregido en `useRangeStats` y en el centro de control. La tarjeta semanal de Hoy queda pendiente de integrarse con el rediseño de Hoy.
+
+## Sincronización
+
+- ✅ **Menos lecturas de Firestore**: la ventana de solape pasó de 5 min a 90 s, con un cursor (tiempo, clave) y un búfer para los lotes con la misma marca de tiempo. Medido con un contador en `memoryRemote`:
+  - Una sincronización en reposo tras subir 400 filas bajó de 403 lecturas cada vez a 2.
+  - Una bajada completa de 651 documentos bajó de 852 lecturas a 652.
+  - Una prueba confirma que las escrituras que llegan fuera de orden dentro de la ventana se siguen recibiendo.
+- 🔧 **El cursor ya no se pierde** si se restablece durante una bajada (escritura con compare-and-set).
+- 🔧 **Sin conflictos invisibles**: las filas que solo difieren en `createdAt` o `updatedAt` toman la copia de la nube.
+- ✅ **La mitad de codificaciones por ciclo**: de 604 a 302.
+- ✅ **Duplicados probables al «Unir»**: `src/sync/duplicates.ts` detecta registros de comida, peso, hidratación y sesiones. La vista previa muestra el conteo y «Omitir duplicados probables» viene activado. No se borra nada de ningún lado. Las sesiones solo se informan, porque omitir una separaría sus series.
+- Verificación: 25 pruebas en el emulador de Firestore (3 nuevas) y e2e de cuenta con emuladores (5).

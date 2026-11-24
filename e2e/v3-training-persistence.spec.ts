@@ -48,6 +48,7 @@ test('a weight typed without leaving the field survives closing the app abruptly
   await kg.click()
   await kg.pressSequentially('72,5')
   await expect(kg).toBeFocused() // never blurred
+  await expect(kg).toHaveValue('72,5') // no keystroke lost to the select-on-focus of the row
   await page.waitForTimeout(400)
   await page.close({ runBeforeUnload: false })
 

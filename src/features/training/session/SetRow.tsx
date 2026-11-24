@@ -208,8 +208,11 @@ function SetRowImpl({ set, n, tracking, effort, prev, prs, following, restSec, t
               }}
               onFocus={(e) => {
                 const el = e.currentTarget
+                // Select the old value for quick overwrite, but only if nothing was typed in the meantime:
+                // a keystroke that lands before this frame must not be selected and replaced by the next one.
+                const atFocus = el.value
                 requestAnimationFrame(() => {
-                  if (document.activeElement === el) el.select()
+                  if (document.activeElement === el && el.value === atFocus) el.select()
                 })
                 if (rowRef.current) actions.revealRow(rowRef.current)
               }}

@@ -15,7 +15,7 @@ async function startSession(page: Page) {
     await page.getByTestId('exercise-results').locator('button').first().click()
   }
   await page.getByTestId('save-routine').click()
-  await expect(page).toHaveURL(/#\/entreno\/rutinas\/[^/]+$/)
+  await expect(page).toHaveURL(/#\/entreno\/rutinas\/(?!nueva$)[^/]+$/)
   await page.goto('./#/entreno')
   await page.getByTestId('start-routine').first().click()
   await expect(page.getByTestId('live-session')).toBeVisible()

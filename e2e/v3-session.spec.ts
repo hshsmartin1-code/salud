@@ -14,7 +14,7 @@ async function createRoutine(page: Page, queries: string[]) {
     await page.getByTestId('exercise-results').locator('button').first().click()
   }
   await page.getByTestId('save-routine').click()
-  await expect(page).toHaveURL(/#\/entreno\/rutinas\/[^/]+$/) // saving opens the routine
+  await expect(page).toHaveURL(/#\/entreno\/rutinas\/(?!nueva$)[^/]+$/) // saving opens the routine
   await page.goto('./#/entreno')
   await expect(page.getByTestId('routine-card').first()).toBeVisible()
 }
@@ -385,7 +385,7 @@ test('routine warm-ups start first, are not counted, and "+ Serie" after them ad
   await editor.getByRole('button', { name: 'Aumentar calentamiento' }).click()
   await editor.getByRole('button', { name: 'Aumentar calentamiento' }).click()
   await page.getByTestId('save-routine').click()
-  await expect(page).toHaveURL(/#\/entreno\/rutinas\/[^/]+$/)
+  await expect(page).toHaveURL(/#\/entreno\/rutinas\/(?!nueva$)[^/]+$/)
   await page.goto('./#/entreno')
   await startRoutine(page)
 

@@ -3,6 +3,7 @@
  */
 import type { NutrientCode, NutrientMap } from '../../db/catalogTypes'
 import type { RefFood } from '../../db/types'
+import { alcoholGramsPer100ml, atwaterKcal } from '../../domain/nutrients'
 
 type Nutriments = Record<string, unknown>
 export interface OffProduct {
@@ -200,9 +201,13 @@ export function offToRefFood(p: OffProduct, fetchedAt = new Date().toISOString()
   if (Object.values(n).some((v) => !Number.isFinite(v) || v < 0)) return { error: 'Valores inválidos en Open Food Facts' }
   const macros = (n.protein ?? 0) + (n.carbs ?? 0) + (n.fat ?? 0)
   if (outputBasis === '100g' && macros > 105) return { error: 'Datos inconsistentes en Open Food Facts (macros > 100 g)' }
+  // Shared energy formula (available carbohydrate + fibre at 2 kcal/g, see atwaterKcal). OFF gives alcohol in
+  // % vol; it is turned into grams only on a per-100 ml basis and used for this check, never stored (the
+  // catalogue has no alcohol field).
+  const alcoholG = outputBasis === '100ml' ? alcoholGramsPer100ml(num(nm.alcohol_100g)) : undefined
   if (n.protein !== undefined && n.carbs !== undefined && n.fat !== undefined) {
-    const est = 4 * n.protein + 4 * n.carbs + 9 * n.fat
-    if (Math.abs(kcal - est) > 0.25 * Math.max(est, kcal)) flags.push('atwater_mismatch')
+    const est = atwaterKcal(n, { alcoholG })
+    if (est !== undefined && Math.abs(kcal - est) > 0.25 * Math.max(est, kcal)) flags.push('atwater_mismatch')
   }
   const portions: [string, number][] = []
   if (validServing && r2(validServing.amount) > 0)

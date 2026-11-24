@@ -1,5 +1,5 @@
 import type { FoodBasis, NutrientMap } from '../db/catalogTypes';
-import { scaleNutrients } from './nutrients';
+import { atwaterKcal, scaleNutrients } from './nutrients';
 import { formatNumber } from './units';
 
 /**
@@ -166,11 +166,10 @@ export function checkLabelDraft(d: LabelDraft, { requireEnergy = true } = {}): {
     warnings.push(`Proteína + carbohidratos + grasa (${fmt(macros)} g) supera la base de ${fmt(ref)}: revisa la columna elegida.`);
   if (has(n.kcal) && has(n.kj) && Math.abs(n.kj / 4.184 - n.kcal) > Math.max(5, n.kcal * 0.08))
     warnings.push('Las kcal y los kJ no coinciden (1 kcal = 4,184 kJ): revisa si se intercambiaron.');
-  if (has(n.kcal) && (has(n.protein) || has(n.carbs) || has(n.fat))) {
-    const atw = 4 * (has(n.protein) ? n.protein : 0) + 4 * (has(n.carbs) ? n.carbs : 0) + 9 * (has(n.fat) ? n.fat : 0);
-    if (atw > 20 && Math.abs(atw - n.kcal) / atw > 0.25)
-      warnings.push(`Las kcal no coinciden con los macronutrientes (esperadas ≈ ${formatNumber(atw, 0)} kcal).`);
-  }
+  // Shared formula (available carbohydrate + fibre, see atwaterKcal); missing macros count as 0 on a label.
+  const atw = has(n.kcal) ? atwaterKcal(n, { missingAsZero: true }) : undefined;
+  if (has(n.kcal) && atw !== undefined && atw > 20 && Math.abs(atw - n.kcal) / atw > 0.25)
+    warnings.push(`Las kcal no coinciden con los macronutrientes (esperadas ≈ ${formatNumber(atw, 0)} kcal).`);
   if (has(n.sugars) && has(n.carbs) && n.sugars > n.carbs + 0.05) warnings.push('Los azúcares superan los carbohidratos totales.');
   if (has(n.addedSugars) && has(n.sugars) && n.addedSugars > n.sugars + 0.05) warnings.push('Los azúcares añadidos superan los azúcares totales.');
   if (has(n.satFat) && has(n.fat) && n.satFat > n.fat + 0.05) warnings.push('La grasa saturada supera la grasa total.');

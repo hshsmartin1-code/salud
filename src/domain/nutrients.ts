@@ -72,19 +72,62 @@ export function completeness(map: NutrientMap, codes: readonly NutrientCode[] = 
   return n / codes.length;
 }
 
-/** Atwater general factors: 4·P + 4·C + 9·F. Needs all three. */
-export function atwaterKcal(map: NutrientMap): number | undefined {
-  const { protein, carbs, fat } = map;
-  if (!known(protein) || !known(carbs) || !known(fat)) return undefined;
-  return 4 * protein + 4 * carbs + 9 * fat;
+/**
+ * Energy conversion factors (kcal/g). Colombia, Res. 810/2021 Art. 11.1, Tabla 4: available carbohydrate 4,
+ * protein 4, fat 9, alcohol (ethanol) 7. Fibre: 2 kcal/g (Codex CXG 2-1985; Reg. (UE) 1169/2011 Anexo XIV),
+ * since Res. 810 refers fibre and polyols to scientific references. Polyols (2,4 kcal/g) are not stored
+ * by the app, so they are not part of the check.
+ */
+export const ENERGY_FACTORS = Object.freeze({ protein: 4, carbsAvail: 4, fat: 9, fiber: 2, alcohol: 7 });
+/** Density of ethanol at 20 °C (g/ml), to turn % vol into grams. */
+export const ETHANOL_DENSITY_G_PER_ML = 0.789;
+
+/** Grams of ethanol in 100 ml from an alcohol content in % vol (ml per 100 ml); undefined if not plausible. */
+export function alcoholGramsPer100ml(pctVol: number | null | undefined): number | undefined {
+  if (!known(pctVol) || pctVol < 0 || pctVol > 100) return undefined;
+  return pctVol * ETHANOL_DENSITY_G_PER_ML;
+}
+
+export interface AtwaterOptions {
+  /**
+   * Ethanol in grams for the same basis, when the caller knows it. The food catalogue has no alcohol field
+   * (NUTRIENTS), so stored foods are checked without it and alcoholic drinks can look inconsistent.
+   */
+  alcoholG?: number | null;
+  /** Unknown protein / fat / carbohydrate count as 0 (label drafts), as long as one of them is known. */
+  missingAsZero?: boolean;
+}
+
+/**
+ * Energy expected from the macronutrients, the ONE formula shared by every consistency check (catalogue,
+ * label drafts, Open Food Facts):
+ *   4·P + 9·G + 4·CHOdisp + 2·fibra (+ 7·alcohol when known)
+ * CHOdisp = stated available carbohydrate, else max(0, total carbohydrate − fibre): total carbohydrate
+ * includes fibre and polyols (Res. 810/2021 Art. 3.8; USDA "by difference"; TCAC). With unknown fibre the
+ * total is counted as available (4 kcal/g), the conservative fallback. Needs protein, fat and some
+ * carbohydrate figure (unless `missingAsZero`).
+ */
+export function atwaterKcal(map: NutrientMap, opts: AtwaterOptions = {}): number | undefined {
+  const { protein, carbs, carbsAvail, fat, fiber } = map;
+  const zero = opts.missingAsZero === true;
+  if (zero && !known(protein) && !known(carbs) && !known(carbsAvail) && !known(fat)) return undefined;
+  const P = known(protein) ? protein : zero ? 0 : undefined;
+  const G = known(fat) ? fat : zero ? 0 : undefined;
+  const fib = known(fiber) && fiber > 0 ? fiber : 0;
+  const avail = known(carbsAvail) ? carbsAvail : known(carbs) ? Math.max(0, carbs - fib) : zero ? 0 : undefined;
+  if (P === undefined || G === undefined || avail === undefined) return undefined;
+  const alcohol = known(opts.alcoholG) && opts.alcoholG > 0 ? opts.alcoholG : 0;
+  const F = ENERGY_FACTORS;
+  return F.protein * P + F.fat * G + F.carbsAvail * avail + F.fiber * fib + F.alcohol * alcohol;
 }
 
 /** Compare declared kcal with the Atwater estimate. ok = true when not computable. diffPct is signed (declared vs expected). */
 export function atwaterCheck(
   map: NutrientMap,
   tolerance = 0.25,
+  opts: AtwaterOptions = {},
 ): { ok: boolean; expected?: number; diffPct?: number } {
-  const expected = atwaterKcal(map);
+  const expected = atwaterKcal(map, opts);
   const kcal = map.kcal;
   if (expected === undefined || !known(kcal)) return { ok: true };
   if (expected === 0) return { ok: kcal <= 5, expected };

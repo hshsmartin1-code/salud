@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useRepo } from '../../../app/profile'
 import { uuid } from '../../../db/repo'
@@ -78,6 +78,15 @@ export function RoutineEditor() {
     toast.show({ message: `«${item.name}» quitado`, actionLabel: 'Deshacer', onAction: () => setItems((items) => insertItem(items, i, item)) })
   }
 
+  // The save is async: if the person has already left the editor when it resolves, don't pull them back.
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
   async function save() {
     if (!canSave) return
     setSaving(true)
@@ -94,7 +103,7 @@ export function RoutineEditor() {
       }
       setSaved(true)
       toast.show({ message: 'Rutina guardada' })
-      nav(`/entreno/rutinas/${to}`, { replace: true })
+      if (mounted.current) nav(`/entreno/rutinas/${to}`, { replace: true })
     } finally {
       setSaving(false)
     }

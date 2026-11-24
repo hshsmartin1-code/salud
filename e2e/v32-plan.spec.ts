@@ -13,7 +13,7 @@ async function createRoutine(page: Page, name: string, query: string) {
   await page.getByTestId('exercise-search').fill(query)
   await page.getByTestId('exercise-results').locator('button').first().click()
   await page.getByTestId('save-routine').click()
-  await expect(page).toHaveURL(/#\/entreno\/rutinas\/[^/]+$/)
+  await expect(page).toHaveURL(/#\/entreno\/rutinas\/(?!nueva$)[^/]+$/)
 }
 
 async function openHome(page: Page) {

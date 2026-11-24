@@ -160,6 +160,22 @@ export class FirestoreRemote implements RemoteStore {
     })
   }
 
+  listLive(table: string, afterKey: string | null, limit: number): Promise<RemoteDoc[]> {
+    return guarded(async () => {
+      // Equality filters only, in key order: served by the same (t, del) index as liveCounts.
+      const c: QueryConstraint[] = [where('t', '==', table), where('del', '==', false), orderBy(documentId())]
+      if (afterKey) c.push(startAfter(afterKey))
+      c.push(qLimit(limit))
+      const snap = await getDocsFromServer(query(this.rows(), ...c))
+      const out: RemoteDoc[] = []
+      for (const d of snap.docs) {
+        const r = toDoc(d.id, d.data())
+        if (r) out.push(r)
+      }
+      return out
+    })
+  }
+
   getMeta(): Promise<RemoteMeta | null> {
     return guarded(async () => {
       const snap = await getDocFromServer(doc(this.fs, 'users', this.uid))

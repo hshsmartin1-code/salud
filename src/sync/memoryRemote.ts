@@ -134,6 +134,17 @@ export class MemoryRemote implements RemoteStore {
     return out
   }
 
+  async listLive(table: string, afterKey: string | null, limit: number): Promise<RemoteDoc[]> {
+    this.online()
+    const out = [...this.server.docs(this.uid).values()]
+      .filter((d) => d.t === table && !d.del && (afterKey === null || d.key > afterKey))
+      .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+      .slice(0, limit)
+      .map((d) => ({ ...d }))
+    this.server.calls.reads += Math.max(1, out.length)
+    return out
+  }
+
   async getMeta() {
     this.online()
     this.server.calls.reads++

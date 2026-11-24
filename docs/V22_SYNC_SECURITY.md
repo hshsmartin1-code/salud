@@ -12,6 +12,8 @@
    - Si dos dispositivos cambian el mismo registro, se guardan las dos versiones hasta que la persona elige.
    - Los borrados masivos se retienen hasta confirmarlos.
    - Iniciar sesión, cerrar sesión o desvincular nunca borra datos locales.
+   - Dos versiones que solo difieren en `createdAt`/`updatedAt` no son un conflicto: se toma la de la nube.
+   - Al **unir** un perfil con una cuenta que ya tiene datos, la vista previa cuenta los duplicados probables: el mismo registro guardado en los dos lados con ids distintos (comida: fecha, comida del día, alimento y gramos; peso: fecha y valor; hidratación: fecha, hora y cantidad; sesión: inicio con menos de 2 min de diferencia). «Omitir duplicados probables» (activado por defecto) no sube la copia del dispositivo ni descarga la de la nube; cada lado conserva la suya y no se borra nada. Si después cambia una de las dos copias, el cambio se sincroniza normalmente. Las sesiones de entrenamiento solo se informan, porque cada una lleva sus series.
 
 ## 2. Reglas de Firestore (`firestore.rules`)
 
@@ -97,6 +99,7 @@ Cuotas diarias de Cloud Firestore en Spark (sin tarjeta): 1 GiB almacenado, 50 0
 | Ventana de solape | Mientras el último cambio visto tenga menos de 90 s, cada sincronización relee los documentos escritos en los 90 s anteriores a él (por si un cambio se hace visible con una hora del servidor algo anterior; releer no aplica nada dos veces). La primera sincronización pasados 90 s (reloj del dispositivo) la relee una última vez; después se lee solo lo posterior al último documento visto |
 | Primera descarga o relectura completa de N filas | N lecturas (cada documento se lee una sola vez, aunque un lote de 200 quede repartido entre dos páginas) |
 | Verificar o vincular | 25 consultas de conteo: unas 25 lecturas |
+| Buscar duplicados probables en la vista previa de «Unir» | 1 lectura por fila de comidas, mediciones, sesiones e hidratación de la cuenta (solo en las tablas con filas en ambos lados) |
 | Primera subida de un historial de N filas | N escrituras |
 
 **Estimación para dos personas y dos dispositivos cada una**, con la app abierta una hora diaria (sincronización cada 5 minutos, más tras cambios): menos de 1 000 lecturas y unas 200–400 escrituras al día. Es menos del 2–3 % de la cuota. El almacenamiento es de 0,5–1 KB por fila: 20 000 filas ≈ 20 MB.

@@ -24,7 +24,9 @@ test('export → wipe all data → import restores the profile', async ({ page }
   await page.reload()
   await expect(page.getByTestId('restore-link')).toBeVisible()
   await page.getByTestId('restore-link').click()
-  await page.getByTestId('import-backup-file').setInputFiles(file)
+  // Pass the bytes, not the path: the output dir is named after the test title (contains "→"), and
+  // a headless Chromium running under a non-UTF-8 locale silently fires no `change` event for such paths.
+  await page.getByTestId('import-backup-file').setInputFiles({ name: 'respaldo.json', mimeType: 'application/json', buffer: await readFile(file) })
   await expect(page.getByTestId('import-target')).toHaveValue('new')
   await page.getByTestId('apply-import').click()
   await expect(page.getByTestId('import-result')).toContainText('1 perfil(es) creados')
